@@ -38,6 +38,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
       - run: bun run lint
       - run: bun run typecheck
@@ -55,7 +60,6 @@ jobs:
           jq empty deploy/stack/serve.json
 
   image:
-    needs: check
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -81,7 +85,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
-    needs: image
+    needs: [check, image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
