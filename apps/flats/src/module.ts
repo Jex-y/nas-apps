@@ -11,6 +11,7 @@ import { BROWSER_USER_AGENT, createHttpFetcher } from "./api/fetcher";
 import { rightmove } from "./api/portals/rightmove";
 import { createFlatsRoutes } from "./api/routes";
 import { createFlatsWork } from "./api/work";
+import page from "./web/index.html";
 
 /** Page requests to a portal are spaced like a person browsing; its image CDN can take them faster. */
 const intervalMs = (host: string): number => (host.startsWith("www.") ? 5_000 : 250);
@@ -35,6 +36,7 @@ export const createFlatsApp = (context: AppContext): AppModule => {
     title: "Flat hunt",
     routes: appRoutes({
       "/flats": trailingSlashRedirect("flats"),
+      "/flats/*": page,
       ...createFlatsRoutes({ db, blob, identity: context.identity, work, parsers }),
     }),
     jobs: work.jobs,
