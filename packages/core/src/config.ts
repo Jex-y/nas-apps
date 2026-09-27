@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { type BlobConfig, parseBlobConfig } from "./blob";
 import type { IdentityMode } from "./identity";
+import { type NotifyConfig, parseNotifyConfig } from "./notify";
 
 export type DatabaseConfig = {
   readonly hostname: string;
@@ -10,12 +11,22 @@ export type DatabaseConfig = {
   readonly database: string;
 };
 
-export type ServerConfig = {
-  readonly port: number;
-  readonly development: boolean;
+/** What both the server and the worker need to build the apps. */
+export type RuntimeConfig = {
   readonly database: DatabaseConfig;
   readonly blob: BlobConfig;
+  readonly notify: NotifyConfig;
+};
+
+export type ServerConfig = RuntimeConfig & {
+  readonly port: number;
+  readonly development: boolean;
   readonly identity: IdentityMode;
+};
+
+export type WorkerConfig = RuntimeConfig & {
+  readonly healthPort: number;
+  readonly concurrency: number;
 };
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -39,6 +50,11 @@ const ServerEnv = z
     path: ["DEV_USER"],
   });
 
+const WorkerEnv = z.object({
+  WORKER_HEALTH_PORT: z.coerce.number().int().positive().default(3001),
+  WORKER_CONCURRENCY: z.coerce.number().int().positive().default(2),
+});
+
 const parse = <S extends z.ZodType>(schema: S, env: Env): z.infer<S> => {
   const result = schema.safeParse(env);
   if (!result.success) {
@@ -58,14 +74,24 @@ export const parseDatabaseConfig = (env: Env): DatabaseConfig => {
   };
 };
 
+export const parseRuntimeConfig = (env: Env): RuntimeConfig => ({
+  database: parseDatabaseConfig(env),
+  blob: parseBlobConfig(env),
+  notify: parseNotifyConfig(env),
+});
+
 export const parseServerConfig = (env: Env): ServerConfig => {
   const server = parse(ServerEnv, env);
   return {
+    ...parseRuntimeConfig(env),
     port: server.PORT,
     development: server.NODE_ENV === "development",
-    database: parseDatabaseConfig(env),
-    blob: parseBlobConfig(env),
     identity:
       server.DEV_USER === undefined ? { kind: "tailscale" } : { kind: "fixed", viewer: { login: server.DEV_USER } },
   };
+};
+
+export const parseWorkerConfig = (env: Env): WorkerConfig => {
+  const worker = parse(WorkerEnv, env);
+  return { ...parseRuntimeConfig(env), healthPort: worker.WORKER_HEALTH_PORT, concurrency: worker.WORKER_CONCURRENCY };
 };

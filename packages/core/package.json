@@ -10,5 +10,8 @@
   "dependencies": {
     "drizzle-orm": "^0.45.3",
     "zod": "^4.6.5"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate"
   }
 }

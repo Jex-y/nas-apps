@@ -1,10 +1,15 @@
 import type { SQL } from "bun";
 import type { BlobConfig } from "./blob";
 import type { IdentityMode } from "./identity";
+import type { JobQueue, RegisteredJob } from "./jobs/queue";
+import type { Schedule } from "./jobs/schedule";
+import type { NotifyConfig } from "./notify";
 
 export type AppContext = {
   readonly sql: SQL;
   readonly blob: BlobConfig;
+  readonly notify: NotifyConfig;
+  readonly jobs: JobQueue;
   readonly identity: IdentityMode;
 };
 
@@ -30,12 +35,33 @@ export const routePaths = (routes: AppRoutes): readonly string[] => Object.keys(
 export const serveRoutes = (routes: AppRoutes): Bun.Serve.Routes<undefined, string> =>
   routes as unknown as Bun.Serve.Routes<undefined, string>;
 
-/** Every route path must start with `/${slug}` so apps can be split into their own servers later. */
+/**
+ * Every route path must start with `/${slug}`, and every job and schedule name with `${slug}.`, so apps can be split
+ * into their own servers later.
+ */
 export type AppModule = {
   readonly slug: string;
   readonly title: string;
   readonly routes: AppRoutes;
+  readonly jobs: readonly RegisteredJob[];
+  readonly schedules: readonly Schedule[];
 };
 
 export const trailingSlashRedirect = (slug: string): Response =>
   new Response(null, { status: 308, headers: { Location: `/${slug}/` } });
+
+export type AppWork = {
+  readonly jobs: readonly RegisteredJob[];
+  readonly schedules: readonly Schedule[];
+};
+
+/** Collects every app's jobs and schedules, refusing names outside the app's `${slug}.` namespace. */
+export const collectAppWork = (apps: readonly AppModule[]): AppWork => {
+  for (const app of apps) {
+    const stray = [...app.jobs, ...app.schedules].find((work) => !work.name.startsWith(`${app.slug}.`));
+    if (stray !== undefined) {
+      throw new Error(`App "${app.slug}" declares job or schedule "${stray.name}" outside ${app.slug}.`);
+    }
+  }
+  return { jobs: apps.flatMap((app) => app.jobs), schedules: apps.flatMap((app) => app.schedules) };
+};
