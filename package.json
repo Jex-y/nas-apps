@@ -20,7 +20,7 @@
     "db:down": "docker compose -f compose.dev.yaml down",
     "db:migrate": "bun server/src/migrate.ts",
     "db:generate": "bun run --filter './apps/*' --filter './packages/*' db:generate",
-    "db:check": "bun run db:generate && git diff --exit-code -- apps/*/drizzle packages/*/drizzle && test -z \"$(git status --porcelain -- apps/*/drizzle packages/*/drizzle)\""
+    "db:check": "bun scripts/db-check.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
