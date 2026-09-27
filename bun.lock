@@ -52,6 +52,7 @@
       "name": "@nas/server",
       "dependencies": {
         "@nas/core": "workspace:*",
+        "@nas/flats": "workspace:*",
         "@nas/notes": "workspace:*",
         "drizzle-orm": "^0.45.3",
       },
