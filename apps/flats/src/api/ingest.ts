@@ -188,3 +188,17 @@ export const recordListingPage = (
 
     return diff(known, known, after);
   });
+
+/** A listing page read as if it were a search result, for listings added by URL rather than found by a search. */
+export const hitFromListing = (parsed: ParsedListing): SearchHit => ({
+  portal: parsed.portal,
+  portalId: parsed.portalId,
+  url: parsed.url,
+  address: parsed.address,
+  price: parsed.price,
+  availability: parsed.availability,
+  bedrooms: parsed.bedrooms,
+  bathrooms: parsed.bathrooms,
+  auction: false,
+  photos: parsed.photos,
+});
