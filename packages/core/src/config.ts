@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type BlobConfig, parseBlobConfig } from "./blob";
 import type { IdentityMode } from "./identity";
 
 export type DatabaseConfig = {
@@ -13,6 +14,7 @@ export type ServerConfig = {
   readonly port: number;
   readonly development: boolean;
   readonly database: DatabaseConfig;
+  readonly blob: BlobConfig;
   readonly identity: IdentityMode;
 };
 
@@ -62,6 +64,7 @@ export const parseServerConfig = (env: Env): ServerConfig => {
     port: server.PORT,
     development: server.NODE_ENV === "development",
     database: parseDatabaseConfig(env),
+    blob: parseBlobConfig(env),
     identity:
       server.DEV_USER === undefined ? { kind: "tailscale" } : { kind: "fixed", viewer: { login: server.DEV_USER } },
   };

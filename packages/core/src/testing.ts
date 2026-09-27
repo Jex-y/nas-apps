@@ -1,5 +1,6 @@
 import { afterAll } from "bun:test";
 import type { AppContext, AppModule } from "./app-module";
+import { parseBlobConfig } from "./blob";
 import { parseDatabaseConfig } from "./config";
 import { createSql } from "./database";
 import { startServer } from "./server";
@@ -15,7 +16,7 @@ export const startTestServer = (createApps: (context: AppContext) => readonly Ap
   const server = startServer({
     port: 0,
     development: false,
-    apps: createApps({ sql, identity: { kind: "tailscale" } }),
+    apps: createApps({ sql, blob: parseBlobConfig(process.env), identity: { kind: "tailscale" } }),
   });
   afterAll(async () => {
     await server.stop(true);

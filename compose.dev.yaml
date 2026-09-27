@@ -20,9 +20,38 @@ services:
       timeout: 5s
       retries: 15
 
+  garage:
+    image: dxflrs/garage:v2.4.1
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    environment:
+      GARAGE_RPC_SECRET: "0000000000000000000000000000000000000000000000000000000000000000"
+      GARAGE_DEFAULT_ACCESS_KEY: GKdev0000000000000000000
+      GARAGE_DEFAULT_SECRET_KEY: dev-secret-key-not-for-production
+      GARAGE_DEFAULT_BUCKET: apps
+    ports:
+      - "127.0.0.1:3900:3900"
+    volumes:
+      - garage:/var/lib/garage
+    configs:
+      - source: garage
+        target: /etc/garage.toml
+
 configs:
   create-test-database:
     content: CREATE DATABASE apps_test;
+  garage:
+    content: |
+      metadata_dir = "/var/lib/garage/meta"
+      data_dir = "/var/lib/garage/data"
+      db_engine = "sqlite"
+      replication_factor = 1
+      rpc_bind_addr = "127.0.0.1:3901"
+      rpc_public_addr = "127.0.0.1:3901"
+
+      [s3_api]
+      api_bind_addr = "0.0.0.0:3900"
+      s3_region = "garage"
 
 volumes:
   postgres:
+  garage:
