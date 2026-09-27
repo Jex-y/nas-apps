@@ -5,8 +5,8 @@ import { z } from "zod";
 import { TRACKED_STATUSES } from "../contract";
 import type { FlatsDb } from "./db";
 import type { Fetcher } from "./fetcher";
-import { type ListingChange, recordListingPage, recordSearchHit } from "./ingest";
-import { ParseError, type Portal, type PortalParser } from "./portals/listing";
+import { hitFromListing, type ListingChange, recordListingPage, recordSearchHit } from "./ingest";
+import { type ParsedListing, ParseError, PORTALS, type Portal, type PortalParser } from "./portals/listing";
 import { listings, photos, properties, searches } from "./schema";
 
 export type FlatsWorkDeps = {
@@ -125,6 +125,31 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
   });
 
+  const parsePage = (parser: PortalParser, html: string, portalId: string): ParsedListing => {
+    try {
+      return parser.parseListing(html, portalId);
+    } catch (error) {
+      throw error instanceof ParseError ? new PermanentJobError(error.message) : error;
+    }
+  };
+
+  /** Keeps the raw page for re-parsing, records what it says, and queues its photos. */
+  const ingestPage = async (listingId: string, parsed: ParsedListing, html: string): Promise<ListingChange | null> => {
+    const pageKey = `pages/${listingId}/${Bun.randomUUIDv7()}.html.gz`;
+    await blob.write(pageKey, new Blob([Bun.gzipSync(html)]), "application/gzip");
+    const change = await recordListingPage(db, listingId, { kind: "page", parsed, pageKey });
+    await queue.enqueue(mirrorPhotos, { listingId }, { dedupeKey: listingId });
+    return change;
+  };
+
+  const fetchPage = async (parser: PortalParser, portalId: string, signal: AbortSignal) => {
+    const result = await fetcher.text(parser.listingUrl(portalId), signal);
+    if (result.kind === "blocked") {
+      throw new Error(`Blocked (${result.status}) fetching ${parser.portal} listing ${portalId}`);
+    }
+    return result;
+  };
+
   const fetchListing = defineJob({
     name: "flats.fetch-listing",
     payload: z.object({ listingId: z.uuid() }),
@@ -138,29 +163,38 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
         return;
       }
       const parser = parserFor(listing.portal);
-      const result = await fetcher.text(parser.listingUrl(listing.portalId), signal);
-      if (result.kind === "blocked") {
-        throw new Error(`Blocked (${result.status}) fetching ${listing.portal} listing ${listing.portalId}`);
-      }
-
-      let change: ListingChange | null;
-      if (result.kind === "gone") {
-        change = await recordListingPage(db, listingId, { kind: "gone" });
-      } else {
-        let parsed: ReturnType<PortalParser["parseListing"]>;
-        try {
-          parsed = parser.parseListing(result.body, listing.portalId);
-        } catch (error) {
-          throw error instanceof ParseError ? new PermanentJobError(error.message) : error;
-        }
-        const pageKey = `pages/${listingId}/${Bun.randomUUIDv7()}.html.gz`;
-        await blob.write(pageKey, new Blob([Bun.gzipSync(result.body)]), "application/gzip");
-        change = await recordListingPage(db, listingId, { kind: "page", parsed, pageKey });
-        await queue.enqueue(mirrorPhotos, { listingId }, { dedupeKey: listingId });
-      }
+      const result = await fetchPage(parser, listing.portalId, signal);
+      const change =
+        result.kind === "gone"
+          ? await recordListingPage(db, listingId, { kind: "gone" })
+          : await ingestPage(listingId, parsePage(parser, result.body, listing.portalId), result.body);
       if (change !== null) {
         await alertIfTracked(change);
       }
+    },
+  });
+
+  const addListing = defineJob({
+    name: "flats.add-listing",
+    payload: z.object({ portal: z.enum(PORTALS), portalId: z.string().min(1) }),
+    maxAttempts: 4,
+    handle: async ({ portal, portalId }, { signal }) => {
+      const [known] = await db
+        .select({ id: listings.id })
+        .from(listings)
+        .where(and(eq(listings.portal, portal), eq(listings.portalId, portalId)));
+      if (known !== undefined) {
+        await queue.enqueue(fetchListing, { listingId: known.id }, { dedupeKey: known.id });
+        return;
+      }
+      const parser = parserFor(portal);
+      const result = await fetchPage(parser, portalId, signal);
+      if (result.kind === "gone") {
+        throw new PermanentJobError(`${portal} listing ${portalId} does not exist`);
+      }
+      const parsed = parsePage(parser, result.body, portalId);
+      const outcome = await recordSearchHit(db, hitFromListing(parsed));
+      await ingestPage(outcome.kind === "changed" ? outcome.change.listingId : outcome.listingId, parsed, result.body);
     },
   });
 
@@ -251,7 +285,14 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
   });
 
-  const jobs: readonly RegisteredJob[] = [pollSearches, pollSearch, fetchListing, mirrorPhotos, refreshTracked];
+  const jobs: readonly RegisteredJob[] = [
+    pollSearches,
+    pollSearch,
+    fetchListing,
+    addListing,
+    mirrorPhotos,
+    refreshTracked,
+  ];
 
   const schedules: readonly Schedule[] = [
     defineSchedule({
@@ -273,7 +314,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
   return {
     jobs,
     schedules,
-    definitions: { pollSearches, pollSearch, fetchListing, mirrorPhotos, refreshTracked },
+    definitions: { pollSearches, pollSearch, fetchListing, addListing, mirrorPhotos, refreshTracked },
     /** Polls the first `pages` result pages of a new search, a minute apart, to seed it with current listings. */
     backfillSearch: async (searchId: string, pages: number) => {
       const start = deps.now().getTime();
@@ -285,8 +326,9 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
         );
       }
     },
-    /** Queues a (re)fetch of one listing page; resolves `false` when one is already queued. */
-    fetchListing: (listingId: string) => queue.enqueue(fetchListing, { listingId }, { dedupeKey: listingId }),
+    /** Starts tracking a listing by its URL; resolves `false` when that listing is already being added. */
+    addListing: (portal: Portal, portalId: string) =>
+      queue.enqueue(addListing, { portal, portalId }, { dedupeKey: `${portal}:${portalId}` }),
   };
 };
 
