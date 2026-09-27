@@ -6,6 +6,9 @@
     ".": "./src/module.ts",
     "./migrations": "./src/migrations.ts"
   },
+  "scripts": {
+    "db:generate": "drizzle-kit generate"
+  },
   "dependencies": {
     "@nas/core": "workspace:*",
     "@tanstack/react-query": "^5.104.0",
