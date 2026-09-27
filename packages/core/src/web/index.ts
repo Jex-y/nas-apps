@@ -17,7 +17,11 @@ const errorMessage = async (response: Response): Promise<string> => {
 };
 
 const send = async (url: string, init: RequestInit): Promise<Response> => {
-  const response = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...init.headers } });
+  const headers = new Headers(init.headers);
+  if (typeof init.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  const response = await fetch(url, { ...init, headers });
   if (!response.ok) {
     throw new ApiError(response.status, await errorMessage(response));
   }
