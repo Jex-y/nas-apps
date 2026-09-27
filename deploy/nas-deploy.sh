@@ -15,7 +15,7 @@ tag=$(printf '%s' "${SSH_ORIGINAL_COMMAND:-}" | grep -xE '[0-9a-f]{40}') || {
 }
 
 cd "$app_dir"
-mkdir -p releases
+mkdir -p releases data/postgres data/garage
 
 compose() {
   release_tag=$1
@@ -34,7 +34,7 @@ compose "$tag" config --quiet
 
 prev_tag=$(basename "$(readlink current 2>/dev/null || true)")
 
-compose "$tag" up -d --wait tailscale postgres
+compose "$tag" up -d --wait tailscale postgres garage
 compose "$tag" run --rm migrate
 
 if compose "$tag" up -d --wait --remove-orphans server; then

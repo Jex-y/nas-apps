@@ -1,12 +1,12 @@
 # nas-apps
 
-Personal apps served from the NAS to the tailnet at `https://nas.tail12605.ts.net/<app>/`.
+Personal apps served from the NAS to the tailnet at `https://apps.tail12605.ts.net/<app>/`.
 
 One Bun server hosts every app. Each app is its own workspace package owning its routes, its Postgres schema,
-its migrations and its React UI, so any one of them can move to its own server later.
+its migrations, its prefix in object storage and its React UI, so any one of them can move to its own server later.
 
 ```
-packages/core     shared runtime: config, identity, server, migrations, test harness, web fetch helpers
+packages/core     shared runtime: config, identity, server, migrations, blob storage, test harness, web fetch helpers
 apps/<slug>       one app: src/api (routes + drizzle schema), src/web (React), src/contract.ts (zod), drizzle/
 server            composition root: the app list, the entrypoint, the migrate entrypoint
 scripts/build.ts  bundles server + UIs into a self-contained dist/
@@ -17,7 +17,7 @@ deploy/           the script the NAS runs for each deploy
 
 ```sh
 bun install
-bun run db:up        # Postgres on localhost:5499 (dev db `apps`, test db `apps_test`)
+bun run db:up        # Postgres on localhost:5499 (dev db `apps`, test db `apps_test`), Garage S3 on localhost:3900
 bun run db:migrate
 bun run dev          # http://localhost:3000, hot reload for server and UI
 ```
@@ -27,7 +27,7 @@ In development the server trusts `DEV_USER` from `.env.development` instead of T
 ```sh
 bun run lint         # biome; `bun run format` to fix
 bun run typecheck
-bun test             # against the real test database, migrated by the preload
+bun test             # against the real test database (migrated by the preload) and Garage
 ```
 
 ## Change the schema
@@ -44,6 +44,15 @@ Commit the generated SQL. CI fails if the schema and the committed migrations di
 Migrations run before the new server starts, and a failed deploy rolls the server back but not the database.
 Keep every migration compatible with the previous release: add columns nullable or with a default, and drop
 things only once no deployed code reads them.
+
+## Store files
+
+`createBlobStore(context.blob, "<slug>")` gives an app its own prefix in the shared `apps` bucket. Upload through
+the server with `write`, and hand browsers `downloadUrl` (a short-lived presigned URL) rather than streaming files
+through the server. `apps/notes` attachments are the worked example.
+
+Blob keys and database rows are not transactional. Write the blob before inserting its row and delete the row
+before its blob, so a failure leaves at worst an unreferenced blob, never a row pointing at nothing.
 
 ## Add an app
 
@@ -63,11 +72,14 @@ that can only run `deploy/nas-deploy.sh`, passing just the commit SHA. The scrip
 stack (`deploy/stack/`, baked into the image) into `/volume1/Ed/app/releases/<sha>/`, migrates, starts the server
 and waits for its health check, rolling back to the previous release if it fails.
 
-The stack joins the tailnet as its own device, `apps.tail12605.ts.net`, through a Tailscale sidecar. Server and
-Postgres share the sidecar's network and publish nothing on the NAS itself:
+The stack joins the tailnet as its own device, `apps.tail12605.ts.net`, through a Tailscale sidecar. Server,
+Postgres and Garage share the sidecar's network and publish nothing on the NAS itself:
 
 - `https://apps.tail12605.ts.net/` is the server
+- `https://apps.tail12605.ts.net:3900` is S3 (Garage, region `garage`, path-style, bucket `apps`)
 - `psql -h apps.tail12605.ts.net -U <user> apps` is Postgres
+
+Postgres and Garage keep their data in `/volume1/Ed/app/data`, inside the `Ed` share, so Hyper Backup covers it.
 
 ### One-time setup
 
@@ -90,7 +102,10 @@ Postgres share the sidecar's network and publish nothing on the NAS itself:
 
 **NAS**
 
-- `/volume1/Ed/app/.env` holds `POSTGRES_USER`, `POSTGRES_PASSWORD` and `TS_AUTHKEY`.
+- `/volume1/Ed/app/.env` holds `POSTGRES_USER`, `POSTGRES_PASSWORD`, `TS_AUTHKEY`, and Garage's
+  `GARAGE_RPC_SECRET` (`openssl rand -hex 32`), `GARAGE_DEFAULT_ACCESS_KEY` (`GK` + `openssl rand -hex 12`) and
+  `GARAGE_DEFAULT_SECRET_KEY` (`openssl rand -hex 32`). Garage creates that key and the `apps` bucket on first
+  start.
 - Log in to GHCR so the NAS can pull the private image, using a classic PAT with only `read:packages`:
   `docker login ghcr.io -u Jex-y`
 - Install the deploy script and give CI a key that can run nothing else:
