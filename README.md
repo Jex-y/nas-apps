@@ -86,7 +86,7 @@ Postgres share the sidecar's network and publish nothing on the NAS itself:
 
 - An OAuth client with the Auth Keys write scope for `tag:ci`, for CI.
 - A one-off auth key for the sidecar: not reusable, not ephemeral, pre-approved, tagged `tag:apps`. It is only
-  used on first start; the sidecar keeps its identity in `/volume1/docker/nas-apps/tailscale` after that.
+  used on first start; the sidecar keeps its identity in the `tailscale-state` volume after that.
 
 **NAS**
 
