@@ -7,6 +7,7 @@ const server = startServer({
   port: config.port,
   development: config.development,
   apps: createApps({
+    env: process.env,
     publicUrl: config.publicUrl,
     sql,
     blob: config.blob,
