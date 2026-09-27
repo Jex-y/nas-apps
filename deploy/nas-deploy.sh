@@ -15,7 +15,7 @@ tag=$(printf '%s' "${SSH_ORIGINAL_COMMAND:-}" | grep -xE '[0-9a-f]{40}') || {
 }
 
 cd "$app_dir"
-mkdir -p releases data/postgres data/garage
+mkdir -p releases data/postgres data/garage data/ntfy
 
 compose() {
   release_tag=$1
@@ -34,10 +34,10 @@ compose "$tag" config --quiet
 
 prev_tag=$(basename "$(readlink current 2>/dev/null || true)")
 
-compose "$tag" up -d --wait tailscale postgres garage
+compose "$tag" up -d --wait tailscale postgres garage ntfy
 compose "$tag" run --rm migrate
 
-if compose "$tag" up -d --wait --remove-orphans server; then
+if compose "$tag" up -d --wait --remove-orphans server worker; then
   ln -sfn "releases/$tag" current
   ls -1t releases | tail -n "+$((keep_releases + 1))" | while read -r old; do rm -rf "releases/$old"; done
   docker image prune -af --filter "label=org.opencontainers.image.source=https://github.com/Jex-y/nas-apps" >/dev/null
@@ -45,7 +45,7 @@ if compose "$tag" up -d --wait --remove-orphans server; then
   exit 0
 fi
 
-echo "server failed its health check" >&2
+echo "server or worker failed its health check" >&2
 if [ -n "$prev_tag" ] && [ -d "releases/$prev_tag" ]; then
   compose "$prev_tag" up -d --wait --remove-orphans
   echo "rolled back to $prev_tag" >&2
