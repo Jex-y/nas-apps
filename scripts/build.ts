@@ -10,7 +10,7 @@ const outdir = "dist";
 await rm(outdir, { recursive: true, force: true });
 
 const result = await Bun.build({
-  entrypoints: ["server/src/index.ts", "server/src/migrate.ts"],
+  entrypoints: ["server/src/index.ts", "server/src/migrate.ts", "server/src/worker.ts"],
   outdir,
   target: "bun",
   minify: true,
@@ -26,7 +26,7 @@ if (!result.success) {
   process.exit(1);
 }
 
-for await (const journal of new Bun.Glob("apps/*/drizzle/meta/_journal.json").scan()) {
+for await (const journal of new Bun.Glob("{apps,packages}/*/drizzle/meta/_journal.json").scan()) {
   const folder = dirname(dirname(journal));
   await cp(folder, join(outdir, folder), { recursive: true });
 }
