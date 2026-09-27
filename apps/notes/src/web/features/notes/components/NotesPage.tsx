@@ -1,12 +1,10 @@
 import { type FormEvent, useState } from "react";
-import { useCreateNote, useDeleteNote, useNotes } from "../api/notes";
-
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+import { useCreateNote, useNotes } from "../api/notes";
+import { NoteItem } from "./NoteItem";
 
 export const NotesPage = () => {
   const notes = useNotes();
   const createNote = useCreateNote();
-  const deleteNote = useDeleteNote();
   const [draft, setDraft] = useState("");
 
   const submit = (event: FormEvent) => {
@@ -34,17 +32,9 @@ export const NotesPage = () => {
       {notes.isPending && <p className="muted">Loading…</p>}
       {notes.error && <p className="muted">{notes.error.message}</p>}
       {notes.data?.length === 0 && <p className="muted">No notes yet.</p>}
-      <ul>
+      <ul className="notes">
         {notes.data?.map((note) => (
-          <li key={note.id}>
-            <div>
-              <p>{note.body}</p>
-              <time dateTime={note.createdAt}>{dateFormat.format(new Date(note.createdAt))}</time>
-            </div>
-            <button type="button" onClick={() => deleteNote.mutate(note.id)} disabled={deleteNote.isPending}>
-              Delete
-            </button>
-          </li>
+          <NoteItem key={note.id} note={note} />
         ))}
       </ul>
     </main>

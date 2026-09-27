@@ -46,7 +46,8 @@ textarea {
   resize: vertical;
 }
 
-button {
+button,
+.button {
   font: inherit;
   padding: 0.5rem 1rem;
   border: 1px solid var(--border);
@@ -66,11 +67,15 @@ button[type="submit"] {
 ul {
   list-style: none;
   padding: 0;
+  margin: 0;
+}
+
+.notes {
   display: grid;
   gap: 0.75rem;
 }
 
-li {
+.note {
   display: flex;
   gap: 1rem;
   align-items: start;
@@ -80,7 +85,36 @@ li {
   border-radius: 0.5rem;
 }
 
-li p {
+.note-body {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.note-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.attachments {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.attachment {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.attachment a {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.note p {
   margin: 0;
   white-space: pre-wrap;
 }
@@ -89,4 +123,16 @@ time,
 .muted {
   color: var(--muted);
   font-size: 0.875rem;
+}
+
+.button {
+  display: inline-block;
+}
+
+button.link {
+  padding: 0;
+  border: none;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-decoration: underline;
 }

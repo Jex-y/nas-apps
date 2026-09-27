@@ -8,6 +8,13 @@
       "when": 1790536796987,
       "tag": "0000_create_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790539165862,
+      "tag": "0001_add_attachments",
+      "breakpoints": true
     }
   ]
 }
