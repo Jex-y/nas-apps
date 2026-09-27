@@ -1,8 +1,10 @@
 import type { SQL } from "bun";
+import type { BlobConfig } from "./blob";
 import type { IdentityMode } from "./identity";
 
 export type AppContext = {
   readonly sql: SQL;
+  readonly blob: BlobConfig;
   readonly identity: IdentityMode;
 };
 

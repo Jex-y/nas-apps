@@ -6,7 +6,7 @@ const sql = createSql(config.database);
 const server = startServer({
   port: config.port,
   development: config.development,
-  apps: createApps({ sql, identity: config.identity }),
+  apps: createApps({ sql, blob: config.blob, identity: config.identity }),
 });
 
 console.log(`Listening on ${server.url}`);

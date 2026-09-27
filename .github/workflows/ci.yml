@@ -17,24 +17,10 @@ env:
 jobs:
   check:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: apps_test
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres -d apps_test"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 15
-    env:
-      PGHOST: localhost
-      PGPORT: "5432"
     steps:
       - uses: actions/checkout@v5
+      - name: Start Postgres and Garage in the background
+        run: docker compose -f compose.dev.yaml up -d
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
@@ -48,6 +34,10 @@ jobs:
       - run: bun run typecheck
       - name: Migrations match the schema
         run: bun run db:check
+      - name: Wait for Postgres and Garage
+        run: |
+          bun run db:up
+          curl --silent --output /dev/null --retry 30 --retry-connrefused --retry-delay 1 http://127.0.0.1:3900
       - run: bun test
       - run: bun run build
       - name: Deploy stack is valid
@@ -55,6 +45,9 @@ jobs:
           APP_TAG: ${{ github.sha }}
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          GARAGE_RPC_SECRET: ci
+          GARAGE_DEFAULT_ACCESS_KEY: ci
+          GARAGE_DEFAULT_SECRET_KEY: ci
         run: |
           docker compose -f deploy/stack/compose.yaml config --quiet
           jq empty deploy/stack/serve.json
