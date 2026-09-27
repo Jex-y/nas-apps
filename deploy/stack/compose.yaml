@@ -3,6 +3,9 @@
 # their data under /volume1/Ed/app/data, which the deploy script creates, so Hyper Backup covers it with the share.
 name: nas-apps
 
+x-runtime-env: &runtime-env
+  PUBLIC_URL: https://apps.tail12605.ts.net
+
 x-database-env: &database-env
   PGHOST: 127.0.0.1
   PGPORT: "5432"
@@ -98,7 +101,7 @@ services:
       garage:
         condition: service_started
     environment:
-      <<: [*database-env, *blob-env, *notify-env]
+      <<: [*runtime-env, *database-env, *blob-env, *notify-env]
     mem_limit: 256m
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
@@ -122,7 +125,7 @@ services:
       ntfy:
         condition: service_healthy
     environment:
-      <<: [*database-env, *blob-env, *notify-env]
+      <<: [*runtime-env, *database-env, *blob-env, *notify-env]
     mem_limit: 192m
     # Long enough for in-flight jobs to finish; job timeouts stay under a minute by default.
     stop_grace_period: 90s
