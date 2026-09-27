@@ -1,0 +1,31 @@
+{
+  "name": "nas-apps",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "workspaces": [
+    "server",
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun --hot server/src/index.ts",
+    "build": "bun scripts/build.ts",
+    "start": "bun run --cwd dist index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome ci .",
+    "format": "biome check --write .",
+    "test": "bun test",
+    "db:up": "docker compose -f compose.dev.yaml up -d --wait",
+    "db:down": "docker compose -f compose.dev.yaml down",
+    "db:migrate": "bun server/src/migrate.ts",
+    "db:generate": "bun run --filter './apps/*' db:generate",
+    "db:check": "bun run db:generate && git diff --exit-code -- apps/*/drizzle && test -z \"$(git status --porcelain -- apps/*/drizzle)\""
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@types/bun": "^1.4.2",
+    "drizzle-kit": "^0.31.11",
+    "typescript": "^7.0.2"
+  }
+}
