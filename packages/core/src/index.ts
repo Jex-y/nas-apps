@@ -4,4 +4,5 @@ export * from "./config";
 export * from "./database";
 export * from "./http";
 export * from "./identity";
+export * from "./notify";
 export * from "./server";
