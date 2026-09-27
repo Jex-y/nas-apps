@@ -1,6 +1,6 @@
 # Baked into the image at /stack and run from /volume1/Ed/app/releases/<sha>/ on the NAS by deploy/nas-deploy.sh.
-# Secrets come from the NAS's /volume1/Ed/app/.env, symlinked into each release. Postgres and Garage keep their
-# data under /volume1/Ed/app/data, which the deploy script creates, so Hyper Backup covers it with the share.
+# Secrets come from the NAS's /volume1/Ed/app/.env, symlinked into each release. Postgres, Garage and ntfy keep
+# their data under /volume1/Ed/app/data, which the deploy script creates, so Hyper Backup covers it with the share.
 name: nas-apps
 
 x-database-env: &database-env
@@ -17,6 +17,10 @@ x-blob-env: &blob-env
   S3_BUCKET: apps
   S3_ACCESS_KEY_ID: ${GARAGE_DEFAULT_ACCESS_KEY:?}
   S3_SECRET_ACCESS_KEY: ${GARAGE_DEFAULT_SECRET_KEY:?}
+
+x-notify-env: &notify-env
+  NTFY_URL: http://127.0.0.1:2586
+  NTFY_TOKEN: ${NTFY_TOKEN:?}
 
 x-tailnet: &tailnet
   network_mode: service:tailscale
@@ -94,13 +98,66 @@ services:
       garage:
         condition: service_started
     environment:
-      <<: [*database-env, *blob-env]
+      <<: [*database-env, *blob-env, *notify-env]
     mem_limit: 256m
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
       interval: 10s
       timeout: 3s
       retries: 3
+      start_period: 10s
+
+  worker:
+    <<: *tailnet
+    image: ghcr.io/jex-y/nas-apps:${APP_TAG:?}
+    restart: unless-stopped
+    command: ["bun", "worker.js"]
+    depends_on:
+      tailscale:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      garage:
+        condition: service_started
+      ntfy:
+        condition: service_healthy
+    environment:
+      <<: [*database-env, *blob-env, *notify-env]
+    mem_limit: 192m
+    # Long enough for in-flight jobs to finish; job timeouts stay under a minute by default.
+    stop_grace_period: 90s
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Push notifications, published to the tailnet on :8443. iOS delivery goes through ntfy.sh's upstream relay,
+  # which only ever sees a hash of the topic and the message ID, never the content.
+  ntfy:
+    <<: *tailnet
+    image: binwiederhier/ntfy:v2.28.0
+    restart: unless-stopped
+    command: ["serve"]
+    environment:
+      NTFY_BASE_URL: https://apps.tail12605.ts.net:8443
+      NTFY_LISTEN_HTTP: 127.0.0.1:2586
+      NTFY_BEHIND_PROXY: "true"
+      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
+      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+      NTFY_ENABLE_LOGIN: "true"
+      NTFY_AUTH_USERS: ${NTFY_AUTH_USERS:?}
+      NTFY_AUTH_TOKENS: ed:${NTFY_TOKEN:?}:worker
+      NTFY_UPSTREAM_BASE_URL: https://ntfy.sh
+    volumes:
+      - /volume1/Ed/app/data/ntfy:/var/lib/ntfy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2586/v1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
       start_period: 10s
 
   migrate:
