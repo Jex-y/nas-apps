@@ -1,0 +1,28 @@
+name: nas-apps-dev
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: apps
+    ports:
+      - "127.0.0.1:5499:5432"
+    volumes:
+      - postgres:/var/lib/postgresql
+    configs:
+      - source: create-test-database
+        target: /docker-entrypoint-initdb.d/create-test-database.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d apps"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+configs:
+  create-test-database:
+    content: CREATE DATABASE apps_test;
+
+volumes:
+  postgres:
