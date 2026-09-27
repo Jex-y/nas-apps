@@ -11,6 +11,7 @@ export const createTestContext = (): AppContext => {
   const sql = createSql(config.database);
   afterAll(() => sql.close());
   return {
+    env: process.env,
     publicUrl: config.publicUrl,
     sql,
     blob: config.blob,

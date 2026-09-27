@@ -6,6 +6,8 @@ import type { Schedule } from "./jobs/schedule";
 import type { NotifyConfig } from "./notify";
 
 export type AppContext = {
+  /** The raw environment, for an app to parse its own settings (e.g. third-party API keys) at its boundary. */
+  readonly env: Readonly<Record<string, string | undefined>>;
   readonly publicUrl: string;
   readonly sql: SQL;
   readonly blob: BlobConfig;
