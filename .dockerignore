@@ -3,5 +3,5 @@
 .git
 .github
 .env*
-compose*.yaml
-deploy
+compose.dev.yaml
+deploy/nas-deploy.sh

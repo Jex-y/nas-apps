@@ -45,6 +45,13 @@ jobs:
         run: bun run db:check
       - run: bun test
       - run: bun run build
+      - name: Deploy stack is valid
+        env:
+          APP_TAG: ${{ github.sha }}
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        run: |
+          docker compose -f deploy/stack/compose.yaml config --quiet
 
   image:
     needs: check
@@ -81,7 +88,6 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v5
       - uses: tailscale/github-action@v3
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
@@ -96,4 +102,4 @@ jobs:
           printf '%s\n' "$NAS_DEPLOY_KEY" > ~/.ssh/deploy
           printf '%s\n' "$NAS_KNOWN_HOST" >> ~/.ssh/known_hosts
           ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            "ed@$NAS_HOST" "$GITHUB_SHA" < compose.yaml
+            "ed@$NAS_HOST" "$GITHUB_SHA" < /dev/null

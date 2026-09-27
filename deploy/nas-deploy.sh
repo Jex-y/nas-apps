@@ -1,42 +1,53 @@
 #!/bin/sh
-# Forced command for the CI deploy key (see README). Reads the commit SHA from SSH_ORIGINAL_COMMAND and
-# compose.yaml from stdin. Installed by hand so CI cannot rewrite what its own key is allowed to run.
+# Forced command for the CI deploy key (see README). Its only input is a commit SHA: the stack files are read
+# from that commit's image, so the key can only move the NAS between images CI has already published.
+# Installed by hand so CI cannot change what its own key may run.
 set -eu
 export PATH=/usr/local/bin:/usr/bin:/bin
 
+image=ghcr.io/jex-y/nas-apps
 app_dir=/volume1/Ed/app
-cd "$app_dir"
+keep_releases=5
 
 tag=$(printf '%s' "${SSH_ORIGINAL_COMMAND:-}" | grep -xE '[0-9a-f]{40}') || {
   echo "expected a 40-character commit SHA as the command, got: ${SSH_ORIGINAL_COMMAND:-<none>}" >&2
   exit 2
 }
 
-cat > compose.next.yaml
-APP_TAG=$tag docker compose -f compose.next.yaml config --quiet
+cd "$app_dir"
+mkdir -p releases
 
-prev_tag=$(cat .deployed-tag 2>/dev/null || true)
-if [ -f compose.yaml ]; then
-  cp compose.yaml compose.prev.yaml
-fi
-mv compose.next.yaml compose.yaml
+compose() {
+  release_tag=$1
+  shift
+  APP_TAG=$release_tag docker compose -f "releases/$release_tag/compose.yaml" "$@"
+}
 
-export APP_TAG="$tag"
-docker compose pull server
-docker compose up -d --wait postgres
-docker compose run --rm migrate
+docker pull --quiet "$image:$tag"
+rm -rf "releases/$tag"
+mkdir "releases/$tag"
+container=$(docker create "$image:$tag")
+docker cp "$container:/stack/." "releases/$tag/"
+docker rm "$container" >/dev/null
+ln -s ../../.env "releases/$tag/.env"
+compose "$tag" config --quiet
 
-if docker compose up -d --wait --remove-orphans server; then
-  echo "$tag" > .deployed-tag
+prev_tag=$(basename "$(readlink current 2>/dev/null || true)")
+
+compose "$tag" up -d --wait tailscale postgres
+compose "$tag" run --rm migrate
+
+if compose "$tag" up -d --wait --remove-orphans server; then
+  ln -sfn "releases/$tag" current
+  ls -1t releases | tail -n "+$((keep_releases + 1))" | while read -r old; do rm -rf "releases/$old"; done
   docker image prune -af --filter "label=org.opencontainers.image.source=https://github.com/Jex-y/nas-apps" >/dev/null
   echo "deployed $tag"
   exit 0
 fi
 
 echo "server failed its health check" >&2
-if [ -n "$prev_tag" ] && [ -f compose.prev.yaml ]; then
-  mv compose.prev.yaml compose.yaml
-  APP_TAG=$prev_tag docker compose up -d --wait server
+if [ -n "$prev_tag" ] && [ -d "releases/$prev_tag" ]; then
+  compose "$prev_tag" up -d --wait --remove-orphans
   echo "rolled back to $prev_tag" >&2
 fi
 exit 1

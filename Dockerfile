@@ -9,6 +9,7 @@ LABEL org.opencontainers.image.source="https://github.com/Jex-y/nas-apps"
 ENV NODE_ENV=production PORT=3000
 WORKDIR /app
 COPY --from=build /repo/dist ./
+COPY --from=build /repo/deploy/stack /stack
 USER bun
 EXPOSE 3000
 CMD ["bun", "index.js"]
