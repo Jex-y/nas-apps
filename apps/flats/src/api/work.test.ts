@@ -1,107 +1,10 @@
-import { beforeEach, describe, expect, test } from "bun:test";
-import { createBlobStore, drainJobs, type Notification } from "@nas/core";
-import { createTestContext } from "@nas/core/testing";
+import { describe, expect, test } from "bun:test";
 import { asc, eq } from "drizzle-orm";
-import { flatsDb } from "./db";
-import type { Download, Fetcher, FetchResult } from "./fetcher";
-import { rightmove } from "./portals/rightmove";
+import { createFlatsTestbed, defaultPages, ok, searchPage } from "../../test/support";
 import { listings, photos, properties, searches, snapshots } from "./schema";
-import { createFlatsWork, isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
+import { isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
 
-const context = createTestContext();
-const db = flatsDb(context.sql);
-const blob = createBlobStore(context.blob, `flats-test/${crypto.randomUUID()}`);
-
-const fixture = (name: string) => Bun.file(new URL(`../../test/fixtures/rightmove/${name}`, import.meta.url)).text();
-const [searchPage, listingPage, soldStcPage] = await Promise.all([
-  fixture("search.html"),
-  fixture("listing.html"),
-  fixture("listing-sold-stc.html"),
-]);
-
-type Pages = { search: () => FetchResult<string>; listing: (portalId: string) => FetchResult<string> };
-
-const JPEG: FetchResult<Download> = {
-  kind: "ok",
-  body: { data: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), contentType: "image/jpeg" },
-};
-
-const fakeFetcher = (pages: Pages): Fetcher & { readonly requested: string[] } => {
-  const requested: string[] = [];
-  return {
-    requested,
-    text: async (url) => {
-      requested.push(url);
-      const listingId = rightmove.portalIdFromUrl(url);
-      return listingId === null ? pages.search() : pages.listing(listingId);
-    },
-    bytes: async (url) => {
-      requested.push(url);
-      return JPEG;
-    },
-  };
-};
-
-const ok = (body: string): FetchResult<string> => ({ kind: "ok", body });
-const LISTING_PAGES: Readonly<Record<string, string>> = { "93524796": listingPage, "128855633": soldStcPage };
-const defaultPages: Pages = {
-  search: () => ok(searchPage),
-  listing: (portalId) => {
-    const page = LISTING_PAGES[portalId];
-    return page === undefined ? { kind: "gone" } : ok(page);
-  },
-};
-
-/** Noon on a past British Summer Time weekday: inside polling hours, and already due by the database clock. */
-const NOON = new Date("2026-09-21T11:00:00Z");
-
-const setup = (pages: Pages = defaultPages, now = NOON) => {
-  const sent: Notification[] = [];
-  const fetcher = fakeFetcher(pages);
-  const work = createFlatsWork({
-    db,
-    blob,
-    queue: context.jobs,
-    notifier: { send: async (notification) => void sent.push(notification) },
-    fetcher,
-    parsers: { rightmove },
-    publicUrl: "https://apps.example",
-    now: () => now,
-  });
-  return { work, sent, fetcher, drain: () => drainJobs(context.sql, work.jobs) };
-};
-
-const addSearch = async () => {
-  const [search] = await db
-    .insert(searches)
-    .values({
-      name: "West London flats",
-      portal: "rightmove",
-      url: `https://www.rightmove.co.uk/property-for-sale/find.html?locationIdentifier=REGION%5E87490&t=${crypto.randomUUID()}`,
-    })
-    .returning();
-  if (search === undefined) {
-    throw new Error("no search");
-  }
-  return search;
-};
-
-const propertyByPortalId = async (portalId: string) => {
-  const [row] = await db
-    .select({ property: properties, listing: listings })
-    .from(listings)
-    .innerJoin(properties, eq(properties.id, listings.propertyId))
-    .where(eq(listings.portalId, portalId));
-  if (row === undefined) {
-    throw new Error(`no listing ${portalId}`);
-  }
-  return row;
-};
-
-beforeEach(async () => {
-  await context.sql`truncate flats.searches, flats.properties cascade`;
-  await context.sql`delete from jobs.jobs where name like 'flats.%'`;
-});
+const { context, db, blob, setup, addSearch, propertyByPortalId } = createFlatsTestbed();
 
 describe("ingesting a search", () => {
   test("seeds a new search with its listings, their pages and photos", async () => {
@@ -183,7 +86,10 @@ describe("ingesting a search", () => {
   });
 
   test("pauses a search and alerts once it keeps getting blocked", async () => {
-    const { work, sent, drain } = setup({ ...defaultPages, search: () => ({ kind: "blocked", status: 403 }) });
+    const { work, sent, drain } = setup({
+      ...defaultPages,
+      search: () => ({ kind: "blocked", status: 403 }),
+    });
     const search = await addSearch();
 
     for (let poll = 0; poll < MAX_CONSECUTIVE_FAILURES + 1; poll++) {
@@ -201,7 +107,10 @@ describe("ingesting a search", () => {
   });
 
   test("buries a listing whose page no longer parses, keeping the search result", async () => {
-    const { work, drain } = setup({ ...defaultPages, listing: () => ok("<html>redesigned</html>") });
+    const { work, drain } = setup({
+      ...defaultPages,
+      listing: () => ok("<html>redesigned</html>"),
+    });
     const search = await addSearch();
 
     await work.backfillSearch(search.id, 1);
@@ -248,5 +157,42 @@ describe("polling hours", () => {
     await context.jobs.enqueue(work.definitions.pollSearches, {});
     await drain();
     expect(fetcher.requested).toEqual([]);
+  });
+});
+
+describe("adding a listing by URL", () => {
+  test("creates the property from its page", async () => {
+    const { work, drain } = setup();
+
+    expect(await work.addListing("rightmove", "93524796")).toBe(true);
+    expect(await work.addListing("rightmove", "93524796")).toBe(false);
+    await drain();
+
+    const union = await propertyByPortalId("93524796");
+    expect(union.property).toMatchObject({
+      address: "Union Lane, Isleworth",
+      leaseYearsRemaining: 107,
+      status: "new",
+    });
+    expect(await db.select().from(photos).where(eq(photos.listingId, union.listing.id))).toHaveLength(11);
+  });
+
+  test("refreshes a listing that is already known instead of duplicating it", async () => {
+    const first = setup();
+    await first.work.addListing("rightmove", "93524796");
+    await first.drain();
+
+    const again = setup();
+    await again.work.addListing("rightmove", "93524796");
+    await again.drain();
+
+    expect(await db.select().from(listings).where(eq(listings.portalId, "93524796"))).toHaveLength(1);
+    expect(again.fetcher.requested).toContain("https://www.rightmove.co.uk/properties/93524796");
+  });
+
+  test("buries a listing that does not exist", async () => {
+    const { work, drain } = setup();
+    await work.addListing("rightmove", "1");
+    expect(await drain()).toMatchObject({ dead: 1 });
   });
 });
