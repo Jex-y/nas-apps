@@ -10,4 +10,6 @@ export const createNotesApp = (context: AppContext): AppModule => ({
     "/notes/*": page,
     ...createNotesRoutes(context),
   }),
+  jobs: [],
+  schedules: [],
 });

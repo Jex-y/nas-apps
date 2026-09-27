@@ -1,29 +1,34 @@
 import { afterAll } from "bun:test";
 import type { AppContext, AppModule } from "./app-module";
-import { parseBlobConfig } from "./blob";
-import { parseDatabaseConfig } from "./config";
+import { parseRuntimeConfig } from "./config";
 import { createSql } from "./database";
+import { createJobQueue } from "./jobs/queue";
 import { startServer } from "./server";
+
+/** A context built from the test environment, closed after the test file. Identity is Tailscale headers. */
+export const createTestContext = (): AppContext => {
+  const config = parseRuntimeConfig(process.env);
+  const sql = createSql(config.database);
+  afterAll(() => sql.close());
+  return { sql, blob: config.blob, notify: config.notify, jobs: createJobQueue(sql), identity: { kind: "tailscale" } };
+};
 
 export type TestRequestInit = RequestInit & {
   /** Sent as the Tailscale login; omit to make an anonymous request. */
   readonly as?: string;
 };
 
-/** Boots a real server for the given apps on a random port, torn down after the test file. */
-export const startTestServer = (createApps: (context: AppContext) => readonly AppModule[]) => {
-  const sql = createSql(parseDatabaseConfig(process.env));
-  const server = startServer({
-    port: 0,
-    development: false,
-    apps: createApps({ sql, blob: parseBlobConfig(process.env), identity: { kind: "tailscale" } }),
-  });
-  afterAll(async () => {
-    await server.stop(true);
-    await sql.close();
-  });
+export type TestRequest = (path: string, init?: TestRequestInit) => Promise<Response>;
 
-  return (path: string, { as, ...init }: TestRequestInit = {}): Promise<Response> => {
+/** Boots a real server for the given apps on a random port, torn down after the test file. */
+export const startTestServer = (
+  createApps: (context: AppContext) => readonly AppModule[],
+  context: AppContext = createTestContext(),
+): TestRequest => {
+  const server = startServer({ port: 0, development: false, apps: createApps(context) });
+  afterAll(() => server.stop(true));
+
+  return (path, { as, ...init } = {}) => {
     const headers = new Headers(init.headers);
     if (as !== undefined) {
       headers.set("Tailscale-User-Login", as);
