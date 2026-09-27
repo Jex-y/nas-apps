@@ -2,6 +2,7 @@
   "TCP": {
     "443": { "HTTPS": true },
     "3900": { "HTTPS": true },
+    "8443": { "HTTPS": true },
     "5432": { "TCPForward": "127.0.0.1:5432" }
   },
   "Web": {
@@ -13,6 +14,11 @@
     "${TS_CERT_DOMAIN}:3900": {
       "Handlers": {
         "/": { "Proxy": "http://127.0.0.1:3900" }
+      }
+    },
+    "${TS_CERT_DOMAIN}:8443": {
+      "Handlers": {
+        "/": { "Proxy": "http://127.0.0.1:2586" }
       }
     }
   }
