@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "includes": ["**", "!**/drizzle/meta"] },
+  "files": { "includes": ["**", "!**/drizzle/meta", "!**/test/fixtures"] },
   "formatter": { "indentStyle": "space", "lineWidth": 120 },
   "linter": { "enabled": true, "rules": { "preset": "recommended" } },
   "assist": { "actions": { "source": { "organizeImports": "on" } } }
