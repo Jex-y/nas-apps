@@ -10,7 +10,14 @@ export const createTestContext = (): AppContext => {
   const config = parseRuntimeConfig(process.env);
   const sql = createSql(config.database);
   afterAll(() => sql.close());
-  return { sql, blob: config.blob, notify: config.notify, jobs: createJobQueue(sql), identity: { kind: "tailscale" } };
+  return {
+    publicUrl: config.publicUrl,
+    sql,
+    blob: config.blob,
+    notify: config.notify,
+    jobs: createJobQueue(sql),
+    identity: { kind: "tailscale" },
+  };
 };
 
 export type TestRequestInit = RequestInit & {

@@ -7,6 +7,7 @@ const server = startServer({
   port: config.port,
   development: config.development,
   apps: createApps({
+    publicUrl: config.publicUrl,
     sql,
     blob: config.blob,
     notify: config.notify,

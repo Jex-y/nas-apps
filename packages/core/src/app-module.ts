@@ -6,6 +6,7 @@ import type { Schedule } from "./jobs/schedule";
 import type { NotifyConfig } from "./notify";
 
 export type AppContext = {
+  readonly publicUrl: string;
   readonly sql: SQL;
   readonly blob: BlobConfig;
   readonly notify: NotifyConfig;

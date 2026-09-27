@@ -7,6 +7,7 @@ const STALE_AFTER_MS = 60_000;
 const config = parseWorkerConfig(process.env);
 const sql = createSql(config.database);
 const apps = createApps({
+  publicUrl: config.publicUrl,
   sql,
   blob: config.blob,
   notify: config.notify,

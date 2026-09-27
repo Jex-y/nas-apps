@@ -13,6 +13,8 @@ export type DatabaseConfig = {
 
 /** What both the server and the worker need to build the apps. */
 export type RuntimeConfig = {
+  /** Where people reach the apps, for links that leave the app (notifications, emails). */
+  readonly publicUrl: string;
   readonly database: DatabaseConfig;
   readonly blob: BlobConfig;
   readonly notify: NotifyConfig;
@@ -50,6 +52,10 @@ const ServerEnv = z
     path: ["DEV_USER"],
   });
 
+const RuntimeEnv = z.object({
+  PUBLIC_URL: z.url(),
+});
+
 const WorkerEnv = z.object({
   WORKER_HEALTH_PORT: z.coerce.number().int().positive().default(3001),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(2),
@@ -75,6 +81,7 @@ export const parseDatabaseConfig = (env: Env): DatabaseConfig => {
 };
 
 export const parseRuntimeConfig = (env: Env): RuntimeConfig => ({
+  publicUrl: parse(RuntimeEnv, env).PUBLIC_URL.replace(/\/$/, ""),
   database: parseDatabaseConfig(env),
   blob: parseBlobConfig(env),
   notify: parseNotifyConfig(env),
