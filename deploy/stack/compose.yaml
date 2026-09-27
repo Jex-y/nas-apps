@@ -31,7 +31,7 @@ services:
       TS_ENABLE_HEALTH_CHECK: "true"
       TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
     volumes:
-      - /volume1/docker/nas-apps/tailscale:/var/lib/tailscale
+      - tailscale-state:/var/lib/tailscale
       - ./serve.json:/stack/serve.json:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
@@ -49,7 +49,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       POSTGRES_DB: apps
     volumes:
-      - /volume1/docker/postgres18:/var/lib/postgresql
+      - postgres-data:/var/lib/postgresql
     shm_size: 128mb
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -85,3 +85,7 @@ services:
         condition: service_healthy
     environment: *database-env
     command: ["bun", "migrate.js"]
+
+volumes:
+  tailscale-state:
+  postgres-data:
