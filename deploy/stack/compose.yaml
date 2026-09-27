@@ -1,43 +1,73 @@
-# Deployed to /volume1/Ed/app on the NAS by CI. Secrets come from the .env beside it there.
+# Baked into the image at /stack and run from /volume1/Ed/app/releases/<sha>/ on the NAS by deploy/nas-deploy.sh.
+# Secrets come from the NAS's /volume1/Ed/app/.env, symlinked into each release.
 name: nas-apps
 
 x-database-env: &database-env
-  PGHOST: postgres
+  PGHOST: 127.0.0.1
   PGPORT: "5432"
   PGUSER: ${POSTGRES_USER:?}
   PGPASSWORD: ${POSTGRES_PASSWORD:?}
   PGDATABASE: apps
 
+x-tailnet: &tailnet
+  network_mode: service:tailscale
+  depends_on:
+    tailscale:
+      condition: service_healthy
+
 services:
+  # The stack's only way in. Server and Postgres share its network namespace and publish no host ports,
+  # so Tailscale-User-Login can only have been set by tailscale serve.
+  tailscale:
+    image: tailscale/tailscale:v1.102.4
+    hostname: apps
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_AUTH_ONCE: "true"
+      TS_EXTRA_ARGS: --advertise-tags=tag:apps
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /stack/serve.json
+      TS_ENABLE_HEALTH_CHECK: "true"
+      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
+    volumes:
+      - /volume1/docker/nas-apps/tailscale:/var/lib/tailscale
+      - ./serve.json:/stack/serve.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+
   postgres:
+    <<: *tailnet
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       POSTGRES_DB: apps
-    ports:
-      - "127.0.0.1:5432:5432"
     volumes:
       - /volume1/docker/postgres18:/var/lib/postgresql
     shm_size: 128mb
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
   server:
+    <<: *tailnet
     image: ghcr.io/jex-y/nas-apps:${APP_TAG:?}
     restart: unless-stopped
     depends_on:
+      tailscale:
+        condition: service_healthy
       postgres:
         condition: service_healthy
     environment: *database-env
-    # Loopback only: identity comes from headers that only `tailscale serve` can be trusted to set.
-    ports:
-      - "127.0.0.1:3000:3000"
     mem_limit: 256m
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
@@ -47,6 +77,7 @@ services:
       start_period: 10s
 
   migrate:
+    <<: *tailnet
     image: ghcr.io/jex-y/nas-apps:${APP_TAG:?}
     profiles: [tools]
     depends_on:

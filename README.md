@@ -59,14 +59,38 @@ The server refuses to start if two apps share a slug or an app declares a route 
 
 Every push to `main` runs lint, typecheck, the migration check and the tests. It then builds
 `ghcr.io/jex-y/nas-apps:<sha>`, joins the tailnet as an ephemeral `tag:ci` node, and SSHes to the NAS with a key
-that can only run `deploy/nas-deploy.sh`. That script swaps in the pushed `compose.yaml`, pulls the image,
-migrates, starts the server and waits for its health check, rolling back to the previous image if it fails.
+that can only run `deploy/nas-deploy.sh`, passing just the commit SHA. The script pulls that image, unpacks the
+stack (`deploy/stack/`, baked into the image) into `/volume1/Ed/app/releases/<sha>/`, migrates, starts the server
+and waits for its health check, rolling back to the previous release if it fails.
+
+The stack joins the tailnet as its own device, `apps.tail12605.ts.net`, through a Tailscale sidecar. Server and
+Postgres share the sidecar's network and publish nothing on the NAS itself:
+
+- `https://apps.tail12605.ts.net/` is the server
+- `psql -h apps.tail12605.ts.net -U <user> apps` is Postgres
 
 ### One-time setup
 
+**Tailscale**, in the policy file:
+
+```jsonc
+"tagOwners": {
+    "tag:ci":   ["autogroup:admin"], // ephemeral GitHub Actions runners
+    "tag:apps": ["autogroup:admin"], // the stack's sidecar
+},
+"acls": [
+    {"action": "accept", "src": ["autogroup:member"], "dst": ["*:*"]},
+    {"action": "accept", "src": ["tag:ci"], "dst": ["nas:22"]},
+],
+```
+
+- An OAuth client with the Auth Keys write scope for `tag:ci`, for CI.
+- A one-off auth key for the sidecar: not reusable, not ephemeral, pre-approved, tagged `tag:apps`. It is only
+  used on first start; the sidecar keeps its identity in `/volume1/docker/nas-apps/tailscale` after that.
+
 **NAS**
 
-- `/volume1/Ed/app/.env` holds `POSTGRES_USER` and `POSTGRES_PASSWORD`.
+- `/volume1/Ed/app/.env` holds `POSTGRES_USER`, `POSTGRES_PASSWORD` and `TS_AUTHKEY`.
 - Log in to GHCR so the NAS can pull the private image, using a classic PAT with only `read:packages`:
   `docker login ghcr.io -u Jex-y`
 - Install the deploy script and give CI a key that can run nothing else:
@@ -80,19 +104,6 @@ migrates, starts the server and waits for its health check, rolling back to the 
   ```
   command="/var/services/homes/ed/bin/nas-apps-deploy",restrict ssh-ed25519 AAAA… nas-apps-ci
   ```
-
-- Put the server on the tailnet over HTTPS: `sudo tailscale serve --bg 3000`
-
-**Tailscale**
-
-- In the policy file, declare `tag:ci` and let it reach only the NAS's SSH port:
-
-  ```json
-  "tagOwners": { "tag:ci": ["autogroup:admin"] },
-  "grants": [{ "src": ["tag:ci"], "dst": ["<nas>"], "ip": ["tcp:22"] }]
-  ```
-
-- Create an OAuth client with the `auth_keys` write scope for `tag:ci`.
 
 **GitHub**, in a `production` environment on the repo:
 

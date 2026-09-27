@@ -52,6 +52,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
         run: |
           docker compose -f deploy/stack/compose.yaml config --quiet
+          jq empty deploy/stack/serve.json
 
   image:
     needs: check
