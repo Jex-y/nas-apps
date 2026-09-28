@@ -28,6 +28,8 @@ export const PropertySummary = z.object({
   status: z.enum(PROPERTY_STATUSES),
   address: z.string(),
   postcode: z.string().nullable(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
   price: z.number().nullable(),
   priceQualifier: z.string(),
   availability: z.enum(AVAILABILITIES),
@@ -78,8 +80,6 @@ export type PricePoint = z.infer<typeof PricePoint>;
 export const PropertyDetail = PropertySummary.extend({
   rejectedReason: z.string().nullable(),
   notes: z.string(),
-  latitude: z.number().nullable(),
-  longitude: z.number().nullable(),
   description: z.string(),
   keyFeatures: z.array(z.string()),
   nearestStations: z.array(z.object({ name: z.string(), miles: z.number() })),
@@ -144,6 +144,8 @@ export const Destination = z.object({
   id: z.uuid(),
   name: z.string(),
   postcode: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
   arriveBy: z.string().regex(ARRIVE_BY),
 });
 export type Destination = z.infer<typeof Destination>;
@@ -157,3 +159,37 @@ export const CreateDestination = z.object({
   arriveBy: z.string().regex(ARRIVE_BY),
 });
 export type CreateDestination = z.infer<typeof CreateDestination>;
+
+/** The palette annotation layers are drawn in. */
+export const LAYER_COLOURS = ["#d6364f", "#f08c00", "#03955a", "#1c7ed6", "#7048e8", "#d45bb6"] as const;
+
+/** Pen widths in screen pixels. */
+export const STROKE_WIDTHS = [3, 6, 14] as const;
+
+const LatLng = z.tuple([z.number().min(-90).max(90), z.number().min(-180).max(180)]);
+
+export const MapStroke = z.object({
+  id: z.uuid(),
+  points: z.array(LatLng).min(1).max(5_000),
+  width: z.number().int().min(1).max(40),
+});
+export type MapStroke = z.infer<typeof MapStroke>;
+
+export const MapLayer = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  colour: z.enum(LAYER_COLOURS),
+  visible: z.boolean(),
+  /** Oldest first, so later strokes draw on top. */
+  strokes: z.array(MapStroke),
+});
+export type MapLayer = z.infer<typeof MapLayer>;
+
+export const MapLayerList = z.array(MapLayer);
+
+export const CreateMapLayer = z.object({ name: z.string().trim().min(1).max(60), colour: z.enum(LAYER_COLOURS) });
+export type CreateMapLayer = z.infer<typeof CreateMapLayer>;
+
+export const UpdateMapLayer = CreateMapLayer.extend({ visible: z.boolean() })
+  .partial()
+  .refine((update) => Object.keys(update).length > 0, "Nothing to update");

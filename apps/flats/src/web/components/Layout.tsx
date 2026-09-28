@@ -21,6 +21,7 @@ const TABS: readonly Section[] = [
   { href: "/rejected", label: "Rejected", icon: ICONS.rejected },
 ];
 const MORE: readonly Omit<Section, "icon">[] = [
+  { href: "/map", label: "Map" },
   { href: "/searches", label: "Searches" },
   { href: "/commutes", label: "Commutes" },
 ];

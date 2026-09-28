@@ -2,7 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { startTestServer, uniqueLogin } from "@nas/core/testing";
 import { drizzle } from "drizzle-orm/bun-sql";
 import { createFlatsTestbed, fakeGeocoder, fakePlanner } from "../../test/support";
-import { Destination, DestinationList, PropertyDetail, PropertyList, Search, SearchList } from "../contract";
+import {
+  Destination,
+  DestinationList,
+  MapLayer,
+  MapLayerList,
+  type MapStroke,
+  PropertyDetail,
+  PropertyList,
+  Search,
+  SearchList,
+} from "../contract";
 import { createFlatsApp } from "../module";
 import { collapseHistory } from "./routes";
 
@@ -292,5 +302,77 @@ describe("destinations", () => {
 
     expect(await context.sql`select 1 from flats.commutes`).toHaveLength(0);
     expect((await request(`/flats/api/destinations/${created.id}`, { as: me, method: "DELETE" })).status).toBe(404);
+  });
+});
+
+describe("map annotations", () => {
+  const layers = async () => MapLayerList.parse(await (await request("/flats/api/map/layers", { as: me })).json());
+  const createLayer = async (name = "Avoid") =>
+    MapLayer.parse(
+      await (
+        await request("/flats/api/map/layers", { as: me, method: "POST", ...json({ name, colour: "#d6364f" }) })
+      ).json(),
+    );
+  const draw = (layerId: string, stroke: object) =>
+    request(`/flats/api/map/layers/${layerId}/strokes`, { as: me, method: "POST", ...json(stroke) });
+  const line = (id: string): MapStroke => ({
+    id,
+    points: [
+      [51.47, -0.32],
+      [51.48, -0.31],
+    ],
+    width: 6,
+  });
+
+  test("draws strokes on a layer, oldest first, and saving one twice keeps one", async () => {
+    const layer = await createLayer();
+    const first = crypto.randomUUID();
+    const second = crypto.randomUUID();
+
+    expect((await draw(layer.id, line(first))).status).toBe(201);
+    expect((await draw(layer.id, line(second))).status).toBe(201);
+    expect((await draw(layer.id, line(first))).status).toBe(201);
+
+    expect(await layers()).toEqual([{ ...layer, strokes: [line(first), line(second)] }]);
+    const [stored] = await context.sql`select created_by from flats.map_strokes where id = ${first}`;
+    expect(stored).toEqual({ created_by: me });
+  });
+
+  test("renames, recolours and hides a layer, but refuses an empty or off-palette update", async () => {
+    const layer = await createLayer();
+    const patch = (body: object) =>
+      request(`/flats/api/map/layers/${layer.id}`, { as: me, method: "PATCH", ...json(body) });
+
+    expect((await patch({ name: "Too noisy", colour: "#1c7ed6", visible: false })).status).toBe(204);
+    expect((await patch({})).status).toBe(400);
+    expect((await patch({ colour: "red" })).status).toBe(400);
+
+    expect(await layers()).toEqual([
+      { id: layer.id, name: "Too noisy", colour: "#1c7ed6", visible: false, strokes: [] },
+    ]);
+  });
+
+  test("erasing a stroke is idempotent, and deleting a layer takes its strokes", async () => {
+    const keep = await createLayer("Keep");
+    const doomed = await createLayer("Doomed");
+    const erased = crypto.randomUUID();
+    await draw(keep.id, line(erased));
+    await draw(doomed.id, line(crypto.randomUUID()));
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect((await request(`/flats/api/map/strokes/${erased}`, { as: me, method: "DELETE" })).status).toBe(204);
+    }
+    expect((await request(`/flats/api/map/layers/${doomed.id}`, { as: me, method: "DELETE" })).status).toBe(204);
+
+    expect(await layers()).toEqual([keep]);
+    expect(await context.sql`select 1 from flats.map_strokes`).toHaveLength(0);
+    expect((await draw(doomed.id, line(crypto.randomUUID()))).status).toBe(404);
+  });
+
+  test("refuses a stroke with no points or off the globe", async () => {
+    const layer = await createLayer();
+
+    expect((await draw(layer.id, { ...line(crypto.randomUUID()), points: [] })).status).toBe(400);
+    expect((await draw(layer.id, { ...line(crypto.randomUUID()), points: [[91, 0]] })).status).toBe(400);
   });
 });

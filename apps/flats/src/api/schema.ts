@@ -14,7 +14,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
-import { PROPERTY_STATUSES } from "../contract";
+import { type LAYER_COLOURS, PROPERTY_STATUSES } from "../contract";
 import { AVAILABILITIES, type ParsedListing, PORTALS, TENURES } from "./portals/listing";
 
 export const flatsSchema = pgSchema("flats");
@@ -202,4 +202,31 @@ export const commutes = flatsSchema.table(
     computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.propertyId, table.destinationId] })],
+);
+
+/** A named, coloured set of hand-drawn map annotations, e.g. "Areas to avoid". */
+export const mapLayers = flatsSchema.table("map_layers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  colour: text("colour").$type<(typeof LAYER_COLOURS)[number]>().notNull(),
+  visible: boolean("visible").notNull().default(true),
+  createdAt: createdAt(),
+});
+
+/** One pen stroke on a layer, as `[latitude, longitude]` points so it stays put as the map pans and zooms. */
+export const mapStrokes = flatsSchema.table(
+  "map_strokes",
+  {
+    /** Chosen by the drawing client, so a save can be shown at once and retried without duplicating. */
+    id: uuid("id").primaryKey(),
+    layerId: uuid("layer_id")
+      .notNull()
+      .references(() => mapLayers.id, { onDelete: "cascade" }),
+    points: jsonb<[number, number][]>("points").notNull(),
+    /** Line width in screen pixels. */
+    width: smallint("width").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index().on(table.layerId, table.createdAt)],
 );

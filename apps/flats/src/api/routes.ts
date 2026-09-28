@@ -13,15 +13,19 @@ import {
   AddListing,
   type Commute,
   CreateDestination,
+  CreateMapLayer,
   CreateSearch,
   CreateViewing,
   type Destination,
   MAX_VIEWING_PHOTO_BYTES,
+  type MapLayer,
+  MapStroke,
   PROPERTY_STATUSES,
   type PricePoint,
   type PropertyDetail,
   type PropertySummary,
   type Search,
+  UpdateMapLayer,
   UpdateNotes,
   UpdateSearch,
   UpdateStatus,
@@ -33,6 +37,8 @@ import {
   commutes,
   destinations,
   listings,
+  mapLayers,
+  mapStrokes,
   photos,
   properties,
   searches,
@@ -117,6 +123,8 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder 
       status: row.status,
       address: row.address,
       postcode: row.postcode,
+      latitude: row.latitude,
+      longitude: row.longitude,
       price: row.price,
       priceQualifier: row.priceQualifier,
       availability: row.availability,
@@ -198,8 +206,6 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder 
       ...summary,
       rejectedReason: row.rejectedReason,
       notes: row.notes,
-      latitude: row.latitude,
-      longitude: row.longitude,
       description: parsed?.description ?? "",
       keyFeatures: [...(parsed?.keyFeatures ?? [])],
       nearestStations: [...(parsed?.nearestStations ?? [])],
@@ -248,7 +254,20 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder 
     id: row.id,
     name: row.name,
     postcode: row.postcode,
+    latitude: row.latitude,
+    longitude: row.longitude,
     arriveBy: row.arriveBy,
+  });
+
+  const toMapLayer = (
+    row: typeof mapLayers.$inferSelect,
+    strokes: readonly (typeof mapStrokes.$inferSelect)[] = [],
+  ): MapLayer => ({
+    id: row.id,
+    name: row.name,
+    colour: row.colour,
+    visible: row.visible,
+    strokes: strokes.map(({ id, points, width }) => ({ id, points, width })),
   });
 
   const redirectTo = (url: string) => new Response(null, { status: 302, headers: { Location: url } });
@@ -521,6 +540,82 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder 
         if (deleted.length === 0) {
           throw new HttpError(404, "Not found");
         }
+        return new Response(null, { status: 204 });
+      },
+    },
+    "/flats/api/map/layers": {
+      GET: async (request) => {
+        resolveViewer(identity, request);
+        const layers = await db.select().from(mapLayers).orderBy(asc(mapLayers.createdAt));
+        const strokes = await db.select().from(mapStrokes).orderBy(asc(mapStrokes.createdAt));
+        return Response.json(
+          layers.map((layer) =>
+            toMapLayer(
+              layer,
+              strokes.filter((stroke) => stroke.layerId === layer.id),
+            ),
+          ),
+        );
+      },
+      POST: async (request) => {
+        resolveViewer(identity, request);
+        const [created] = await db
+          .insert(mapLayers)
+          .values(await parseBody(request, CreateMapLayer))
+          .returning();
+        if (created === undefined) {
+          throw new Error("INSERT … RETURNING produced no layer");
+        }
+        return Response.json(toMapLayer(created), { status: 201 });
+      },
+    },
+    "/flats/api/map/layers/:id": {
+      PATCH: async (request) => {
+        resolveViewer(identity, request);
+        const update = await parseBody(request, UpdateMapLayer);
+        const [updated] = await db
+          .update(mapLayers)
+          .set(update)
+          .where(eq(mapLayers.id, parseParam(request.params.id, z.uuid())))
+          .returning({ id: mapLayers.id });
+        if (updated === undefined) {
+          throw new HttpError(404, "Not found");
+        }
+        return new Response(null, { status: 204 });
+      },
+      DELETE: async (request) => {
+        resolveViewer(identity, request);
+        const deleted = await db
+          .delete(mapLayers)
+          .where(eq(mapLayers.id, parseParam(request.params.id, z.uuid())))
+          .returning({ id: mapLayers.id });
+        if (deleted.length === 0) {
+          throw new HttpError(404, "Not found");
+        }
+        return new Response(null, { status: 204 });
+      },
+    },
+    "/flats/api/map/layers/:id/strokes": {
+      POST: async (request) => {
+        const viewer = resolveViewer(identity, request);
+        const layerId = parseParam(request.params.id, z.uuid());
+        const stroke = await parseBody(request, MapStroke);
+        const [layer] = await db.select({ id: mapLayers.id }).from(mapLayers).where(eq(mapLayers.id, layerId));
+        if (layer === undefined) {
+          throw new HttpError(404, "Not found");
+        }
+        await db
+          .insert(mapStrokes)
+          .values({ ...stroke, layerId: layer.id, createdBy: viewer.login })
+          .onConflictDoNothing();
+        return new Response(null, { status: 201 });
+      },
+    },
+    "/flats/api/map/strokes/:id": {
+      /** Idempotent: undoing a stroke whose save never landed is not an error. */
+      DELETE: async (request) => {
+        resolveViewer(identity, request);
+        await db.delete(mapStrokes).where(eq(mapStrokes.id, parseParam(request.params.id, z.uuid())));
         return new Response(null, { status: 204 });
       },
     },

@@ -141,7 +141,7 @@ export const createFlatsTestbed = () => {
   };
 
   beforeEach(async () => {
-    await context.sql`truncate flats.searches, flats.properties, flats.destinations cascade`;
+    await context.sql`truncate flats.searches, flats.properties, flats.destinations, flats.map_layers cascade`;
     await context.sql`delete from jobs.jobs where name like 'flats.%'`;
   });
 

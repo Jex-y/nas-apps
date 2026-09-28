@@ -1,4 +1,5 @@
 @import "@nas/core/theme.css";
+@import "leaflet/dist/leaflet.css";
 
 a {
   color: inherit;
@@ -594,5 +595,272 @@ main:has(.swipe) {
   .more-link.active {
     color: var(--accent);
     font-weight: 600;
+  }
+}
+
+/* Map: full bleed between the header and, on phones, the tab bar. */
+body:has(.map-page) {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+body:has(.map-page) #root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+main:has(.map-page) {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  padding: 0;
+}
+
+.map-page {
+  display: grid;
+  grid-template-columns: 1fr 19rem;
+  height: 100%;
+}
+
+.map {
+  height: 100%;
+  background: var(--surface-2);
+  /* Leaflet's panes sit at z-index 400+; keep them under the header and tab bar. */
+  isolation: isolate;
+  /* The Pencil must never scroll, zoom or long-press the page, whichever Leaflet handlers are on. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  font: inherit;
+}
+
+.map-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+}
+
+.map-panel h2 {
+  margin: 0.5rem 0 0;
+}
+
+.map-panel p {
+  margin: 0;
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.layer-actions button {
+  padding: 0.35rem 0.55rem;
+}
+
+.segmented {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.segmented button + button {
+  border-left: none;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--fg);
+  color: var(--surface);
+}
+
+.width-dot {
+  display: block;
+  border-radius: 50%;
+  background: var(--fg);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.layers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.layer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.layer-target {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.layer.hidden .layer-target {
+  opacity: 0.5;
+}
+
+.layer-name {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.layer-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.swatch {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+}
+
+.new-layer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.swatches {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.swatches .swatch {
+  width: 1.75rem;
+  height: 1.75rem;
+  cursor: pointer;
+}
+
+.swatches .swatch:has(:checked) {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.swatches input {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+  width: 100%;
+  height: 100%;
+  background: none;
+  cursor: pointer;
+}
+
+.status-filter {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.status-new {
+  --pin: var(--accent);
+}
+
+.status-shortlisted {
+  --pin: var(--accent-2);
+}
+
+.status-viewing_booked {
+  --pin: var(--pink);
+}
+
+.status-viewed {
+  --pin: #7048e8;
+}
+
+.status-offer_made {
+  --pin: #f08c00;
+}
+
+.status-rejected {
+  --pin: var(--muted);
+}
+
+.status-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--pin);
+}
+
+/* Leaflet sets these as SVG attributes, which CSS overrides, so pins follow the theme. */
+.pin {
+  fill: var(--pin);
+  fill-opacity: 1;
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.pin.destination {
+  fill: var(--fg);
+}
+
+.pin-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-decoration: none;
+}
+
+.map .pin-popup {
+  color: var(--fg);
+}
+
+.map .leaflet-popup-content-wrapper,
+.map .leaflet-popup-tip,
+.map .leaflet-tooltip {
+  background: var(--surface);
+  color: var(--fg);
+  border-radius: var(--radius);
+}
+
+.map .leaflet-tooltip {
+  border-color: var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+}
+
+@media (max-width: 40rem) {
+  main:has(.map-page) {
+    padding-bottom: calc(3.75rem + env(safe-area-inset-bottom));
+  }
+
+  .map-page {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  .map-panel {
+    max-height: 40dvh;
+    border-left: none;
+    border-top: 1px solid var(--border);
   }
 }
