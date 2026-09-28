@@ -6,8 +6,10 @@ import {
   createNotifier,
   trailingSlashRedirect,
 } from "@nas/core";
+import { parseFlatsConfig } from "./api/config";
 import { flatsDb } from "./api/db";
 import { BROWSER_USER_AGENT, createHttpFetcher } from "./api/fetcher";
+import { createPostcodesIo, createTflPlanner, type Geocoder, type JourneyPlanner } from "./api/places";
 import { rightmove } from "./api/portals/rightmove";
 import { createFlatsRoutes } from "./api/routes";
 import { createFlatsWork } from "./api/work";
@@ -16,7 +18,18 @@ import page from "./web/index.html";
 /** Page requests to a portal are spaced like a person browsing; its image CDN can take them faster. */
 const intervalMs = (host: string): number => (host.startsWith("www.") ? 5_000 : 250);
 
-export const createFlatsApp = (context: AppContext): AppModule => {
+/** The outside services flats talks to; tests swap in fakes. */
+export type FlatsAdapters = {
+  readonly geocoder: Geocoder;
+  readonly planner: JourneyPlanner | null;
+};
+
+const realAdapters = (context: AppContext): FlatsAdapters => {
+  const { tflApiKey } = parseFlatsConfig(context.env);
+  return { geocoder: createPostcodesIo(), planner: tflApiKey === null ? null : createTflPlanner(tflApiKey) };
+};
+
+export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = realAdapters(context)): AppModule => {
   const db = flatsDb(context.sql);
   const blob = createBlobStore(context.blob, "flats");
   const parsers = [rightmove];
@@ -27,6 +40,7 @@ export const createFlatsApp = (context: AppContext): AppModule => {
     notifier: createNotifier(context.notify, "flats"),
     fetcher: createHttpFetcher({ userAgent: BROWSER_USER_AGENT, intervalMs }),
     parsers: { rightmove },
+    planner: adapters.planner,
     publicUrl: context.publicUrl,
     now: () => new Date(),
   });
@@ -37,7 +51,7 @@ export const createFlatsApp = (context: AppContext): AppModule => {
     routes: appRoutes({
       "/flats": trailingSlashRedirect("flats"),
       "/flats/*": page,
-      ...createFlatsRoutes({ db, blob, identity: context.identity, work, parsers }),
+      ...createFlatsRoutes({ db, blob, identity: context.identity, work, parsers, geocoder: adapters.geocoder }),
     }),
     jobs: work.jobs,
     schedules: work.schedules,

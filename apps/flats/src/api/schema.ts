@@ -7,6 +7,7 @@ import {
   integer,
   numeric,
   pgSchema,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -173,4 +174,32 @@ export const viewingPhotos = flatsSchema.table(
     createdAt: createdAt(),
   },
   (table) => [index().on(table.viewingId)],
+);
+
+/** A place commutes are timed to, e.g. work. */
+export const destinations = flatsSchema.table("destinations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  postcode: text("postcode").notNull(),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+  /** London time to arrive by, `HH:MM`. */
+  arriveBy: text("arrive_by").notNull(),
+  createdAt: createdAt(),
+});
+
+export const commutes = flatsSchema.table(
+  "commutes",
+  {
+    propertyId: uuid("property_id")
+      .notNull()
+      .references(() => properties.id, { onDelete: "cascade" }),
+    destinationId: uuid("destination_id")
+      .notNull()
+      .references(() => destinations.id, { onDelete: "cascade" }),
+    /** Fastest public-transport journey; `null` when TfL found no route. */
+    minutes: smallint("minutes"),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.propertyId, table.destinationId] })],
 );

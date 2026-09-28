@@ -11,8 +11,11 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   AddListing,
+  type Commute,
+  CreateDestination,
   CreateSearch,
   CreateViewing,
+  type Destination,
   MAX_VIEWING_PHOTO_BYTES,
   PROPERTY_STATUSES,
   type PricePoint,
@@ -24,8 +27,19 @@ import {
   UpdateStatus,
 } from "../contract";
 import type { FlatsDb } from "./db";
+import type { Geocoder } from "./places";
 import type { PortalParser } from "./portals/listing";
-import { listings, photos, properties, searches, snapshots, viewingPhotos, viewings } from "./schema";
+import {
+  commutes,
+  destinations,
+  listings,
+  photos,
+  properties,
+  searches,
+  snapshots,
+  viewingPhotos,
+  viewings,
+} from "./schema";
 import type { FlatsWork } from "./work";
 
 export type FlatsRoutesDeps = {
@@ -34,6 +48,7 @@ export type FlatsRoutesDeps = {
   readonly identity: IdentityMode;
   readonly work: FlatsWork;
   readonly parsers: readonly PortalParser[];
+  readonly geocoder: Geocoder;
 };
 
 const API = "/flats/api";
@@ -53,23 +68,49 @@ export const collapseHistory = (points: readonly PricePoint[]): PricePoint[] =>
       index === 0 || point.price !== points[index - 1]?.price || point.availability !== points[index - 1]?.availability,
   );
 
-export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRoutesDeps) => {
+export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder }: FlatsRoutesDeps) => {
   const summaries = async (rows: readonly PropertyRow[]): Promise<PropertySummary[]> => {
     const ids = rows.map((row) => row.id);
     if (ids.length === 0) {
       return [];
     }
     const adverts = await db
-      .select({ propertyId: listings.propertyId, portal: listings.portal, url: listings.url })
+      .select({
+        propertyId: listings.propertyId,
+        portal: listings.portal,
+        url: listings.url,
+      })
       .from(listings)
       .where(inArray(listings.propertyId, ids));
     const covers = await db
-      .selectDistinctOn([listings.propertyId], { propertyId: listings.propertyId, photoId: photos.id })
+      .selectDistinctOn([listings.propertyId], {
+        propertyId: listings.propertyId,
+        photoId: photos.id,
+      })
       .from(photos)
       .innerJoin(listings, eq(listings.id, photos.listingId))
       .where(and(inArray(listings.propertyId, ids), eq(photos.kind, "photo")))
       .orderBy(listings.propertyId, asc(photos.position));
     const coverOf = new Map(covers.map((cover) => [cover.propertyId, photoPath(cover.photoId)]));
+    const timed = await db
+      .select({
+        propertyId: commutes.propertyId,
+        destinationId: commutes.destinationId,
+        name: destinations.name,
+        minutes: commutes.minutes,
+      })
+      .from(commutes)
+      .innerJoin(destinations, eq(destinations.id, commutes.destinationId))
+      .where(inArray(commutes.propertyId, ids))
+      .orderBy(asc(destinations.createdAt));
+    const commutesOf = (propertyId: string): Commute[] =>
+      timed
+        .filter((commute) => commute.propertyId === propertyId)
+        .map(({ destinationId, name, minutes }) => ({
+          destinationId,
+          name,
+          minutes,
+        }));
 
     return rows.map((row) => ({
       id: row.id,
@@ -93,6 +134,7 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRo
       thumbnailUrl: coverOf.get(row.id) ?? row.thumbnailUrl,
       firstSeenAt: row.firstSeenAt.toISOString(),
       listings: adverts.filter((advert) => advert.propertyId === row.id).map(({ portal, url }) => ({ portal, url })),
+      commutes: commutesOf(row.id),
     }));
   };
 
@@ -129,7 +171,11 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRo
       listingIds.length === 0
         ? []
         : await db
-            .select({ observedAt: snapshots.observedAt, price: snapshots.price, availability: snapshots.availability })
+            .select({
+              observedAt: snapshots.observedAt,
+              price: snapshots.price,
+              availability: snapshots.availability,
+            })
             .from(snapshots)
             .where(inArray(snapshots.listingId, listingIds))
             .orderBy(asc(snapshots.observedAt));
@@ -158,8 +204,17 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRo
       keyFeatures: [...(parsed?.keyFeatures ?? [])],
       nearestStations: [...(parsed?.nearestStations ?? [])],
       agent: parsed?.agent ?? null,
-      photos: gallery.map((photo) => ({ id: photo.id, kind: photo.kind, url: photoPath(photo.id) })),
-      history: collapseHistory(observations.map((point) => ({ ...point, observedAt: point.observedAt.toISOString() }))),
+      photos: gallery.map((photo) => ({
+        id: photo.id,
+        kind: photo.kind,
+        url: photoPath(photo.id),
+      })),
+      history: collapseHistory(
+        observations.map((point) => ({
+          ...point,
+          observedAt: point.observedAt.toISOString(),
+        })),
+      ),
       viewings: visits.map((visit) => ({
         id: visit.id,
         at: visit.at.toISOString(),
@@ -168,7 +223,11 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRo
         createdBy: visit.createdBy,
         photos: visitPhotos
           .filter((photo) => photo.viewingId === visit.id)
-          .map((photo) => ({ id: photo.id, filename: photo.filename, url: viewingPhotoPath(photo.id) })),
+          .map((photo) => ({
+            id: photo.id,
+            filename: photo.filename,
+            url: viewingPhotoPath(photo.id),
+          })),
       })),
     };
   };
@@ -183,6 +242,13 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRo
     lastSucceededAt: iso(row.lastSucceededAt),
     consecutiveFailures: row.consecutiveFailures,
     lastError: row.lastError,
+  });
+
+  const toDestination = (row: typeof destinations.$inferSelect): Destination => ({
+    id: row.id,
+    name: row.name,
+    postcode: row.postcode,
+    arriveBy: row.arriveBy,
   });
 
   const redirectTo = (url: string) => new Response(null, { status: 302, headers: { Location: url } });
@@ -211,7 +277,10 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRo
         const update = await parseBody(request, UpdateStatus);
         await db
           .update(properties)
-          .set({ status: update.status, rejectedReason: update.status === "rejected" ? update.reason : null })
+          .set({
+            status: update.status,
+            rejectedReason: update.status === "rejected" ? update.reason : null,
+          })
           .where(eq(properties.id, row.id));
         return new Response(null, { status: 204 });
       },
@@ -275,9 +344,13 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRo
         const contentType = file.type || "application/octet-stream";
         await blob.write(`viewing-photos/${id}`, file, contentType);
         try {
-          await db
-            .insert(viewingPhotos)
-            .values({ id, viewingId: viewing.id, filename: file.name || "photo", contentType, size: file.size });
+          await db.insert(viewingPhotos).values({
+            id,
+            viewingId: viewing.id,
+            filename: file.name || "photo",
+            contentType,
+            size: file.size,
+          });
         } catch (error) {
           await blob.delete(`viewing-photos/${id}`);
           throw error;
@@ -295,7 +368,11 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRo
         if (photo === undefined) {
           throw new HttpError(404, "Not found");
         }
-        return redirectTo(blob.downloadUrl(`viewing-photos/${photo.id}`, { filename: photo.filename }));
+        return redirectTo(
+          blob.downloadUrl(`viewing-photos/${photo.id}`, {
+            filename: photo.filename,
+          }),
+        );
       },
       DELETE: async (request) => {
         resolveViewer(identity, request);
@@ -315,7 +392,11 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRo
       GET: async (request) => {
         resolveViewer(identity, request);
         const [photo] = await db
-          .select({ id: photos.id, kind: photos.kind, position: photos.position })
+          .select({
+            id: photos.id,
+            kind: photos.kind,
+            position: photos.position,
+          })
           .from(photos)
           .where(eq(photos.id, parseParam(request.params.id, z.uuid())));
         if (photo === undefined) {
@@ -398,6 +479,49 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers }: FlatsRo
           }
         }
         throw new HttpError(400, "That is not a listing URL from a supported portal");
+      },
+    },
+    "/flats/api/destinations": {
+      GET: async (request) => {
+        resolveViewer(identity, request);
+        return Response.json(
+          (await db.select().from(destinations).orderBy(asc(destinations.createdAt))).map(toDestination),
+        );
+      },
+      POST: async (request) => {
+        resolveViewer(identity, request);
+        const input = await parseBody(request, CreateDestination);
+        const place = await geocoder.postcode(input.postcode);
+        if (place === null) {
+          throw new HttpError(400, `${input.postcode} is not a UK postcode`);
+        }
+        const [created] = await db
+          .insert(destinations)
+          .values({
+            name: input.name,
+            postcode: place.postcode,
+            arriveBy: input.arriveBy,
+            ...place.location,
+          })
+          .returning();
+        if (created === undefined) {
+          throw new Error("INSERT … RETURNING produced no destination");
+        }
+        await work.timeCommutes();
+        return Response.json(toDestination(created), { status: 201 });
+      },
+    },
+    "/flats/api/destinations/:id": {
+      DELETE: async (request) => {
+        resolveViewer(identity, request);
+        const deleted = await db
+          .delete(destinations)
+          .where(eq(destinations.id, parseParam(request.params.id, z.uuid())))
+          .returning({ id: destinations.id });
+        if (deleted.length === 0) {
+          throw new HttpError(404, "Not found");
+        }
+        return new Response(null, { status: 204 });
       },
     },
     "/flats/api/*": Response.json({ error: "Not found" }, { status: 404 }),

@@ -1,0 +1,138 @@
+{
+  "$type": "Tfl.Api.Presentation.Entities.JourneyPlanner.ItineraryResult, Tfl.Api.Presentation.Entities",
+  "journeys": [
+    {
+      "startDateTime": "2026-09-29T07:25:00",
+      "arrivalDateTime": "2026-09-29T08:43:00",
+      "duration": 78,
+      "legs": [
+        {
+          "duration": 3,
+          "mode": {
+            "id": "walking",
+            "name": "walking"
+          }
+        },
+        {
+          "duration": 18,
+          "mode": {
+            "id": "bus",
+            "name": "bus"
+          }
+        },
+        {
+          "duration": 30,
+          "mode": {
+            "id": "tube",
+            "name": "tube"
+          }
+        },
+        {
+          "duration": 17,
+          "mode": {
+            "id": "walking",
+            "name": "walking"
+          }
+        }
+      ]
+    },
+    {
+      "startDateTime": "2026-09-29T07:31:00",
+      "arrivalDateTime": "2026-09-29T08:46:00",
+      "duration": 75,
+      "legs": [
+        {
+          "duration": 0,
+          "mode": {
+            "id": "walking",
+            "name": "walking"
+          }
+        },
+        {
+          "duration": 17,
+          "mode": {
+            "id": "bus",
+            "name": "bus"
+          }
+        },
+        {
+          "duration": 28,
+          "mode": {
+            "id": "national-rail",
+            "name": "national-rail"
+          }
+        },
+        {
+          "duration": 5,
+          "mode": {
+            "id": "walking",
+            "name": "walking"
+          }
+        },
+        {
+          "duration": 13,
+          "mode": {
+            "id": "bus",
+            "name": "bus"
+          }
+        },
+        {
+          "duration": 4,
+          "mode": {
+            "id": "walking",
+            "name": "walking"
+          }
+        }
+      ]
+    },
+    {
+      "startDateTime": "2026-09-29T07:39:00",
+      "arrivalDateTime": "2026-09-29T08:52:00",
+      "duration": 73,
+      "legs": [
+        {
+          "duration": 4,
+          "mode": {
+            "id": "walking",
+            "name": "walking"
+          }
+        },
+        {
+          "duration": 15,
+          "mode": {
+            "id": "bus",
+            "name": "bus"
+          }
+        },
+        {
+          "duration": 27,
+          "mode": {
+            "id": "national-rail",
+            "name": "national-rail"
+          }
+        },
+        {
+          "duration": 5,
+          "mode": {
+            "id": "walking",
+            "name": "walking"
+          }
+        },
+        {
+          "duration": 13,
+          "mode": {
+            "id": "bus",
+            "name": "bus"
+          }
+        },
+        {
+          "duration": 4,
+          "mode": {
+            "id": "walking",
+            "name": "walking"
+          }
+        }
+      ]
+    }
+  ]
+}
