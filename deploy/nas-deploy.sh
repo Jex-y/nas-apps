@@ -15,12 +15,23 @@ tag=$(printf '%s' "${SSH_ORIGINAL_COMMAND:-}" | grep -xE '[0-9a-f]{40}') || {
 }
 
 cd "$app_dir"
-mkdir -p releases data/postgres data/garage
+mkdir -p releases config data/postgres data/garage
+
+sha256() { sha256sum "$1" | cut -d' ' -f1; }
 
 compose() {
   release_tag=$1
   shift
-  APP_TAG=$release_tag docker compose -f "releases/$release_tag/compose.yaml" "$@"
+  APP_TAG=$release_tag \
+    SERVE_CONFIG_SHA256=$(sha256 "releases/$release_tag/serve.json") \
+    GARAGE_CONFIG_SHA256=$(sha256 "releases/$release_tag/garage.toml") \
+    docker compose -f "releases/$release_tag/compose.yaml" "$@"
+}
+
+# Copies in place, keeping the inode, so running containers' mounts see the new files; the hash labels recreate a
+# service whose config changed.
+install_config() {
+  cp "releases/$1/serve.json" "releases/$1/garage.toml" config/
 }
 
 docker pull --quiet "$image:$tag"
@@ -34,6 +45,7 @@ compose "$tag" config --quiet
 
 prev_tag=$(basename "$(readlink current 2>/dev/null || true)")
 
+install_config "$tag"
 compose "$tag" up -d --wait tailscale postgres garage
 compose "$tag" run --rm migrate
 
@@ -47,6 +59,7 @@ fi
 
 echo "server or worker failed its health check" >&2
 if [ -n "$prev_tag" ] && [ -d "releases/$prev_tag" ]; then
+  install_config "$prev_tag"
   compose "$prev_tag" up -d --wait --remove-orphans
   echo "rolled back to $prev_tag" >&2
 fi

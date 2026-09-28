@@ -1,6 +1,10 @@
 # Baked into the image at /stack and run from /volume1/Ed/app/releases/<sha>/ on the NAS by deploy/nas-deploy.sh.
 # Secrets come from the NAS's /volume1/Ed/app/.env, symlinked into each release. Postgres and Garage keep
 # their data under /volume1/Ed/app/data, which the deploy script creates, so Hyper Backup covers it with the share.
+# Config files are mounted from /volume1/Ed/app/config, where the deploy script copies each release's: a mount from
+# the release directory would change path every deploy, making Compose recreate tailscale and so the whole stack
+# that shares its network, and would break once that release is pruned. Their hashes, as labels, recreate a service
+# only when its config really changes.
 name: nas-apps
 
 x-runtime-env: &runtime-env
@@ -52,9 +56,11 @@ services:
       TS_SERVE_CONFIG: /stack/serve.json
       TS_ENABLE_HEALTH_CHECK: "true"
       TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
+    labels:
+      nas-apps.config-sha256: ${SERVE_CONFIG_SHA256:?}
     volumes:
       - tailscale-state:/var/lib/tailscale
-      - ./serve.json:/stack/serve.json:ro
+      - /volume1/Ed/app/config/serve.json:/stack/serve.json:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9002/healthz"]
       interval: 10s
@@ -91,8 +97,10 @@ services:
       GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_DEFAULT_ACCESS_KEY:?}
       GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_DEFAULT_SECRET_KEY:?}
       GARAGE_DEFAULT_BUCKET: apps
+    labels:
+      nas-apps.config-sha256: ${GARAGE_CONFIG_SHA256:?}
     volumes:
-      - ./garage.toml:/etc/garage.toml:ro
+      - /volume1/Ed/app/config/garage.toml:/etc/garage.toml:ro
       - /volume1/Ed/app/data/garage:/var/lib/garage
 
   server:

@@ -51,6 +51,8 @@ jobs:
           VAPID_PUBLIC_KEY: ci
           VAPID_PRIVATE_KEY: ci
           VAPID_SUBJECT: mailto:ci@example.com
+          SERVE_CONFIG_SHA256: ci
+          GARAGE_CONFIG_SHA256: ci
         run: |
           docker compose -f deploy/stack/compose.yaml config --quiet
           jq empty deploy/stack/serve.json
