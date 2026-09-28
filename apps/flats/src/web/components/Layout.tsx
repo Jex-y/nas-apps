@@ -1,11 +1,55 @@
-import { type FormEvent, type ReactNode, useState } from "react";
-import { Link, useRoute } from "wouter";
+import { type FormEvent, type ReactNode, useRef, useState } from "react";
+import { Link, useLocation, useRoute } from "wouter";
 import { useAddListing } from "../features/properties/api/properties";
 
-const NavLink = ({ href, children }: { href: string; children: ReactNode }) => {
+type Section = { readonly href: string; readonly label: string; readonly icon: string };
+
+/** 24×24 stroked icon paths. */
+const ICONS = {
+  inbox: "M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z",
+  swipe: "M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM9 10l-2 2 2 2M15 10l2 2-2 2",
+  board: "M4 4h4v16H4zM10 4h4v10h-4zM16 4h4v13h-4z",
+  rejected: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 9l6 6M15 9l-6 6",
+  more: "M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0",
+} as const;
+
+/** On phones the first four sit in the bottom tab bar and the rest in its More menu. */
+const TABS: readonly Section[] = [
+  { href: "/", label: "Inbox", icon: ICONS.inbox },
+  { href: "/swipe", label: "Swipe", icon: ICONS.swipe },
+  { href: "/board", label: "Board", icon: ICONS.board },
+  { href: "/rejected", label: "Rejected", icon: ICONS.rejected },
+];
+const MORE: readonly Omit<Section, "icon">[] = [
+  { href: "/searches", label: "Searches" },
+  { href: "/commutes", label: "Commutes" },
+];
+
+const Icon = ({ path }: { path: string }) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
+    <path d={path} />
+  </svg>
+);
+
+const NavLink = ({
+  href,
+  className,
+  onClick,
+  children,
+}: {
+  href: string;
+  className: string;
+  onClick?: () => void;
+  children: ReactNode;
+}) => {
   const [active] = useRoute(href);
   return (
-    <Link href={href} className={active ? "nav-link active" : "nav-link"}>
+    <Link
+      href={href}
+      className={active ? `${className} active` : className}
+      aria-current={active ? "page" : undefined}
+      onClick={onClick}
+    >
       {children}
     </Link>
   );
@@ -39,6 +83,34 @@ const AddListingForm = () => {
   );
 };
 
+const TabBar = () => {
+  const [location] = useLocation();
+  const menu = useRef<HTMLDivElement>(null);
+  const inMore = MORE.some(({ href }) => href === location);
+
+  return (
+    <nav className="tab-bar" aria-label="Sections">
+      {TABS.map(({ href, label, icon }) => (
+        <NavLink key={href} href={href} className="tab">
+          <Icon path={icon} />
+          {label}
+        </NavLink>
+      ))}
+      <button type="button" className={inMore ? "tab active" : "tab"} popoverTarget="more-sections">
+        <Icon path={ICONS.more} />
+        More
+      </button>
+      <div id="more-sections" ref={menu} popover="auto" className="more-menu">
+        {MORE.map(({ href, label }) => (
+          <NavLink key={href} href={href} className="more-link" onClick={() => menu.current?.hidePopover()}>
+            {label}
+          </NavLink>
+        ))}
+      </div>
+    </nav>
+  );
+};
+
 export const Layout = ({ children }: { children: ReactNode }) => (
   <>
     <header className="site-header">
@@ -46,15 +118,15 @@ export const Layout = ({ children }: { children: ReactNode }) => (
         <a href="/" className="nav-link">
           ‹ Apps
         </a>
-        <NavLink href="/">Inbox</NavLink>
-        <NavLink href="/swipe">Swipe</NavLink>
-        <NavLink href="/board">Board</NavLink>
-        <NavLink href="/rejected">Rejected</NavLink>
-        <NavLink href="/searches">Searches</NavLink>
-        <NavLink href="/commutes">Commutes</NavLink>
+        {[...TABS, ...MORE].map(({ href, label }) => (
+          <NavLink key={href} href={href} className="nav-link section-link">
+            {label}
+          </NavLink>
+        ))}
       </nav>
       <AddListingForm />
     </header>
     <main>{children}</main>
+    <TabBar />
   </>
 );

@@ -517,3 +517,112 @@ main:has(.swipe) {
     display: none;
   }
 }
+
+.back-link {
+  padding: 0;
+  margin-bottom: 0.75rem;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+
+.icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tab-bar {
+  display: none;
+}
+
+/* Phones: sections move to a bottom tab bar within thumb reach, leaving the header one row. */
+@media (max-width: 40rem) {
+  .site-header {
+    flex-wrap: nowrap;
+    padding-top: calc(0.75rem + env(safe-area-inset-top));
+  }
+
+  .site-header .section-link {
+    display: none;
+  }
+
+  .add-listing {
+    flex: 1;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .add-listing input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .add-listing .muted,
+  .add-listing .error {
+    display: none;
+  }
+
+  main {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .tab-bar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 0.25rem max(0.25rem, env(safe-area-inset-right)) env(safe-area-inset-bottom)
+      max(0.25rem, env(safe-area-inset-left));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.4rem 0 0.5rem;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: 0.7rem;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tab.active {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .more-menu {
+    inset: auto max(0.5rem, env(safe-area-inset-right)) calc(4.5rem + env(safe-area-inset-bottom)) auto;
+    margin: 0;
+    padding: 0.25rem;
+    min-width: 10rem;
+    background: var(--surface);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  }
+
+  .more-link {
+    display: block;
+    padding: 0.7rem 0.9rem;
+    border-radius: var(--radius-small);
+    text-decoration: none;
+  }
+
+  .more-link.active {
+    color: var(--accent);
+    font-weight: 600;
+  }
+}

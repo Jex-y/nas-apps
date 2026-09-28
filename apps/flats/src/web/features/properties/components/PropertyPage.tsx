@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import type { PropertyDetail } from "../../../../contract";
 import { Warnings } from "../../../components/PropertyCard";
 import {
@@ -13,6 +14,23 @@ import {
 import { useProperty, useUpdateNotes } from "../api/properties";
 import { StatusControl } from "./StatusControl";
 import { ViewingsSection } from "./ViewingsSection";
+
+/**
+ * An installed app has no browser back button. Goes back through the app's history, or to the inbox when the page was
+ * opened directly, e.g. from a notification.
+ */
+const BackLink = () => {
+  const [, navigate] = useLocation();
+  return (
+    <button
+      type="button"
+      className="back-link"
+      onClick={() => (window.history.length > 1 ? window.history.back() : navigate("/"))}
+    >
+      ‹ Back
+    </button>
+  );
+};
 
 const Facts = ({ property }: { property: PropertyDetail }) => {
   const rows: [string, string | null][] = [
@@ -80,6 +98,7 @@ export const PropertyPage = ({ id }: { id: string }) => {
 
   return (
     <article className="property">
+      <BackLink />
       <div className="page-heading">
         <div>
           <h1>{formatPrice(detail.price, detail.priceQualifier)}</h1>

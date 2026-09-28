@@ -55,8 +55,12 @@ export const InboxPage = () => {
       <div className="page-heading">
         <h1>Inbox</h1>
         <span className="muted">
-          {items.length} new · <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>s</kbd> shortlist · <kbd>x</kbd> reject ·{" "}
-          <kbd>r</kbd> with reason · <kbd>o</kbd> open
+          {items.length} new
+          <span className="key-hints">
+            {" "}
+            · <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>s</kbd> shortlist · <kbd>x</kbd> reject · <kbd>r</kbd> with reason ·{" "}
+            <kbd>o</kbd> open
+          </span>
         </span>
       </div>
       {items.length === 0 && <p className="muted">Nothing new. Searches are polled every ten minutes.</p>}
