@@ -1,21 +1,43 @@
 @import "../web/theme.css";
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 main {
-  max-width: 32rem;
+  max-width: 40rem;
   margin: 0 auto;
   padding: 2rem 1rem 4rem;
   display: grid;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
-h1,
-h2 {
+h1 {
+  font-size: 1.5rem;
   margin: 0;
+}
+
+h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.card {
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 .apps {
@@ -23,36 +45,64 @@ h2 {
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+  gap: 0.75rem;
 }
 
 .apps a {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
   color: inherit;
   text-decoration: none;
-  font-size: 1.1rem;
+  transition:
+    border-color 120ms ease-out,
+    transform 120ms ease-out;
+}
+
+.apps a:hover {
+  border-color: var(--accent);
+}
+
+.apps a:active {
+  transform: scale(0.98);
+}
+
+.art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Axis-aligned cell backgrounds, so neighbouring cells meet without anti-aliased seams. */
+.art path:first-child {
+  shape-rendering: crispEdges;
+}
+
+.app-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
   font-weight: 600;
 }
 
-.apps a::after {
+.app-title::after {
   content: "→";
   color: var(--accent);
+  transition: transform 120ms ease-out;
+}
+
+.apps a:hover .app-title::after {
+  transform: translateX(0.2rem);
 }
 
 .push {
   display: grid;
   gap: 0.5rem;
-}
-
-.muted {
-  color: var(--muted);
-  margin: 0;
 }
 
 .actions {
@@ -61,19 +111,22 @@ h2 {
   gap: 0.5rem;
 }
 
+.actions:not(:has(button:not([hidden]))) {
+  display: none;
+}
+
 button {
   font: inherit;
   color: inherit;
-  background: var(--surface);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.5rem 0.9rem;
+  padding: 0.4rem 0.9rem;
   cursor: pointer;
 }
 
-#push-enable {
+button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
-  font-weight: 600;
 }
