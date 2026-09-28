@@ -40,7 +40,9 @@ const fakeFetcher = (pages: Pages): Fetcher & { readonly requested: string[] } =
 };
 
 export const ok = (body: string): FetchResult<string> => ({ kind: "ok", body });
-const LISTING_PAGES: Readonly<Record<string, string>> = { "93524796": listingPage, "128855633": soldStcPage };
+/** The sold STC flat is really 593 sq ft; lifted to the 650 sq ft minimum so it stays in play. */
+const soldStcInPlay = soldStcPage.replace('\\"sq. ft.\\",593,', '\\"sq. ft.\\",650,');
+const LISTING_PAGES: Readonly<Record<string, string>> = { "93524796": listingPage, "128855633": soldStcInPlay };
 export const defaultPages: Pages = {
   search: () => ok(searchPage),
   listing: (portalId) => {

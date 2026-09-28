@@ -1,8 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { asc, eq } from "drizzle-orm";
 import { rightmoveListingPage } from "../../test/rightmove-page";
-import { createFlatsTestbed, defaultPages, fakePlanner, NOON, ok, type Pages, searchPage } from "../../test/support";
-import { SHARED_OWNERSHIP_REASON } from "./ingest";
+import {
+  createFlatsTestbed,
+  defaultPages,
+  fakePlanner,
+  NOON,
+  ok,
+  type Pages,
+  searchPage,
+  soldStcPage,
+} from "../../test/support";
+import { SERVICE_CHARGE_REASON, SHARED_OWNERSHIP_REASON, TOO_SMALL_REASON } from "./ingest";
 import type { JourneyPlanner } from "./places";
 import { commutes, listings, photos, properties, searches, snapshots } from "./schema";
 import { isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
@@ -354,5 +363,58 @@ describe("shared ownership", () => {
       status: "shortlisted",
       sharedOwnership: true,
     });
+  });
+});
+
+describe("size and service charge", () => {
+  const ingestUnionLane = async (overrides: Record<string, unknown>) => {
+    const page = rightmoveListingPage(overrides);
+    const { work, drain } = setup({
+      ...defaultPages,
+      listing: (portalId) => (portalId === "93524796" ? ok(page) : defaultPages.listing(portalId)),
+    });
+    await work.backfillSearch((await addSearch()).id, 1);
+    await drain();
+    return (await propertyByPortalId("93524796")).property;
+  };
+  const sized = (minimumSize: number) => ({ sizings: [{ unit: "sqft", minimumSize }] });
+  const charged = (annualServiceCharge: number) => ({
+    livingCosts: { annualServiceCharge, annualGroundRent: 0, councilTaxBand: "TBC" },
+  });
+
+  test("rejects an untriaged property under 650 sq ft", async () => {
+    expect(await ingestUnionLane(sized(649))).toMatchObject({
+      status: "rejected",
+      rejectedReason: TOO_SMALL_REASON,
+      sizeSqft: 649,
+    });
+  });
+
+  test("rejects the real 593 sq ft sold STC flat", async () => {
+    const { work, drain } = setup({
+      ...defaultPages,
+      listing: (portalId) => (portalId === "128855633" ? ok(soldStcPage) : defaultPages.listing(portalId)),
+    });
+    await work.backfillSearch((await addSearch()).id, 1);
+    await drain();
+
+    expect((await propertyByPortalId("128855633")).property).toMatchObject({
+      status: "rejected",
+      rejectedReason: TOO_SMALL_REASON,
+      sizeSqft: 593,
+    });
+  });
+
+  test("rejects an untriaged property whose service charge is over £6,000", async () => {
+    expect(await ingestUnionLane(charged(6000.01))).toMatchObject({
+      status: "rejected",
+      rejectedReason: SERVICE_CHARGE_REASON,
+      annualServiceCharge: 6000.01,
+    });
+  });
+
+  test("keeps a property on either limit, or that states neither", async () => {
+    expect((await ingestUnionLane({ ...sized(650), ...charged(6000) })).status).toBe("new");
+    expect((await ingestUnionLane({})).status).toBe("new");
   });
 });

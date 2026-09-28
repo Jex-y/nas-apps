@@ -6,6 +6,14 @@ import { listings, properties, snapshots } from "./schema";
 /** Why a property the portal marks as shared ownership was rejected without being triaged. */
 export const SHARED_OWNERSHIP_REASON = "Shared ownership";
 
+/** The smallest floor area worth viewing. */
+const MIN_SIZE_SQFT = 650;
+export const TOO_SMALL_REASON = `Under ${MIN_SIZE_SQFT} sq ft`;
+
+/** The largest annual service charge worth paying. */
+const MAX_ANNUAL_SERVICE_CHARGE = 6000;
+export const SERVICE_CHARGE_REASON = `Service charge over £${MAX_ANNUAL_SERVICE_CHARGE.toLocaleString("en-GB")}`;
+
 /** What a portal now says that differs from what we last recorded. */
 export type ListingChange = {
   readonly propertyId: string;
@@ -135,10 +143,24 @@ export const propertyFacts = (parsed: ParsedListing) => ({
   thumbnailUrl: parsed.photos[0]?.url ?? null,
 });
 
+/** Why a property's facts rule it out before triage, or `null`; a fact the listing doesn't state rules nothing out. */
+const disqualification = (facts: ReturnType<typeof propertyFacts>): string | null => {
+  if (facts.sharedOwnership) {
+    return SHARED_OWNERSHIP_REASON;
+  }
+  if (facts.sizeSqft !== null && facts.sizeSqft < MIN_SIZE_SQFT) {
+    return TOO_SMALL_REASON;
+  }
+  if (facts.annualServiceCharge !== null && facts.annualServiceCharge > MAX_ANNUAL_SERVICE_CHARGE) {
+    return SERVICE_CHARGE_REASON;
+  }
+  return null;
+};
+
 /**
  * Records a freshly parsed listing page (whose raw copy is already stored at `pageKey`) and brings the property's
- * facts up to date; returns what changed since the last observation. A page marked shared ownership rejects the
- * property unless it has already been triaged.
+ * facts up to date; returns what changed since the last observation. A page whose facts disqualify the property
+ * (shared ownership, too small, too high a service charge) rejects it unless it has already been triaged.
  */
 export const recordListingPage = (
   db: FlatsDb,
@@ -182,17 +204,16 @@ export const recordListingPage = (
         ...(observed.kind === "page" && { parsed: observed.parsed, parsedAt: sql`now()` }),
       })
       .where(eq(listings.id, listingId));
+    const facts = observed.kind === "page" ? propertyFacts(observed.parsed) : null;
     await tx
       .update(properties)
-      .set({
-        ...(observed.kind === "page" ? propertyFacts(observed.parsed) : { availability: "removed" }),
-        updatedAt: sql`now()`,
-      })
+      .set({ ...(facts ?? { availability: "removed" }), updatedAt: sql`now()` })
       .where(eq(properties.id, known.propertyId));
-    if (observed.kind === "page" && observed.parsed.sharedOwnership) {
+    const rejectedReason = facts === null ? null : disqualification(facts);
+    if (rejectedReason !== null) {
       await tx
         .update(properties)
-        .set({ status: "rejected", rejectedReason: SHARED_OWNERSHIP_REASON })
+        .set({ status: "rejected", rejectedReason })
         .where(and(eq(properties.id, known.propertyId), eq(properties.status, "new")));
     }
 
