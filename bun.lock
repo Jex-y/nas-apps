@@ -42,6 +42,21 @@
         "@types/react-dom": "^19.3.0",
       },
     },
+    "apps/status": {
+      "name": "@nas/status",
+      "dependencies": {
+        "@nas/core": "workspace:*",
+        "@tanstack/react-query": "^5.104.0",
+        "drizzle-orm": "^0.45.3",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "zod": "^4.6.5",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+      },
+    },
     "packages/core": {
       "name": "@nas/core",
       "dependencies": {
@@ -57,6 +72,7 @@
         "@nas/core": "workspace:*",
         "@nas/flats": "workspace:*",
         "@nas/notes": "workspace:*",
+        "@nas/status": "workspace:*",
         "drizzle-orm": "^0.45.3",
       },
     },
@@ -149,6 +165,8 @@
     "@nas/notes": ["@nas/notes@workspace:apps/notes"],
 
     "@nas/server": ["@nas/server@workspace:server"],
+
+    "@nas/status": ["@nas/status@workspace:apps/status"],
 
     "@tanstack/query-core": ["@tanstack/query-core@5.104.0", "", {}, "sha512-JrC2r/JQlXt7khBSdUpsgxNvybzOg+aITa+ARRMlP2AFo93Y8vIqz077rp+e61mJetSZ0T6AJbwW1JHer1vrPQ=="],
 
