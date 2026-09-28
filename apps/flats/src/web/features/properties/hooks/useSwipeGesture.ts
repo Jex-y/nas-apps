@@ -7,6 +7,8 @@ type Gesture =
   | {
       kind: "dragging";
       pointerId: number;
+      /** What the pointer went down on; capture retargets the later events to the card. */
+      target: Element;
       originX: number;
       width: number;
       dx: number;
@@ -19,6 +21,8 @@ type Gesture =
 const COMMIT_FRACTION = 0.3;
 const FLICK_PX_PER_MS = 0.5;
 const FLICK_MIN_PX = 24;
+/** Movement below this is a tap, not a drag. */
+const TAP_MAX_PX = 8;
 
 const SIGN = { left: -1, right: 1 } as const satisfies Record<SwipeDirection, number>;
 
@@ -40,8 +44,14 @@ export type SwipeGesture = {
   fling: (direction: SwipeDirection) => void;
 };
 
-/** Drags the element under `ref` sideways and calls `onSwipe` once it has flown off past the threshold. */
-export const useSwipeGesture = (onSwipe: (direction: SwipeDirection) => void): SwipeGesture => {
+/**
+ * Drags the element under `ref` sideways and calls `onSwipe` once it has flown off past the threshold. A press that
+ * barely moves calls `onTap` instead, with the element it landed on.
+ */
+export const useSwipeGesture = (
+  onSwipe: (direction: SwipeDirection) => void,
+  onTap: (target: Element, clientX: number) => void = () => undefined,
+): SwipeGesture => {
   const ref = useRef<HTMLElement>(null);
   const [gesture, setGesture] = useState<Gesture>({ kind: "idle" });
 
@@ -70,14 +80,22 @@ export const useSwipeGesture = (onSwipe: (direction: SwipeDirection) => void): S
 
   const handlers: SwipeGesture["handlers"] = {
     onPointerDown: (event) => {
-      const onControl = event.target instanceof Element && event.target.closest("a, button") !== null;
-      if (gesture.kind !== "idle" || !event.isPrimary || event.button !== 0 || onControl) {
+      const { target } = event;
+      const onControl = target instanceof Element && target.closest("a, button") !== null;
+      if (
+        gesture.kind !== "idle" ||
+        !event.isPrimary ||
+        event.button !== 0 ||
+        onControl ||
+        !(target instanceof Element)
+      ) {
         return;
       }
       event.currentTarget.setPointerCapture(event.pointerId);
       setGesture({
         kind: "dragging",
         pointerId: event.pointerId,
+        target,
         originX: event.clientX,
         width: event.currentTarget.offsetWidth,
         dx: 0,
@@ -103,7 +121,12 @@ export const useSwipeGesture = (onSwipe: (direction: SwipeDirection) => void): S
       if (gesture.kind !== "dragging" || event.pointerId !== gesture.pointerId) {
         return;
       }
-      const { dx, velocity, width } = gesture;
+      const { dx, velocity, width, target } = gesture;
+      if (Math.abs(dx) < TAP_MAX_PX) {
+        setGesture({ kind: "idle" });
+        onTap(target, event.clientX);
+        return;
+      }
       const flicked =
         Math.abs(velocity) > FLICK_PX_PER_MS && Math.sign(velocity) === Math.sign(dx) && Math.abs(dx) > FLICK_MIN_PX;
       if (Math.abs(dx) > width * COMMIT_FRACTION || flicked) {
