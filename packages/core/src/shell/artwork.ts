@@ -1,7 +1,8 @@
 /**
  * An identicon per app: the points of an elliptic curve y² = x³ + ax + b over a small prime field, with chords
  * joining the orbit of one point under the curve's group law. The seed picks p, a, b, the orbit and two tints mixed
- * from the theme colours, so each app keeps a distinctive, stable picture that follows light and dark mode.
+ * from a palette, so each app keeps a distinctive, stable picture. It returns plain SVG markup so the same drawing
+ * serves the launcher (theme variables, following light and dark mode) and the build-time app icon (fixed colours).
  */
 
 type Point = readonly [x: number, y: number];
@@ -10,15 +11,10 @@ type Random = () => number;
 
 type Curve = { readonly p: number; readonly a: number; readonly b: number };
 
-const SVG_NS = "http://www.w3.org/2000/svg";
-const WIDTH = 300;
-const HEIGHT = 200;
-const MARGIN = 14;
 const PRIMES = [37, 41, 43, 47, 53, 59, 61, 67];
 /** Enough chords for a recognisable polygon; longer orbits scribble into sameness. */
 const MAX_ORBIT = 14;
 const GENERATOR_TRIES = 12;
-const THEME_COLOURS = ["var(--accent)", "var(--accent-2)", "var(--warning-fg)", "var(--error)"];
 
 /** mulberry32 seeded by FNV-1a. */
 const seededRandom = (seed: string): Random => {
@@ -93,43 +89,55 @@ const orbit = (curve: Curve, generator: Point): Point[] => {
   return multiples;
 };
 
-/** A tint anywhere between two theme colours, so apps are not limited to the handful of theme hues. */
-const tint = (random: Random): string => {
-  const first = pick(random, THEME_COLOURS);
+/** The colours to tint with and how to blend two of them; `weight` is the share of `first`, from 0 to 1. */
+export type Palette = {
+  readonly colours: readonly string[];
+  readonly mix: (first: string, second: string, weight: number) => string;
+};
+
+export type ArtworkOptions = {
+  readonly width: number;
+  readonly height: number;
+  /** Space kept clear around the points, e.g. a maskable icon's safe zone. */
+  readonly margin: number;
+  readonly palette: Palette;
+  /** An opaque fill under the artwork; omitted, it shows whatever is behind it. */
+  readonly background?: string;
+};
+
+/** A tint anywhere between two palette colours, so apps are not limited to the handful of theme hues. */
+const tint = (random: Random, { colours, mix }: Palette): string => {
+  const first = pick(random, colours);
   const second = pick(
     random,
-    THEME_COLOURS.filter((colour) => colour !== first),
+    colours.filter((colour) => colour !== first),
   );
-  return `color-mix(in oklch, ${first} ${Math.round(random() * 100)}%, ${second})`;
+  return mix(first, second, random());
 };
 
-const create = <K extends keyof SVGElementTagNameMap>(
-  tag: K,
-  attributes: Record<string, string>,
-  style: Partial<CSSStyleDeclaration> = {},
-): SVGElementTagNameMap[K] => {
-  const created = document.createElementNS(SVG_NS, tag);
-  for (const [name, value] of Object.entries(attributes)) {
-    created.setAttribute(name, value);
-  }
-  // Set as styles, not presentation attributes, so `var()` and `color-mix()` resolve in every browser.
-  Object.assign(created.style, style);
-  return created;
-};
+const toKebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 
-const gradient = (
-  tag: "linearGradient" | "radialGradient",
-  attributes: Record<string, string>,
-  stops: readonly (readonly [offset: string, colour: string, opacity: string])[],
+/**
+ * Colours go in `style` rather than presentation attributes, where `var()` and `color-mix()` do not resolve in every
+ * browser. Every value is generated here, so none needs escaping.
+ */
+const element = (
+  tag: string,
+  attributes: Record<string, string | number>,
+  style: Record<string, string | number> = {},
+  children = "",
 ) => {
-  const created = create(tag, attributes);
-  created.append(
-    ...stops.map(([offset, stopColor, stopOpacity]) => create("stop", { offset }, { stopColor, stopOpacity })),
-  );
-  return created;
+  const attributeText = Object.entries(attributes).map(([name, value]) => ` ${name}="${value}"`);
+  const styleText = Object.entries(style)
+    .map(([name, value]) => `${toKebab(name)}:${value}`)
+    .join(";");
+  return `<${tag}${attributeText.join("")}${styleText === "" ? "" : ` style="${styleText}"`}>${children}</${tag}>`;
 };
 
-export const artwork = (seed: string): SVGSVGElement => {
+const stops = (entries: readonly (readonly [offset: number, colour: string, opacity: number])[]) =>
+  entries.map(([offset, stopColor, stopOpacity]) => element("stop", { offset }, { stopColor, stopOpacity })).join("");
+
+export const artworkSvg = (seed: string, { width, height, margin, palette, background }: ArtworkOptions): string => {
   const random = seededRandom(seed);
   const curve = randomCurve(random);
   const points = pointsOn(curve);
@@ -137,63 +145,70 @@ export const artwork = (seed: string): SVGSVGElement => {
   const chords = Array.from({ length: affine.length === 0 ? 0 : GENERATOR_TRIES }, () =>
     orbit(curve, pick(random, affine)),
   ).reduce<Point[]>((longest, candidate) => (candidate.length > longest.length ? candidate : longest), []);
-  const [from, to] = [tint(random), tint(random)];
+  const [from, to] = [tint(random, palette), tint(random, palette)];
   const id = `art-${seed}`;
 
-  const place = ([x, y]: Point): Point => [
-    MARGIN + (x / (curve.p - 1)) * (WIDTH - 2 * MARGIN),
-    HEIGHT - MARGIN - (y / (curve.p - 1)) * (HEIGHT - 2 * MARGIN),
+  const place = ([x, y]: Point): readonly [cx: string, cy: string] => [
+    (margin + (x / (curve.p - 1)) * (width - 2 * margin)).toFixed(1),
+    (height - margin - (y / (curve.p - 1)) * (height - 2 * margin)).toFixed(1),
   ];
-  const dot = (point: Point, r: number) => {
-    const [cx, cy] = place(point);
-    return create("circle", { cx: cx.toFixed(1), cy: cy.toFixed(1), r: String(r) });
-  };
-
-  const defs = create("defs", {});
-  defs.append(
-    gradient("linearGradient", { id: `${id}-wash`, x1: "0", y1: "0", x2: "1", y2: "1" }, [
-      ["0", from, "0.28"],
-      ["1", to, "0.08"],
-    ]),
-    gradient("radialGradient", { id: `${id}-glow` }, [
-      ["0", to, "0.3"],
-      ["1", to, "0"],
-    ]),
-    // In user space so every dot takes its colour from where it sits, not from its own tiny bounding box.
-    gradient(
-      "linearGradient",
-      { id: `${id}-ink`, gradientUnits: "userSpaceOnUse", x1: "0", y1: "0", x2: String(WIDTH), y2: String(HEIGHT) },
-      [
-        ["0", from, "1"],
-        ["1", to, "1"],
-      ],
-    ),
-  );
-
+  const dots = (on: readonly Point[], r: number) =>
+    on
+      .map((point) => {
+        const [cx, cy] = place(point);
+        return element("circle", { cx, cy, r });
+      })
+      .join("");
   const ink = `url(#${id}-ink)`;
-  const field = create("g", {}, { fill: ink, opacity: "0.65" });
-  field.append(...points.map((point) => dot(point, 1.9)));
-  const path = chords.map(
-    (point, i) =>
-      `${i === 0 ? "M" : "L"}${place(point)
-        .map((n) => n.toFixed(1))
-        .join(" ")}`,
-  );
-  const highlighted = create("g", {}, { fill: ink });
-  highlighted.append(...chords.map((point) => dot(point, 2.8)));
+  const cover = (fill: string) => element("rect", { width, height }, { fill });
 
-  const svg = create("svg", { viewBox: `0 0 ${WIDTH} ${HEIGHT}`, "aria-hidden": "true", class: "art" });
-  svg.append(
-    defs,
-    create("rect", { width: String(WIDTH), height: String(HEIGHT) }, { fill: `url(#${id}-wash)` }),
-    create("rect", { width: String(WIDTH), height: String(HEIGHT) }, { fill: `url(#${id}-glow)` }),
-    field,
-    create(
-      "path",
-      { d: path.join("") },
-      { fill: "none", stroke: ink, strokeOpacity: "0.7", strokeWidth: "1.2", strokeLinejoin: "round" },
+  const defs = [
+    element(
+      "linearGradient",
+      { id: `${id}-wash`, x1: 0, y1: 0, x2: 1, y2: 1 },
+      {},
+      stops([
+        [0, from, 0.28],
+        [1, to, 0.08],
+      ]),
     ),
-    highlighted,
+    element(
+      "radialGradient",
+      { id: `${id}-glow` },
+      {},
+      stops([
+        [0, to, 0.3],
+        [1, to, 0],
+      ]),
+    ),
+    // In user space so every dot takes its colour from where it sits, not from its own tiny bounding box.
+    element(
+      "linearGradient",
+      { id: `${id}-ink`, gradientUnits: "userSpaceOnUse", x1: 0, y1: 0, x2: width, y2: height },
+      {},
+      stops([
+        [0, from, 1],
+        [1, to, 1],
+      ]),
+    ),
+  ];
+
+  return element(
+    "svg",
+    { xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${width} ${height}`, "aria-hidden": "true", class: "art" },
+    {},
+    [
+      element("defs", {}, {}, defs.join("")),
+      background === undefined ? "" : cover(background),
+      cover(`url(#${id}-wash)`),
+      cover(`url(#${id}-glow)`),
+      element("g", {}, { fill: ink, opacity: 0.65 }, dots(points, 1.9)),
+      element(
+        "path",
+        { d: chords.map((point, i) => `${i === 0 ? "M" : "L"}${place(point).join(" ")}`).join("") },
+        { fill: "none", stroke: ink, strokeOpacity: 0.7, strokeWidth: 1.2, strokeLinejoin: "round" },
+      ),
+      element("g", {}, { fill: ink }, dots(chords, 2.8)),
+    ].join(""),
   );
-  return svg;
 };

@@ -6,8 +6,8 @@ import { parseBody } from "../http";
 import { type IdentityMode, resolveViewer } from "../identity";
 import { subscriptions } from "../push/schema";
 import { createWebPushNotifier, type WebPushConfig } from "../push/send";
-import { SHELL_ICONS_FOLDER } from "./assets";
 import { PushEndpoint, type PushSettings, PushSubscriptionInput, SHELL_API, type ShellApp } from "./contract";
+import { renderIcons } from "./icons" with { type: "macro" };
 import page from "./index.html";
 import serviceWorker from "./sw.js" with { type: "text" };
 
@@ -38,8 +38,11 @@ const manifest = {
   ],
 };
 
-const icon = (size: number) => () =>
-  new Response(Bun.file(`${SHELL_ICONS_FOLDER}/icon-${size}.png`), {
+/** Rendered while bundling (or transpiling, in development), so the PNGs are part of the build. */
+const icons = await renderIcons();
+
+const icon = (size: keyof typeof icons) =>
+  new Response(Buffer.from(icons[size], "base64"), {
     headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" },
   });
 

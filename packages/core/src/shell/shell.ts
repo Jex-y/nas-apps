@@ -1,5 +1,5 @@
 import { requestEmpty, requestJson } from "../web";
-import { artwork } from "./artwork";
+import { type ArtworkOptions, artworkSvg } from "./artwork";
 import { PushSettings, SHELL_API, ShellApps } from "./contract";
 import { installShell } from "./register";
 
@@ -9,6 +9,17 @@ const element = <T extends HTMLElement>(id: string): T => {
     throw new Error(`#${id} missing from index.html`);
   }
   return found as T;
+};
+
+/** Theme variables, so the launcher artwork follows light and dark mode. */
+const TILE_ARTWORK: ArtworkOptions = {
+  width: 300,
+  height: 200,
+  margin: 14,
+  palette: {
+    colours: ["var(--accent)", "var(--accent-2)", "var(--warning-fg)", "var(--error)"],
+    mix: (first, second, weight) => `color-mix(in oklch, ${first} ${Math.round(weight * 100)}%, ${second})`,
+  },
 };
 
 const renderApps = async () => {
@@ -21,7 +32,8 @@ const renderApps = async () => {
       const link = document.createElement("a");
       link.className = "card";
       link.href = `/${slug}/`;
-      link.append(artwork(slug), name);
+      link.innerHTML = artworkSvg(slug, TILE_ARTWORK);
+      link.append(name);
       const item = document.createElement("li");
       item.append(link);
       return item;
