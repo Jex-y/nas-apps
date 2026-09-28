@@ -12,7 +12,6 @@ export const STALE_READY_MS = 5 * 60_000;
 const SERVICES = [
   ["postgres", "Postgres"],
   ["blob", "Object storage"],
-  ["notify", "ntfy"],
 ] as const;
 
 const serviceProblems = (report: StatusReport): Problem[] =>

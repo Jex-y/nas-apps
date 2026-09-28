@@ -77,11 +77,6 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       message: describeChange(change),
       clickUrl: `${deps.publicUrl}/flats/properties/${change.propertyId}`,
       priority: change.availability === null ? "default" : "high",
-      tags: [
-        change.price !== null && (change.price.to ?? 0) < (change.price.from ?? 0)
-          ? "chart_with_downwards_trend"
-          : "house",
-      ],
     });
   };
 
@@ -268,7 +263,6 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
         message: `It failed ${search.failures} polls in a row: ${message}`,
         clickUrl: `${deps.publicUrl}/flats/searches`,
         priority: "high",
-        tags: ["warning"],
       });
     }
   };

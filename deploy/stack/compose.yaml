@@ -1,5 +1,5 @@
 # Baked into the image at /stack and run from /volume1/Ed/app/releases/<sha>/ on the NAS by deploy/nas-deploy.sh.
-# Secrets come from the NAS's /volume1/Ed/app/.env, symlinked into each release. Postgres, Garage and ntfy keep
+# Secrets come from the NAS's /volume1/Ed/app/.env, symlinked into each release. Postgres and Garage keep
 # their data under /volume1/Ed/app/data, which the deploy script creates, so Hyper Backup covers it with the share.
 name: nas-apps
 
@@ -21,9 +21,11 @@ x-blob-env: &blob-env
   S3_ACCESS_KEY_ID: ${GARAGE_DEFAULT_ACCESS_KEY:?}
   S3_SECRET_ACCESS_KEY: ${GARAGE_DEFAULT_SECRET_KEY:?}
 
+# Web Push VAPID keys; generate a pair once with `bunx web-push generate-vapid-keys`.
 x-notify-env: &notify-env
-  NTFY_URL: http://127.0.0.1:2586
-  NTFY_TOKEN: ${NTFY_TOKEN:?}
+  VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:?}
+  VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:?}
+  VAPID_SUBJECT: ${VAPID_SUBJECT:?}
 
 # Optional per-app secrets: an unset one reaches the app as an empty string, which the app reads as unset.
 x-app-secrets-env: &app-secrets-env
@@ -126,8 +128,6 @@ services:
         condition: service_healthy
       garage:
         condition: service_started
-      ntfy:
-        condition: service_healthy
     environment:
       <<: [*runtime-env, *database-env, *blob-env, *notify-env, *app-secrets-env]
     mem_limit: 192m
@@ -138,33 +138,6 @@ services:
       interval: 15s
       timeout: 3s
       retries: 3
-      start_period: 10s
-
-  # Push notifications, published to the tailnet on :8443. iOS delivery goes through ntfy.sh's upstream relay,
-  # which only ever sees a hash of the topic and the message ID, never the content.
-  ntfy:
-    <<: *tailnet
-    image: binwiederhier/ntfy:v2.28.0
-    restart: unless-stopped
-    command: ["serve"]
-    environment:
-      NTFY_BASE_URL: https://apps.tail12605.ts.net:8443
-      NTFY_LISTEN_HTTP: 127.0.0.1:2586
-      NTFY_BEHIND_PROXY: "true"
-      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
-      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
-      NTFY_AUTH_DEFAULT_ACCESS: deny-all
-      NTFY_ENABLE_LOGIN: "true"
-      NTFY_AUTH_USERS: ${NTFY_AUTH_USERS:?}
-      NTFY_AUTH_TOKENS: ed:${NTFY_TOKEN:?}:worker
-      NTFY_UPSTREAM_BASE_URL: https://ntfy.sh
-    volumes:
-      - /volume1/Ed/app/data/ntfy:/var/lib/ntfy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2586/v1/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
       start_period: 10s
 
   migrate:

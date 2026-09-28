@@ -68,9 +68,9 @@ const statusApp = (ctx: typeof context) =>
     build: { commit: COMMIT },
   });
 const request = startTestServer((ctx) => [statusApp(ctx)], context);
-const requestWithoutNtfy = startTestServer((ctx) => [statusApp(ctx)], {
+const requestWithoutStorage = startTestServer((ctx) => [statusApp(ctx)], {
   ...context,
-  env: { ...context.env, NTFY_URL: "http://127.0.0.1:9" },
+  blob: { ...context.blob, endpoint: "http://127.0.0.1:9" },
 });
 
 const fetchReport = async (send = request): Promise<StatusReport> => {
@@ -114,7 +114,6 @@ describe("status api", () => {
     });
     expect(ok(report.postgres).schemas.map((schema) => schema.name)).toContain("jobs");
     ok(report.blob);
-    ok(report.notify);
 
     const queue = ok(report.queue);
     const job = (name: string) => queue.jobs.find((summary) => summary.name === name);
@@ -161,9 +160,9 @@ describe("status api", () => {
   });
 
   test("an unreachable service fails its own part of the report, not the whole", async () => {
-    const report = await fetchReport(requestWithoutNtfy);
+    const report = await fetchReport(requestWithoutStorage);
 
-    expect(report.notify.status).toBe("down");
+    expect(report.blob.status).toBe("down");
     ok(report.postgres);
     ok(report.queue);
   });

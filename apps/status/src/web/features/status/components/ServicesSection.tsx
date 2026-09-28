@@ -62,7 +62,6 @@ export const ServicesSection = ({ report }: { readonly report: StatusReport }) =
         {report.postgres.status === "ok" && <PostgresFacts postgres={report.postgres.value} />}
       </ServiceCard>
       <ServiceCard title="Object storage" probe={report.blob} />
-      <ServiceCard title="ntfy" probe={report.notify} />
     </div>
   </section>
 );

@@ -36,19 +36,6 @@ services:
       - source: garage
         target: /etc/garage.toml
 
-  ntfy:
-    image: binwiederhier/ntfy:v2.28.0
-    command: ["serve"]
-    environment:
-      NTFY_BASE_URL: http://127.0.0.1:2586
-      NTFY_LISTEN_HTTP: ":80"
-    ports:
-      - "127.0.0.1:2586:80"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/v1/health"]
-      interval: 2s
-      timeout: 5s
-      retries: 15
 
 configs:
   create-test-database:

@@ -38,7 +38,7 @@ export const startTestServer = (
     port: 0,
     development: false,
     apps: createApps(context),
-    shell: { identity: context.identity, sql: context.sql, webPush: null },
+    shell: { identity: context.identity, sql: context.sql, webPush: parseRuntimeConfig(process.env).notify },
   });
   afterAll(() => server.stop(true));
 

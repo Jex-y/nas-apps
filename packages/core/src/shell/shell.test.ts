@@ -55,34 +55,14 @@ beforeEach(async () => {
 });
 
 describe("notify config", () => {
-  const base = { NTFY_URL: "http://ntfy.test" };
-
-  test("web push is off unless every VAPID variable is set, and compose's empty strings count as unset", () => {
-    expect(parseNotifyConfig(base).webPush).toBeNull();
+  test("requires a complete VAPID key pair and a contact subject", () => {
     expect(
-      parseNotifyConfig({
-        ...base,
-        VAPID_PUBLIC_KEY: "",
-        VAPID_PRIVATE_KEY: "",
-        VAPID_SUBJECT: "",
-      }).webPush,
-    ).toBeNull();
-    expect(
-      parseNotifyConfig({
-        ...base,
-        VAPID_PUBLIC_KEY: "pub",
-        VAPID_PRIVATE_KEY: "priv",
-        VAPID_SUBJECT: "mailto:a@b.c",
-      }).webPush,
-    ).toEqual({
-      publicKey: "pub",
-      privateKey: "priv",
-      subject: "mailto:a@b.c",
-    });
-  });
-
-  test("a partial VAPID setup is refused", () => {
-    expect(() => parseNotifyConfig({ ...base, VAPID_PUBLIC_KEY: "pub" })).toThrow(/VAPID/);
+      parseNotifyConfig({ VAPID_PUBLIC_KEY: "pub", VAPID_PRIVATE_KEY: "priv", VAPID_SUBJECT: "mailto:a@b.c" }),
+    ).toEqual({ publicKey: "pub", privateKey: "priv", subject: "mailto:a@b.c" });
+    expect(() => parseNotifyConfig({ VAPID_PUBLIC_KEY: "pub" })).toThrow(/VAPID_PRIVATE_KEY/);
+    expect(() =>
+      parseNotifyConfig({ VAPID_PUBLIC_KEY: "pub", VAPID_PRIVATE_KEY: "priv", VAPID_SUBJECT: "someone" }),
+    ).toThrow(/VAPID_SUBJECT/);
   });
 });
 
@@ -111,7 +91,6 @@ describe("shell", () => {
 
   test("tells the launcher the key to subscribe with", async () => {
     expect(await (await request("/shell/api/push")).json()).toEqual({
-      enabled: true,
       publicKey: vapid.publicKey,
     });
   });
@@ -120,7 +99,7 @@ describe("shell", () => {
     const shell = {
       identity: context.identity,
       sql: context.sql,
-      webPush: null,
+      webPush,
     };
     const app = {
       slug: "shell",

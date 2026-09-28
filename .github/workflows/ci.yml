@@ -48,8 +48,9 @@ jobs:
           GARAGE_RPC_SECRET: ci
           GARAGE_DEFAULT_ACCESS_KEY: ci
           GARAGE_DEFAULT_SECRET_KEY: ci
-          NTFY_TOKEN: tk_ci00000000000000000000000000
-          NTFY_AUTH_USERS: ci:hash:admin
+          VAPID_PUBLIC_KEY: ci
+          VAPID_PRIVATE_KEY: ci
+          VAPID_SUBJECT: mailto:ci@example.com
         run: |
           docker compose -f deploy/stack/compose.yaml config --quiet
           jq empty deploy/stack/serve.json
