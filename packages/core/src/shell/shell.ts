@@ -1,4 +1,5 @@
 import { requestEmpty, requestJson } from "../web";
+import { artwork } from "./artwork";
 import { PushSettings, SHELL_API, ShellApps } from "./contract";
 import { installShell } from "./register";
 
@@ -8,66 +9,6 @@ const element = <T extends HTMLElement>(id: string): T => {
     throw new Error(`#${id} missing from index.html`);
   }
   return found as T;
-};
-
-/** mulberry32 seeded by FNV-1a, so each app keeps the same artwork across visits. */
-const seededRandom = (seed: string) => {
-  let state = 2166136261;
-  for (const char of seed) {
-    state = Math.imul(state ^ char.charCodeAt(0), 16777619);
-  }
-  return () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-};
-
-const PALETTE = ["var(--accent)", "var(--accent-2)", "var(--warning-fg)", "var(--fg)", "var(--border)"];
-const COLUMNS = 4;
-const ROWS = 2;
-
-/** Unit-cell shapes drawn in a 10×10 cell; each is rotated by a random quarter turn. */
-const SQUARE = "M0 0H10V10H0Z";
-const SHAPES = [
-  SQUARE,
-  "M0 0H10A10 10 0 0 1 0 10Z",
-  "M0 10A10 10 0 0 1 10 0V10Z",
-  "M0 0H10L0 10Z",
-  "M0 5A5 5 0 0 1 10 5A5 5 0 0 1 0 5Z",
-  "M0 5A5 5 0 0 1 10 5Z",
-];
-
-const SVG_NS = "http://www.w3.org/2000/svg";
-
-const path = (d: string, fill: string) => {
-  const created = document.createElementNS(SVG_NS, "path");
-  created.setAttribute("d", d);
-  created.setAttribute("fill", fill);
-  return created;
-};
-
-/** A Bauhaus-style grid of coloured shapes, drawn with theme colours so it follows light and dark mode. */
-const artwork = (seed: string): SVGSVGElement => {
-  const random = seededRandom(seed);
-  const pick = <T>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T;
-  const svg = document.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("viewBox", `0 0 ${COLUMNS * 10} ${ROWS * 10}`);
-  svg.setAttribute("aria-hidden", "true");
-  svg.classList.add("art");
-  for (let cell = 0; cell < COLUMNS * ROWS; cell++) {
-    const background = pick(PALETTE);
-    const foreground = pick(PALETTE.filter((colour) => colour !== background));
-    const group = document.createElementNS(SVG_NS, "g");
-    group.setAttribute(
-      "transform",
-      `translate(${(cell % COLUMNS) * 10} ${Math.floor(cell / COLUMNS) * 10}) rotate(${pick([0, 90, 180, 270])} 5 5)`,
-    );
-    group.append(path(SQUARE, background), path(pick(SHAPES), foreground));
-    svg.append(group);
-  }
-  return svg;
 };
 
 const renderApps = async () => {
