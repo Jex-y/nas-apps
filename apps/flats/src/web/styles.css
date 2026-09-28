@@ -1,34 +1,4 @@
-:root {
-  color-scheme: light dark;
-  --bg: #fafaf9;
-  --surface: #ffffff;
-  --fg: #1c1917;
-  --muted: #78716c;
-  --border: #e7e5e4;
-  --accent: #2563eb;
-  --warning-bg: #fef3c7;
-  --warning-fg: #92400e;
-  --error: #b91c1c;
-  --success: #15803d;
-  font-family: system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--fg);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0c0a09;
-    --surface: #1c1917;
-    --fg: #f5f5f4;
-    --muted: #a8a29e;
-    --border: #292524;
-    --accent: #60a5fa;
-    --warning-bg: #451a03;
-    --warning-fg: #fcd34d;
-    --error: #f87171;
-    --success: #4ade80;
-  }
-}
+@import "@nas/core/theme.css";
 
 * {
   box-sizing: border-box;
@@ -73,7 +43,7 @@ button {
   color: inherit;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   padding: 0.4rem 0.6rem;
 }
 
@@ -89,12 +59,12 @@ button {
 button[type="submit"] {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--on-accent);
 }
 
 kbd {
   border: 1px solid var(--border);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-small);
   padding: 0 0.3rem;
   font-size: 0.8rem;
 }
@@ -169,7 +139,7 @@ main {
   padding: 0.75rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  border-radius: var(--radius);
 }
 
 .card.selected {
@@ -181,7 +151,7 @@ main {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   background: var(--border);
   display: block;
 }
@@ -202,7 +172,19 @@ main {
 
 .facts {
   margin: 0.25rem 0 0.5rem;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+}
+
+.facts,
+.facts-table dd {
+  font-family: var(--font-mono);
+}
+
+.facts,
+.facts-table dd,
+.card-heading h2,
+.property .page-heading h1 {
+  font-variant-numeric: tabular-nums;
 }
 
 .badges {
@@ -237,7 +219,7 @@ main {
   width: 100%;
   max-height: 32rem;
   object-fit: cover;
-  border-radius: 0.5rem;
+  border-radius: var(--radius);
 }
 
 .thumbs {
@@ -249,7 +231,7 @@ main {
 
 .thumbs img {
   height: 5rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-small);
 }
 
 .columns {
@@ -308,7 +290,7 @@ main {
   padding: 0.75rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  border-radius: var(--radius);
 }
 
 .viewing-form {
@@ -413,7 +395,7 @@ main:has(.swipe) {
   top: 1rem;
   padding: 0.2rem 0.6rem;
   border: 3px solid;
-  border-radius: 0.375rem;
+  border-radius: var(--radius);
   font-weight: 700;
   font-size: 1.5rem;
   text-transform: uppercase;

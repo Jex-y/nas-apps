@@ -1,0 +1,84 @@
+/* The bundler inlines every font file it reaches as a data URI, so only the Latin woff2 faces are declared. */
+@font-face {
+  font-family: "Instrument Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
+@font-face {
+  font-family: "DM Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("@fontsource/dm-mono/files/dm-mono-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "DM Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url("@fontsource/dm-mono/files/dm-mono-latin-500-normal.woff2") format("woff2");
+}
+
+:root {
+  color-scheme: light dark;
+  --bg: #ecebe7;
+  --surface: #f7f6f3;
+  --fg: #1d1d1b;
+  --muted: #66655f;
+  --border: #d8d6cf;
+  --accent: #be4a12;
+  --on-accent: #ffffff;
+  --accent-2: #3f7a3c;
+  --warning-bg: #f3e3b5;
+  --warning-fg: #6b4a00;
+  --error: #b3261e;
+  --success: #3f7a3c;
+  --radius: 6px;
+  --radius-small: 4px;
+  --font-body: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, Menlo, monospace;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a18;
+    --surface: #232321;
+    --fg: #efeee9;
+    --muted: #9d9c96;
+    --border: #363532;
+    --accent: #ff7442;
+    --on-accent: #1a1a18;
+    --accent-2: #7fc079;
+    --warning-bg: #3a2c0c;
+    --warning-fg: #f2c230;
+    --error: #ff8a7a;
+    --success: #7fc079;
+  }
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+time,
+kbd,
+.numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
