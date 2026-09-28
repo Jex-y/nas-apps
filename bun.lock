@@ -27,6 +27,22 @@
         "@types/react-dom": "^19.3.0",
       },
     },
+    "apps/pet": {
+      "name": "@nas/pet",
+      "dependencies": {
+        "@nas/core": "workspace:*",
+        "@tanstack/react-query": "^5.104.0",
+        "drizzle-orm": "^0.45.3",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "wouter": "^3.11.0",
+        "zod": "^4.6.5",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+      },
+    },
     "apps/status": {
       "name": "@nas/status",
       "dependencies": {
@@ -61,6 +77,7 @@
       "dependencies": {
         "@nas/core": "workspace:*",
         "@nas/flats": "workspace:*",
+        "@nas/pet": "workspace:*",
         "@nas/status": "workspace:*",
         "drizzle-orm": "^0.45.3",
       },
@@ -150,6 +167,8 @@
     "@nas/core": ["@nas/core@workspace:packages/core"],
 
     "@nas/flats": ["@nas/flats@workspace:apps/flats"],
+
+    "@nas/pet": ["@nas/pet@workspace:apps/pet"],
 
     "@nas/server": ["@nas/server@workspace:server"],
 
