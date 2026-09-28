@@ -30,6 +30,8 @@ export type SearchHit = {
   readonly bedrooms: number | null;
   readonly bathrooms: number | null;
   readonly auction: boolean;
+  /** Shared ownership or another affordable-buying scheme; these are kept out of triage. */
+  readonly sharedOwnership: boolean;
   readonly photos: readonly Photo[];
 };
 
@@ -59,6 +61,7 @@ export type ParsedListing = {
   readonly annualServiceCharge: number | null;
   readonly annualGroundRent: number | null;
   readonly councilTaxBand: string | null;
+  /** Shared ownership or another affordable-buying scheme; these are kept out of triage. */
   readonly sharedOwnership: boolean;
   readonly description: string;
   readonly keyFeatures: readonly string[];
@@ -67,6 +70,12 @@ export type ParsedListing = {
   readonly nearestStations: readonly Station[];
   readonly agent: { readonly name: string; readonly phone: string | null } | null;
 };
+
+const SHARED_OWNERSHIP = /(?<!\b(?:non-?|not (?:an? )?|no )\s*)\bshared[- ]ownership\b/i;
+
+/** For portals without a structured flag: whether an advert's own words say it is shared ownership. */
+export const mentionsSharedOwnership = (...texts: readonly string[]): boolean =>
+  texts.some((text) => SHARED_OWNERSHIP.test(text));
 
 /** A portal's pages changed shape; retrying will not help until the parser is updated. */
 export class ParseError extends Error {}

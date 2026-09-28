@@ -288,7 +288,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
         if (result.kind !== "ok") {
           throw new Error(result.kind === "blocked" ? `Blocked with ${result.status}` : "Search page not found");
         }
-        const hits = parser.parseSearch(result.body);
+        const hits = parser.parseSearch(result.body).filter((hit) => !hit.sharedOwnership);
         for (const hit of hits) {
           const outcome = await recordSearchHit(db, hit);
           if (outcome.kind === "new") {

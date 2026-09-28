@@ -3,6 +3,9 @@ import type { FlatsDb } from "./db";
 import type { Availability, ParsedListing, SearchHit } from "./portals/listing";
 import { listings, properties, snapshots } from "./schema";
 
+/** Why a property the portal marks as shared ownership was rejected without being triaged. */
+export const SHARED_OWNERSHIP_REASON = "Shared ownership";
+
 /** What a portal now says that differs from what we last recorded. */
 export type ListingChange = {
   readonly propertyId: string;
@@ -134,7 +137,8 @@ export const propertyFacts = (parsed: ParsedListing) => ({
 
 /**
  * Records a freshly parsed listing page (whose raw copy is already stored at `pageKey`) and brings the property's
- * facts up to date; returns what changed since the last observation.
+ * facts up to date; returns what changed since the last observation. A page marked shared ownership rejects the
+ * property unless it has already been triaged.
  */
 export const recordListingPage = (
   db: FlatsDb,
@@ -185,6 +189,12 @@ export const recordListingPage = (
         updatedAt: sql`now()`,
       })
       .where(eq(properties.id, known.propertyId));
+    if (observed.kind === "page" && observed.parsed.sharedOwnership) {
+      await tx
+        .update(properties)
+        .set({ status: "rejected", rejectedReason: SHARED_OWNERSHIP_REASON })
+        .where(and(eq(properties.id, known.propertyId), eq(properties.status, "new")));
+    }
 
     return diff(known, known, after);
   });
@@ -200,5 +210,6 @@ export const hitFromListing = (parsed: ParsedListing): SearchHit => ({
   bedrooms: parsed.bedrooms,
   bathrooms: parsed.bathrooms,
   auction: false,
+  sharedOwnership: parsed.sharedOwnership,
   photos: parsed.photos,
 });
