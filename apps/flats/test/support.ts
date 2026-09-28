@@ -4,6 +4,7 @@ import { createTestContext } from "@nas/core/testing";
 import { eq } from "drizzle-orm";
 import { flatsDb } from "../src/api/db";
 import type { Download, Fetcher, FetchResult } from "../src/api/fetcher";
+import type { ArriveBy, Coordinates, Geocoder, JourneyPlanner } from "../src/api/places";
 import { rightmove } from "../src/api/portals/rightmove";
 import { listings, properties, searches } from "../src/api/schema";
 import { createFlatsWork } from "../src/api/work";
@@ -48,6 +49,26 @@ export const defaultPages: Pages = {
   },
 };
 
+/** A journey planner that answers every query with `minutes`, recording what it was asked. */
+export const fakePlanner = (minutes: number | null = 43) => {
+  const asked: { from: Coordinates; to: Coordinates; arriveBy: ArriveBy }[] = [];
+  const planner: JourneyPlanner = {
+    fastestMinutes: async (from, to, arriveBy) => {
+      asked.push({ from, to, arriveBy });
+      return minutes;
+    },
+  };
+  return { planner, asked };
+};
+
+/** Knows Fora Chancery House's postcode and nothing else. */
+export const fakeGeocoder: Geocoder = {
+  postcode: async (postcode) =>
+    postcode.replace(/\s/g, "").toUpperCase() === "WC2A1QS"
+      ? { postcode: "WC2A 1QS", location: { latitude: 51.5162, longitude: -0.1117 } }
+      : null,
+};
+
 /** Noon on a past British Summer Time weekday: inside polling hours, and already due by the database clock. */
 export const NOON = new Date("2026-09-21T11:00:00Z");
 
@@ -61,7 +82,7 @@ export const createFlatsTestbed = () => {
   const db = flatsDb(context.sql);
   const blob = createBlobStore(context.blob, `flats-test/${crypto.randomUUID()}`);
 
-  const setup = (pages: Pages = defaultPages, now = NOON) => {
+  const setup = (pages: Pages = defaultPages, now = NOON, planner: JourneyPlanner | null = fakePlanner().planner) => {
     const sent: Notification[] = [];
     const fetcher = fakeFetcher(pages);
     const work = createFlatsWork({
@@ -71,6 +92,7 @@ export const createFlatsTestbed = () => {
       notifier: { send: async (notification) => void sent.push(notification) },
       fetcher,
       parsers: { rightmove },
+      planner,
       publicUrl: "https://apps.example",
       now: () => now,
     });

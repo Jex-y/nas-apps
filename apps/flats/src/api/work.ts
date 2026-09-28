@@ -1,13 +1,14 @@
 import type { BlobStore, JobQueue, Notifier, RegisteredJob, Schedule } from "@nas/core";
 import { defineJob, defineSchedule, PermanentJobError } from "@nas/core";
-import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { TRACKED_STATUSES } from "../contract";
 import type { FlatsDb } from "./db";
 import type { Fetcher } from "./fetcher";
 import { hitFromListing, type ListingChange, recordListingPage, recordSearchHit } from "./ingest";
+import { type JourneyPlanner, nextTuesday } from "./places";
 import { type ParsedListing, ParseError, PORTALS, type Portal, type PortalParser } from "./portals/listing";
-import { listings, photos, properties, searches } from "./schema";
+import { commutes, destinations, listings, photos, properties, searches } from "./schema";
 
 export type FlatsWorkDeps = {
   readonly db: FlatsDb;
@@ -15,6 +16,8 @@ export type FlatsWorkDeps = {
   readonly queue: JobQueue;
   readonly notifier: Notifier;
   readonly fetcher: Fetcher;
+  /** `null` when no TfL key is configured; commutes are then left uncomputed. */
+  readonly planner: JourneyPlanner | null;
   readonly parsers: Readonly<Partial<Record<Portal, PortalParser>>>;
   readonly publicUrl: string;
   readonly now: () => Date;
@@ -125,6 +128,45 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
   });
 
+  const computeCommutes = defineJob({
+    name: "flats.commute",
+    payload: z.object({ propertyId: z.uuid() }),
+    timeoutMs: 2 * MINUTE,
+    handle: async ({ propertyId }, { signal }) => {
+      const planner = deps.planner;
+      if (planner === null) {
+        return;
+      }
+      const [property] = await db
+        .select({ latitude: properties.latitude, longitude: properties.longitude })
+        .from(properties)
+        .where(eq(properties.id, propertyId));
+      if (property?.latitude == null || property.longitude == null) {
+        return;
+      }
+      const from = { latitude: property.latitude, longitude: property.longitude };
+      const untimed = await db
+        .select({
+          id: destinations.id,
+          latitude: destinations.latitude,
+          longitude: destinations.longitude,
+          arriveBy: destinations.arriveBy,
+        })
+        .from(destinations)
+        .leftJoin(commutes, and(eq(commutes.destinationId, destinations.id), eq(commutes.propertyId, propertyId)))
+        .where(isNull(commutes.propertyId));
+      for (const destination of untimed) {
+        const minutes = await planner.fastestMinutes(
+          from,
+          destination,
+          nextTuesday(deps.now(), destination.arriveBy),
+          signal,
+        );
+        await db.insert(commutes).values({ propertyId, destinationId: destination.id, minutes }).onConflictDoNothing();
+      }
+    },
+  });
+
   const parsePage = (parser: PortalParser, html: string, portalId: string): ParsedListing => {
     try {
       return parser.parseListing(html, portalId);
@@ -139,6 +181,13 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     await blob.write(pageKey, new Blob([Bun.gzipSync(html)]), "application/gzip");
     const change = await recordListingPage(db, listingId, { kind: "page", parsed, pageKey });
     await queue.enqueue(mirrorPhotos, { listingId }, { dedupeKey: listingId });
+    const [listing] = await db
+      .select({ propertyId: listings.propertyId })
+      .from(listings)
+      .where(eq(listings.id, listingId));
+    if (listing !== undefined) {
+      await queue.enqueue(computeCommutes, { propertyId: listing.propertyId }, { dedupeKey: listing.propertyId });
+    }
     return change;
   };
 
@@ -291,6 +340,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     fetchListing,
     addListing,
     mirrorPhotos,
+    computeCommutes,
     refreshTracked,
   ];
 
@@ -314,7 +364,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
   return {
     jobs,
     schedules,
-    definitions: { pollSearches, pollSearch, fetchListing, addListing, mirrorPhotos, refreshTracked },
+    definitions: { pollSearches, pollSearch, fetchListing, addListing, mirrorPhotos, computeCommutes, refreshTracked },
     /** Polls the first `pages` result pages of a new search, a minute apart, to seed it with current listings. */
     backfillSearch: async (searchId: string, pages: number) => {
       const start = deps.now().getTime();
@@ -324,6 +374,16 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
           { searchId, offset: page * PAGE_SIZE },
           { dedupeKey: `${searchId}:${page * PAGE_SIZE}`, runAt: new Date(start + page * MINUTE) },
         );
+      }
+    },
+    /** Times every property still in play to any place it has not been timed to yet, e.g. after adding a place. */
+    timeCommutes: async () => {
+      const inPlay = await db
+        .select({ id: properties.id })
+        .from(properties)
+        .where(and(ne(properties.status, "rejected"), ne(properties.availability, "removed")));
+      for (const { id } of inPlay) {
+        await queue.enqueue(computeCommutes, { propertyId: id }, { dedupeKey: id });
       }
     },
     /** Starts tracking a listing by its URL; resolves `false` when that listing is already being added. */

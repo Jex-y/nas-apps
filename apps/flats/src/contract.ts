@@ -15,6 +15,14 @@ export const TRACKED_STATUSES = [
   "offer_made",
 ] as const satisfies readonly PropertyStatus[];
 
+export const Commute = z.object({
+  destinationId: z.uuid(),
+  name: z.string(),
+  /** Fastest public-transport journey; `null` when TfL found no route. */
+  minutes: z.number().nullable(),
+});
+export type Commute = z.infer<typeof Commute>;
+
 export const PropertySummary = z.object({
   id: z.uuid(),
   status: z.enum(PROPERTY_STATUSES),
@@ -38,6 +46,8 @@ export const PropertySummary = z.object({
   thumbnailUrl: z.string().nullable(),
   firstSeenAt: z.iso.datetime(),
   listings: z.array(z.object({ portal: z.enum(PORTALS), url: z.url() })),
+  /** Only the places already timed; the rest are still being computed. */
+  commutes: z.array(Commute),
 });
 export type PropertySummary = z.infer<typeof PropertySummary>;
 
@@ -120,3 +130,23 @@ export const AddListing = z.object({ url: z.url() });
 export type AddListing = z.infer<typeof AddListing>;
 
 export const MAX_VIEWING_PHOTO_BYTES = 25 * 1024 * 1024;
+
+const ARRIVE_BY = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export const Destination = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  postcode: z.string(),
+  arriveBy: z.string().regex(ARRIVE_BY),
+});
+export type Destination = z.infer<typeof Destination>;
+
+export const DestinationList = z.array(Destination);
+
+export const CreateDestination = z.object({
+  name: z.string().trim().min(1).max(60),
+  postcode: z.string().trim().min(5).max(8),
+  /** London time to arrive by on a weekday, `HH:MM`. */
+  arriveBy: z.string().regex(ARRIVE_BY),
+});
+export type CreateDestination = z.infer<typeof CreateDestination>;

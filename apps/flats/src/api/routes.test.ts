@@ -1,13 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { startTestServer, uniqueLogin } from "@nas/core/testing";
 import { drizzle } from "drizzle-orm/bun-sql";
-import { createFlatsTestbed } from "../../test/support";
+import { createFlatsTestbed, fakeGeocoder, fakePlanner } from "../../test/support";
 import { PropertyDetail, PropertyList, Search, SearchList } from "../contract";
 import { createFlatsApp } from "../module";
 import { collapseHistory } from "./routes";
 
 const { context, setup, addSearch, propertyByPortalId } = createFlatsTestbed();
-const request = startTestServer((ctx) => [createFlatsApp(ctx)], context);
+const request = startTestServer(
+  (ctx) => [createFlatsApp(ctx, { geocoder: fakeGeocoder, planner: fakePlanner().planner })],
+  context,
+);
 const me = uniqueLogin();
 
 const json = (body: unknown): RequestInit => ({
