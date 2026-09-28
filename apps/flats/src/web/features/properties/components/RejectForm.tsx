@@ -17,9 +17,8 @@ export const RejectForm = ({ onReject, onCancel }: { onReject: (reason: string) 
         value={reason}
         onChange={(event) => setReason(event.target.value)}
         onKeyDown={(event) => event.key === "Escape" && onCancel()}
-        placeholder="Why not? e.g. ground floor, tiny kitchen"
-        aria-label="Reason for rejecting"
-        required
+        placeholder="Why not? Optional, e.g. ground floor"
+        aria-label="Reason for rejecting (optional)"
       />
       <button type="submit">Reject</button>
       <button type="button" onClick={onCancel}>

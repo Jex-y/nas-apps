@@ -73,12 +73,30 @@ describe("properties", () => {
     expect(detail.history).toEqual([expect.objectContaining({ price: 350000, availability: "available" })]);
   });
 
-  test("needs a reason to reject, and clears it when un-rejected", async () => {
+  test("rejects without a reason, storing an absent or blank one as none", async () => {
     await seed();
     const { property } = await propertyByPortalId("93524796");
     const status = `/flats/api/properties/${property.id}/status`;
 
-    expect((await request(status, { as: me, method: "PUT", ...json({ status: "rejected" }) })).status).toBe(400);
+    for (const update of [
+      { status: "rejected" },
+      { status: "rejected", reason: null },
+      { status: "rejected", reason: "  " },
+    ]) {
+      await request(status, { as: me, method: "PUT", ...json({ status: "new" }) });
+      expect((await request(status, { as: me, method: "PUT", ...json(update) })).status).toBe(204);
+      expect((await propertyByPortalId("93524796")).property).toMatchObject({
+        status: "rejected",
+        rejectedReason: null,
+      });
+    }
+  });
+
+  test("keeps a rejection's reason, and clears it when un-rejected", async () => {
+    await seed();
+    const { property } = await propertyByPortalId("93524796");
+    const status = `/flats/api/properties/${property.id}/status`;
+
     expect(
       (await request(status, { as: me, method: "PUT", ...json({ status: "rejected", reason: "Service charge" }) }))
         .status,

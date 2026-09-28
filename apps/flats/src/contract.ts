@@ -90,9 +90,16 @@ export const PropertyDetail = PropertySummary.extend({
 });
 export type PropertyDetail = z.infer<typeof PropertyDetail>;
 
-/** Rejecting a property must say why; the reason is what makes the rejection useful later. */
+/** An absent or blank reason parses to `null`, so a rejection never stores an empty string. */
+const RejectedReason = z
+  .string()
+  .trim()
+  .max(500)
+  .nullish()
+  .transform((reason) => reason || null);
+
 export const UpdateStatus = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("rejected"), reason: z.string().trim().min(1).max(500) }),
+  z.object({ status: z.literal("rejected"), reason: RejectedReason }),
   z.object({ status: z.enum(PROPERTY_STATUSES).exclude(["rejected"]) }),
 ]);
 export type UpdateStatus = z.infer<typeof UpdateStatus>;
