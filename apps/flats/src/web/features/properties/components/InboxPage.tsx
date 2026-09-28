@@ -2,11 +2,8 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { PropertyCard } from "../../../components/PropertyCard";
 import { useProperties, useUpdateStatus } from "../api/properties";
+import { isTyping } from "../utils/keyboard";
 import { RejectForm } from "./RejectForm";
-
-const isTyping = (target: EventTarget | null) =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
 /** New listings to triage: j/k to move, s to shortlist, x to reject, r to reject with a reason, o to open. */
 export const InboxPage = () => {

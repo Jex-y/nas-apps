@@ -9,6 +9,7 @@
   --warning-bg: #fef3c7;
   --warning-fg: #92400e;
   --error: #b91c1c;
+  --success: #15803d;
   font-family: system-ui, sans-serif;
   background: var(--bg);
   color: var(--fg);
@@ -25,6 +26,7 @@
     --warning-bg: #451a03;
     --warning-fg: #fcd34d;
     --error: #f87171;
+    --success: #4ade80;
   }
 }
 
@@ -347,5 +349,134 @@ main {
   .card,
   .columns {
     grid-template-columns: 1fr;
+  }
+}
+
+main:has(.swipe) {
+  overflow-x: clip;
+}
+
+.swipe {
+  max-width: 28rem;
+  margin: 0 auto;
+}
+
+.deck {
+  display: grid;
+  min-height: 12rem;
+}
+
+.deck > * {
+  grid-area: 1 / 1;
+}
+
+.swipe-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  transform: translateY(0.5rem) scale(0.96);
+  transition: transform 200ms ease-out;
+  user-select: none;
+}
+
+.swipe-card.top {
+  z-index: 1;
+  transform: none;
+  touch-action: pan-y;
+  cursor: grab;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+}
+
+.swipe-card.dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+.swipe-photo {
+  position: relative;
+}
+
+.swipe-photo img,
+.swipe-photo .no-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 45dvh;
+  object-fit: cover;
+  display: block;
+  border-radius: 0;
+}
+
+.stamp {
+  position: absolute;
+  top: 1rem;
+  padding: 0.2rem 0.6rem;
+  border: 3px solid;
+  border-radius: 0.375rem;
+  font-weight: 700;
+  font-size: 1.5rem;
+  text-transform: uppercase;
+  background: rgb(255 255 255 / 0.8);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.stamp.shortlist {
+  left: 1rem;
+  color: var(--success);
+  transform: rotate(-12deg);
+}
+
+.stamp.reject {
+  right: 1rem;
+  color: var(--error);
+  transform: rotate(12deg);
+}
+
+.swipe-body {
+  padding: 0.75rem 1rem 1rem;
+}
+
+.commutes {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  font-size: 0.9rem;
+}
+
+.swipe-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.swipe-actions button {
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+}
+
+.swipe-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.swipe-actions .reject {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.swipe-actions .shortlist {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+@media (hover: none) {
+  .key-hints {
+    display: none;
   }
 }

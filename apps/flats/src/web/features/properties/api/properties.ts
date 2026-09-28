@@ -6,6 +6,7 @@ import {
   PropertyDetail,
   PropertyList,
   type PropertyStatus,
+  type PropertySummary,
   type UpdateStatus,
 } from "../../../../contract";
 
@@ -13,6 +14,7 @@ const keys = {
   all: ["properties"] as const,
   list: (status: PropertyStatus | "all") => ["properties", "list", status] as const,
   detail: (id: string) => ["properties", "detail", id] as const,
+  triage: ["properties", "triage"] as const,
 };
 
 export const useProperties = (status: PropertyStatus | "all") =>
@@ -33,10 +35,35 @@ const useInvalidatingMutation = <T>(mutationFn: (input: T) => Promise<void>) => 
   return useMutation({ mutationFn, onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.all }) });
 };
 
+const putStatus = (id: string, update: UpdateStatus) =>
+  requestEmpty(`${FLATS_API}/properties/${id}/status`, { method: "PUT", body: JSON.stringify(update) });
+
 export const useUpdateStatus = () =>
-  useInvalidatingMutation(({ id, update }: { id: string; update: UpdateStatus }) =>
-    requestEmpty(`${FLATS_API}/properties/${id}/status`, { method: "PUT", body: JSON.stringify(update) }),
-  );
+  useInvalidatingMutation(({ id, update }: { id: string; update: UpdateStatus }) => putStatus(id, update));
+
+/**
+ * Moves a property into or out of the new list at once rather than after the round trip. Refetching waits for the
+ * last triage in flight: an earlier one settling mid-burst would refetch a list that still holds the later ones.
+ */
+export const useTriage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: keys.triage,
+    mutationFn: ({ property, update }: { property: PropertySummary; update: UpdateStatus }) =>
+      putStatus(property.id, update),
+    onMutate: async ({ property, update }) => {
+      await queryClient.cancelQueries({ queryKey: keys.list("new") });
+      queryClient.setQueryData<PropertySummary[]>(keys.list("new"), (list) => {
+        const others = list?.filter((other) => other.id !== property.id);
+        return others && (update.status === "new" ? [property, ...others] : others);
+      });
+    },
+    onSettled: () =>
+      queryClient.isMutating({ mutationKey: keys.triage }) === 1
+        ? queryClient.invalidateQueries({ queryKey: keys.all })
+        : undefined,
+  });
+};
 
 export const useUpdateNotes = () =>
   useInvalidatingMutation(({ id, notes }: { id: string; notes: string }) =>
