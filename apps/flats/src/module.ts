@@ -1,11 +1,4 @@
-import {
-  type AppContext,
-  type AppModule,
-  appRoutes,
-  createBlobStore,
-  createNotifier,
-  trailingSlashRedirect,
-} from "@nas/core";
+import { type AppContext, type AppModule, appRoutes, createBlobStore, trailingSlashRedirect } from "@nas/core";
 import { parseFlatsConfig } from "./api/config";
 import { flatsDb } from "./api/db";
 import { BROWSER_USER_AGENT, createHttpFetcher } from "./api/fetcher";
@@ -37,7 +30,7 @@ export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = re
     db,
     blob,
     queue: context.jobs,
-    notifier: createNotifier(context.notify, "flats"),
+    notifier: context.notifier("flats"),
     fetcher: createHttpFetcher({ userAgent: BROWSER_USER_AGENT, intervalMs }),
     parsers: { rightmove },
     planner: adapters.planner,

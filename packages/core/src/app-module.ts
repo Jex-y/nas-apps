@@ -3,7 +3,7 @@ import type { BlobConfig } from "./blob";
 import type { IdentityMode } from "./identity";
 import type { JobQueue, RegisteredJob } from "./jobs/queue";
 import type { Schedule } from "./jobs/schedule";
-import type { NotifyConfig } from "./notify";
+import type { NotifierFactory } from "./notify";
 
 export type AppContext = {
   /** The raw environment, for an app to parse its own settings (e.g. third-party API keys) at its boundary. */
@@ -11,7 +11,7 @@ export type AppContext = {
   readonly publicUrl: string;
   readonly sql: SQL;
   readonly blob: BlobConfig;
-  readonly notify: NotifyConfig;
+  readonly notifier: NotifierFactory;
   readonly jobs: JobQueue;
   readonly identity: IdentityMode;
 };

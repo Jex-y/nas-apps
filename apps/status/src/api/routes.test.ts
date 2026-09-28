@@ -70,7 +70,7 @@ const statusApp = (ctx: typeof context) =>
 const request = startTestServer((ctx) => [statusApp(ctx)], context);
 const requestWithoutNtfy = startTestServer((ctx) => [statusApp(ctx)], {
   ...context,
-  notify: { url: "http://127.0.0.1:9" },
+  env: { ...context.env, NTFY_URL: "http://127.0.0.1:9" },
 });
 
 const fetchReport = async (send = request): Promise<StatusReport> => {

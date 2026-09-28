@@ -43,6 +43,9 @@ export const Layout = ({ children }: { children: ReactNode }) => (
   <>
     <header className="site-header">
       <nav>
+        <a href="/" className="nav-link">
+          ‹ Apps
+        </a>
         <NavLink href="/">Inbox</NavLink>
         <NavLink href="/swipe">Swipe</NavLink>
         <NavLink href="/board">Board</NavLink>

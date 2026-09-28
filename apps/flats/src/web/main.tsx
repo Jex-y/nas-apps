@@ -1,3 +1,4 @@
+import { installShell } from "@nas/core/web";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -11,6 +12,8 @@ import { RejectedPage } from "./features/properties/components/RejectedPage";
 import { SwipePage } from "./features/properties/components/SwipePage";
 import { SearchesPage } from "./features/searches/components/SearchesPage";
 import { queryClient } from "./lib/query-client";
+
+void installShell();
 
 const root = document.getElementById("root");
 if (!root) {

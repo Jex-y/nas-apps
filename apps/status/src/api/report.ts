@@ -6,6 +6,7 @@ import {
   createBlobStore,
   type JobStats,
   type JobsDatabase,
+  parseNotifyConfig,
   readJobQueue,
   readMigrationState,
   readSchedules,
@@ -105,9 +106,9 @@ const readPostgres = async ({ sql }: AppContext): Promise<PostgresInfo> => {
 
 const NtfyHealth = z.object({ healthy: z.boolean() });
 
-const readNotify = async ({ notify }: AppContext, signal: AbortSignal) =>
+const readNotify = async ({ env }: AppContext, signal: AbortSignal) =>
   timed(async () => {
-    const response = await fetch(`${notify.url}/v1/health`, { signal });
+    const response = await fetch(`${parseNotifyConfig(env).ntfy.url}/v1/health`, { signal });
     if (!response.ok) {
       throw new Error(`ntfy answered ${response.status}`);
     }

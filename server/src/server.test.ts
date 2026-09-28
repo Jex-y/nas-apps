@@ -10,9 +10,9 @@ describe("server", () => {
     expect(response.status).toBe(200);
   });
 
-  test("landing page links every app", async () => {
-    const html = await (await request("/")).text();
-    expect(html).toContain('href="/notes/"');
+  test("launcher lists every app", async () => {
+    expect(await (await request("/")).text()).toContain(`<ul id="apps"`);
+    expect(await (await request("/shell/api/apps")).json()).toContainEqual({ slug: "notes", title: "Notes" });
   });
 
   test("app root redirects to its trailing-slash path", async () => {

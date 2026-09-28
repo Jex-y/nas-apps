@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test";
-import { createNotifier, parseNotifyConfig } from "./notify";
+import { createNtfyNotifier, parseNotifyConfig } from "./notify";
 
 test("publishes to the app's ntfy topic", async () => {
   const config = parseNotifyConfig(process.env);
   const topic = `test-${crypto.randomUUID()}`;
 
-  await createNotifier(config, topic).send({
+  await createNtfyNotifier(config.ntfy, topic).send({
     title: "New flat",
     message: "2 bed, Hackney, £450k",
     clickUrl: "https://example.com/flat",
@@ -13,7 +13,7 @@ test("publishes to the app's ntfy topic", async () => {
     tags: ["house"],
   });
 
-  const response = await fetch(`${config.url}/${topic}/json?poll=1`);
+  const response = await fetch(`${config.ntfy.url}/${topic}/json?poll=1`);
   const [message] = (await response.text())
     .trim()
     .split("\n")

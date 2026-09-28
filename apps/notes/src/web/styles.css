@@ -116,3 +116,9 @@ button.link {
   font-size: 0.875rem;
   text-decoration: underline;
 }
+
+.home-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.875rem;
+}

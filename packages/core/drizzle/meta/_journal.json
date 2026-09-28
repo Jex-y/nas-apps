@@ -15,6 +15,13 @@
       "when": 1790577630158,
       "tag": "0001_record_job_outcomes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790578841551,
+      "tag": "0002_add_push_subscriptions",
+      "breakpoints": true
     }
   ]
 }

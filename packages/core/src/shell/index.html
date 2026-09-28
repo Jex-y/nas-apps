@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Apps</title>
+    <link rel="stylesheet" href="./shell.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Apps</h1>
+      <ul id="apps" class="apps"></ul>
+      <section id="push" class="push" hidden>
+        <h2>Notifications</h2>
+        <p id="push-status" class="muted"></p>
+        <div class="actions">
+          <button type="button" id="push-enable" hidden>Turn on notifications</button>
+          <button type="button" id="push-test" hidden>Send a test</button>
+          <button type="button" id="push-disable" hidden>Turn off</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./shell.ts"></script>
+  </body>
+</html>
