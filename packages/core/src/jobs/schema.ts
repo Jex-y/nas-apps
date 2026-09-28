@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, index, integer, pgSchema, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, index, integer, pgSchema, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { jsonb } from "../columns";
 
 export const jobsSchema = pgSchema("jobs");
@@ -22,6 +22,8 @@ export const jobs = jobsSchema.table(
     maxAttempts: integer("max_attempts").notNull(),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
     lastError: text("last_error"),
+    /** When `last_error` was recorded; null on rows that failed before this column existed. */
+    failedAt: timestamp("failed_at", { withTimezone: true }),
     dedupeKey: text("dedupe_key"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -38,3 +40,17 @@ export const schedules = jobsSchema.table("schedules", {
   name: text("name").primaryKey(),
   lastSlot: bigint("last_slot", { mode: "number" }).notNull(),
 });
+
+export const jobOutcome = jobsSchema.enum("job_outcome", ["completed", "retrying", "dead"]);
+
+/** How many attempts of each job ended each way per UTC hour; a completed job leaves no other trace. */
+export const hourlyOutcomes = jobsSchema.table(
+  "hourly_outcomes",
+  {
+    name: text("name").notNull(),
+    hour: timestamp("hour", { withTimezone: true }).notNull(),
+    outcome: jobOutcome("outcome").notNull(),
+    count: integer("count").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.name, table.hour, table.outcome] })],
+);

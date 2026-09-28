@@ -8,6 +8,13 @@
       "when": 1790540149246,
       "tag": "0000_create_job_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790577630158,
+      "tag": "0001_record_job_outcomes",
+      "breakpoints": true
     }
   ]
 }
