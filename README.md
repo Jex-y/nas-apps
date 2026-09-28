@@ -49,7 +49,8 @@ things only once no deployed code reads them.
 
 All the apps are one installable web app scoped to `/`: open `https://apps.tail12605.ts.net/` in Safari, Share →
 Add to Home Screen, then open it from the Home Screen and turn notifications on. iOS only offers Web Push to an
-installed app. An app sends with `context.notifier("<slug>").send(...)`, which reaches every subscribed device.
+installed app. An app sends with `context.notifier("<slug>").send(...)`, which reaches every subscribed device, or
+`context.notifier("<slug>", login)` to reach only that person's.
 
 ## Store files
 
@@ -69,6 +70,30 @@ before its blob, so a failure leaves at worst an unreferenced blob, never a row 
    `server/src/apps.ts`, then `bun install`.
 
 The server refuses to start if two apps share a slug or an app declares a route outside `/<slug>/`.
+
+## Pet
+
+`apps/pet` is a Tamagotchi-style pixel pet kept alive by walking. Each tailnet login hatches one; meeting the daily
+step goal (8,000 unless changed in Settings) feeds it, streaks raise its mood and bond and unlock accessories, and
+missed days make it hungry, then sad, then sick. After a week of them it runs away, and comes home on a day of one and
+a half times the goal. Its state is derived from the day-by-day step history each time it is read, never stored, so
+late or corrected Health data rewrites the story. It nudges its owner at 18:00 London time when short of the goal,
+when the goal is hit, and when steps stop arriving.
+
+Apple Health has no web API, so an iOS Shortcut sends the totals. The Pet app's Health page has the full recipe;
+in short:
+
+1. Build a shortcut that uses Find Health Samples (Steps, Group By Day) and Calculate Statistics (Sum) to total
+   today's and yesterday's steps, and posts them with Get Contents of URL to
+   `https://apps.tail12605.ts.net/pet/api/health` as JSON:
+   `{"days":[{"date":"2026-09-27","steps":9412},{"date":"2026-09-28","steps":3180}]}`. Each day may also carry
+   `distanceMeters` and `activeEnergyKcal`; resending a day replaces it.
+2. Run it once by hand with Tailscale on, allowing Health access and choosing Always Allow for the server, so later
+   runs need no confirmation.
+3. Add personal automations that Run Immediately: when a few everyday apps are opened, and at 17:45.
+
+The Shortcut cannot read Health while the iPhone is locked, so a run then fails and the next one with the phone
+unlocked catches up. The pet only warns about missing data after 36 hours without any.
 
 ## Deploy
 

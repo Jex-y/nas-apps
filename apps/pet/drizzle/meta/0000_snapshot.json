@@ -1,0 +1,389 @@
+{
+  "id": "9bc32fb0-5715-42e3-b52a-86914cb8748e",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "pet.days": {
+      "name": "days",
+      "schema": "pet",
+      "columns": {
+        "login": {
+          "name": "login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "steps": {
+          "name": "steps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "distance_meters": {
+          "name": "distance_meters",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active_energy_kcal": {
+          "name": "active_energy_kcal",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "days_login_date_pk": {
+          "name": "days_login_date_pk",
+          "columns": [
+            "login",
+            "date"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "pet.goals": {
+      "name": "goals",
+      "schema": "pet",
+      "columns": {
+        "pet_id": {
+          "name": "pet_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "since": {
+          "name": "since",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "steps": {
+          "name": "steps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "goals_pet_id_pets_id_fk": {
+          "name": "goals_pet_id_pets_id_fk",
+          "tableFrom": "goals",
+          "tableTo": "pets",
+          "schemaTo": "pet",
+          "columnsFrom": [
+            "pet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "goals_pet_id_since_pk": {
+          "name": "goals_pet_id_since_pk",
+          "columns": [
+            "pet_id",
+            "since"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "pet.interactions": {
+      "name": "interactions",
+      "schema": "pet",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "pet_id": {
+          "name": "pet_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "interaction",
+          "typeSchema": "pet",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "interactions_pet_id_at_index": {
+          "name": "interactions_pet_id_at_index",
+          "columns": [
+            {
+              "expression": "pet_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "interactions_pet_id_pets_id_fk": {
+          "name": "interactions_pet_id_pets_id_fk",
+          "tableFrom": "interactions",
+          "tableTo": "pets",
+          "schemaTo": "pet",
+          "columnsFrom": [
+            "pet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "pet.nudges": {
+      "name": "nudges",
+      "schema": "pet",
+      "columns": {
+        "pet_id": {
+          "name": "pet_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "nudge_kind",
+          "typeSchema": "pet",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "nudges_pet_id_pets_id_fk": {
+          "name": "nudges_pet_id_pets_id_fk",
+          "tableFrom": "nudges",
+          "tableTo": "pets",
+          "schemaTo": "pet",
+          "columnsFrom": [
+            "pet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "nudges_pet_id_date_kind_pk": {
+          "name": "nudges_pet_id_date_kind_pk",
+          "columns": [
+            "pet_id",
+            "date",
+            "kind"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "pet.pets": {
+      "name": "pets",
+      "schema": "pet",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "login": {
+          "name": "login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "species": {
+          "name": "species",
+          "type": "species",
+          "typeSchema": "pet",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trait": {
+          "name": "trait",
+          "type": "trait",
+          "typeSchema": "pet",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accessory": {
+          "name": "accessory",
+          "type": "accessory",
+          "typeSchema": "pet",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hatched_at": {
+          "name": "hatched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "pets_login_unique": {
+          "name": "pets_login_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "login"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "pet.accessory": {
+      "name": "accessory",
+      "schema": "pet",
+      "values": [
+        "bow",
+        "party_hat",
+        "crown"
+      ]
+    },
+    "pet.interaction": {
+      "name": "interaction",
+      "schema": "pet",
+      "values": [
+        "treat",
+        "pet",
+        "play"
+      ]
+    },
+    "pet.nudge_kind": {
+      "name": "nudge_kind",
+      "schema": "pet",
+      "values": [
+        "evening",
+        "goal",
+        "stale"
+      ]
+    },
+    "pet.species": {
+      "name": "species",
+      "schema": "pet",
+      "values": [
+        "chick",
+        "frog",
+        "cat",
+        "bunny",
+        "axolotl",
+        "dragon"
+      ]
+    },
+    "pet.trait": {
+      "name": "trait",
+      "schema": "pet",
+      "values": [
+        "cheerful",
+        "greedy",
+        "cuddly",
+        "playful",
+        "sleepy"
+      ]
+    }
+  },
+  "schemas": {
+    "pet": "pet"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
