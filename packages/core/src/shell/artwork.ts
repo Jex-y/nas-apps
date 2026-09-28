@@ -1,7 +1,7 @@
 /**
  * An identicon per app: the points of an elliptic curve y² = x³ + ax + b over a small prime field, with chords
- * joining the orbit of one point under the curve's group law. The seed picks p, a, b, the orbit and two tints mixed
- * from a palette, so each app keeps a distinctive, stable picture. It returns plain SVG markup so the same drawing
+ * joining the orbit of one point under the curve's group law. The seed picks p, a, b, the orbit and two of the
+ * palette's colours, so each app keeps a distinctive, stable picture. It returns plain SVG markup so the same drawing
  * serves the launcher (theme variables, following light and dark mode) and the build-time app icon (fixed colours).
  */
 
@@ -89,37 +89,21 @@ const orbit = (curve: Curve, generator: Point): Point[] => {
   return multiples;
 };
 
-/** The colours to tint with and how to blend two of them; `weight` is the share of `first`, from 0 to 1. */
-export type Palette = {
-  readonly colours: readonly string[];
-  readonly mix: (first: string, second: string, weight: number) => string;
-};
-
 export type ArtworkOptions = {
   readonly width: number;
   readonly height: number;
   /** Space kept clear around the points, e.g. a maskable icon's safe zone. */
   readonly margin: number;
-  readonly palette: Palette;
+  /** Two are picked, unblended: blends of distant hues turn muddy. */
+  readonly colours: readonly string[];
   /** An opaque fill under the artwork; omitted, it shows whatever is behind it. */
   readonly background?: string;
-};
-
-/** A tint anywhere between two palette colours, so apps are not limited to the handful of theme hues. */
-const tint = (random: Random, { colours, mix }: Palette): string => {
-  const first = pick(random, colours);
-  const second = pick(
-    random,
-    colours.filter((colour) => colour !== first),
-  );
-  return mix(first, second, random());
 };
 
 const toKebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 
 /**
- * Colours go in `style` rather than presentation attributes, where `var()` and `color-mix()` do not resolve in every
- * browser. Every value is generated here, so none needs escaping.
+ * Colours go in `style` rather than presentation attributes, where `var()` does not resolve in every browser. Every value is generated here, so none needs escaping.
  */
 const element = (
   tag: string,
@@ -137,7 +121,7 @@ const element = (
 const stops = (entries: readonly (readonly [offset: number, colour: string, opacity: number])[]) =>
   entries.map(([offset, stopColor, stopOpacity]) => element("stop", { offset }, { stopColor, stopOpacity })).join("");
 
-export const artworkSvg = (seed: string, { width, height, margin, palette, background }: ArtworkOptions): string => {
+export const artworkSvg = (seed: string, { width, height, margin, colours, background }: ArtworkOptions): string => {
   const random = seededRandom(seed);
   const curve = randomCurve(random);
   const points = pointsOn(curve);
@@ -145,7 +129,11 @@ export const artworkSvg = (seed: string, { width, height, margin, palette, backg
   const chords = Array.from({ length: affine.length === 0 ? 0 : GENERATOR_TRIES }, () =>
     orbit(curve, pick(random, affine)),
   ).reduce<Point[]>((longest, candidate) => (candidate.length > longest.length ? candidate : longest), []);
-  const [from, to] = [tint(random, palette), tint(random, palette)];
+  const from = pick(random, colours);
+  const to = pick(
+    random,
+    colours.filter((colour) => colour !== from),
+  );
   const id = `art-${seed}`;
 
   const place = ([x, y]: Point): readonly [cx: string, cy: string] => [

@@ -56,7 +56,10 @@ textarea {
   text-decoration: none;
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .nav-link.active {
@@ -485,6 +488,11 @@ main:has(.swipe) {
   color: var(--muted);
 }
 
+.back-link:hover {
+  background: none;
+  color: var(--fg);
+}
+
 .icon {
   width: 1.4rem;
   height: 1.4rem;
@@ -551,7 +559,10 @@ main:has(.swipe) {
     border: none;
     background: none;
     color: var(--muted);
-    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
   }

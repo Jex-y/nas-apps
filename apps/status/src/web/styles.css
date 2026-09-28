@@ -272,7 +272,7 @@ pre {
 
 .swatch.retrying,
 .segment.retrying {
-  background: var(--warning-fg);
+  background: var(--pink);
 }
 
 .swatch.dead,
@@ -294,5 +294,8 @@ pre {
   color: var(--muted);
   text-decoration: none;
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }

@@ -3,11 +3,11 @@
  * `format("woff2")`: the bundler unquotes `format("woff2-variations")` into an invalid keyword, dropping the face.
  */
 @font-face {
-  font-family: "Geist Variable";
+  font-family: "Inter Variable";
   font-style: normal;
   font-display: swap;
   font-weight: 100 900;
-  src: url("@fontsource-variable/geist/files/geist-latin-wght-normal.woff2") format("woff2");
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2");
 }
 
 @font-face {
@@ -19,58 +19,55 @@
 }
 
 /*
- * Cool slate neutrals with one warm accent: body text in Geist, headings, controls and figures in JetBrains Mono,
- * square-ish corners and a hard offset shadow on primary actions.
+ * Paper and ink: white cards with ink rules on a sage ground, one teal accent, square corners. Headings are tightly
+ * tracked Inter; labels, controls and figures are JetBrains Mono, labels set small, upper case and widely tracked.
  */
 :root {
   color-scheme: light dark;
-  --bg: #f8fafc;
-  --surface: #ffffff;
-  --surface-2: #f1f5f9;
-  --fg: #0f172a;
-  --muted: #64748b;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --accent: #ea580c;
-  --on-accent: #ffffff;
-  --accent-2: #16a34a;
-  --sky: #0284c7;
-  --violet: #7c3aed;
-  --warning-bg: #fef9c3;
-  --warning-fg: #a16207;
-  --error: #dc2626;
-  --success: #16a34a;
-  --shadow-hard: 2px 2px 0 var(--fg);
-  --shadow-float: 0 12px 32px -12px rgb(15 23 42 / 0.25);
-  --radius: 4px;
-  --radius-small: 2px;
-  --font-body: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --bg: #e3e9e8;
+  --surface: #fefefe;
+  --surface-2: #f1f4f4;
+  --fg: #1e1e1e;
+  --muted: #5d6968;
+  --border: #c9d2d1;
+  --border-strong: #1e1e1e;
+  --accent: #078f84;
+  --on-accent: #fefefe;
+  --accent-2: #03aa5c;
+  --pink: #d45bb6;
+  --rose: #f386a1;
+  --warning-bg: #fbeebf;
+  --warning-fg: #6f5200;
+  --error: #d6364f;
+  --success: #03955a;
+  --radius: 0;
+  --radius-small: 0;
+  --font-body: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, Menlo, monospace;
   font-family: var(--font-body);
+  font-feature-settings: "cv11", "ss03";
   background: var(--bg);
   color: var(--fg);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #020617;
-    --surface: #0b1222;
-    --surface-2: #111a2e;
-    --fg: #e2e8f0;
-    --muted: #8391a7;
-    --border: #1c2638;
-    --border-strong: #334155;
-    --accent: #fdba74;
-    --on-accent: #1c0f04;
-    --accent-2: #4ade80;
-    --sky: #38bdf8;
-    --violet: #a78bfa;
+    --bg: #111413;
+    --surface: #181c1b;
+    --surface-2: #1f2423;
+    --fg: #eef2f1;
+    --muted: #8e9b9a;
+    --border: #2b3231;
+    --border-strong: #eef2f1;
+    --accent: #1fc7b8;
+    --on-accent: #0b1211;
+    --accent-2: #2fd083;
+    --pink: #ea7fd0;
+    --rose: #f7a1b7;
     --warning-bg: rgb(250 204 21 / 0.12);
-    --warning-fg: #facc15;
-    --error: #f87171;
-    --success: #4ade80;
-    --shadow-hard: none;
-    --shadow-float: 0 16px 40px -12px rgb(0 0 0 / 0.7);
+    --warning-fg: #f5cf4a;
+    --error: #ff7589;
+    --success: #2fd083;
   }
 }
 
@@ -92,10 +89,13 @@ body {
 h1,
 h2,
 h3 {
-  font-family: var(--font-mono);
   font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.25;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+h1 {
+  letter-spacing: -0.045em;
 }
 
 ::selection {
@@ -120,7 +120,7 @@ input,
 select,
 textarea {
   background: var(--surface);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.45rem 0.7rem;
   transition: border-color 120ms ease-out;
@@ -129,7 +129,7 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--accent);
+  border-color: var(--border-strong);
   outline: none;
 }
 
@@ -138,64 +138,64 @@ textarea:focus {
   display: inline-flex;
 }
 
+/* Controls read as labels: small upper-case mono, widely tracked. */
 button,
 .button {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  padding: 0.45rem 0.85rem;
+  padding: 0.5rem 0.85rem;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.6875rem;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
   text-decoration: none;
   cursor: pointer;
   transition:
-    border-color 120ms ease-out,
     background-color 120ms ease-out,
-    transform 80ms ease-out;
+    color 120ms ease-out;
 }
 
 button:hover,
 .button:hover {
-  border-color: var(--fg);
-}
-
-button:active {
-  transform: translate(1px, 1px);
+  background: var(--fg);
+  color: var(--surface);
 }
 
 button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: default;
-  transform: none;
+  background: var(--surface);
+  color: inherit;
 }
 
+/* Primary actions are solid ink blocks. */
 button[type="submit"],
 button.primary {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--surface);
+}
+
+button[type="submit"]:hover,
+button.primary:hover {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
-  box-shadow: var(--shadow-hard);
-}
-
-button[type="submit"]:active,
-button.primary:active {
-  box-shadow: none;
-  transform: translate(2px, 2px);
 }
 
 kbd {
   display: inline-block;
-  padding: 0 0.35rem;
-  border: 1px solid var(--border-strong);
-  border-bottom-width: 2px;
+  padding: 0 0.3rem;
+  border: 1px solid var(--border);
   border-radius: var(--radius-small);
   background: var(--surface);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
 }
 

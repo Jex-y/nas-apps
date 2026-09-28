@@ -1,4 +1,4 @@
-const THEME_COLORS = { light: "#f8fafc", dark: "#020617" } as const;
+const THEME_COLORS = { light: "#e3e9e8", dark: "#111413" } as const;
 
 const append = (tag: "link" | "meta", attributes: Record<string, string>) => {
   const element = document.createElement(tag);
