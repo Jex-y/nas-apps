@@ -67,6 +67,7 @@
         "zod": "^4.6.5",
       },
       "devDependencies": {
+        "@resvg/resvg-wasm": "^2.6.2",
         "@types/web-push": "^3.6.4",
       },
     },
@@ -171,6 +172,8 @@
     "@nas/server": ["@nas/server@workspace:server"],
 
     "@nas/status": ["@nas/status@workspace:apps/status"],
+
+    "@resvg/resvg-wasm": ["@resvg/resvg-wasm@2.6.2", "", {}, "sha512-FqALmHI8D4o6lk/LRWDnhw95z5eO+eAa6ORjVg09YRR7BkcM6oPHU9uyC0gtQG5vpFLvgpeU4+zEAz2H8APHNw=="],
 
     "@tanstack/query-core": ["@tanstack/query-core@5.104.0", "", {}, "sha512-JrC2r/JQlXt7khBSdUpsgxNvybzOg+aITa+ARRMlP2AFo93Y8vIqz077rp+e61mJetSZ0T6AJbwW1JHer1vrPQ=="],
 

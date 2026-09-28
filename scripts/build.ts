@@ -1,6 +1,5 @@
 import { cp, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { SHELL_ICONS_FOLDER } from "../packages/core/src/shell/assets";
 
 /**
  * Produces a self-contained `dist/`. The bundle resolves its HTML assets and the migrations resolve their
@@ -31,8 +30,6 @@ for await (const journal of new Bun.Glob("{apps,packages}/*/drizzle/meta/_journa
   const folder = dirname(dirname(journal));
   await cp(folder, join(outdir, folder), { recursive: true });
 }
-
-await cp(SHELL_ICONS_FOLDER, join(outdir, SHELL_ICONS_FOLDER), { recursive: true });
 
 for (const output of result.outputs) {
   console.log(`${output.path.replace(`${process.cwd()}/`, "")}  ${(output.size / 1024).toFixed(1)} KB`);

@@ -20,6 +20,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "devDependencies": {
+    "@resvg/resvg-wasm": "^2.6.2",
     "@types/web-push": "^3.6.4"
   }
 }
