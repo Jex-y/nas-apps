@@ -12,6 +12,8 @@ ENV NODE_ENV=production PORT=3000
 WORKDIR /app
 COPY --from=build /repo/deploy/stack /stack
 COPY --from=build /repo/dist ./
+ARG GIT_SHA=""
+ENV GIT_SHA=$GIT_SHA
 USER bun
 EXPOSE 3000
 CMD ["bun", "index.js"]
