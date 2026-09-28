@@ -6,6 +6,7 @@
     "@nas/core": "workspace:*",
     "@nas/notes": "workspace:*",
     "drizzle-orm": "^0.45.3",
-    "@nas/flats": "workspace:*"
+    "@nas/flats": "workspace:*",
+    "@nas/status": "workspace:*"
   }
 }
