@@ -16,10 +16,7 @@ const TILE_ARTWORK: ArtworkOptions = {
   width: 300,
   height: 200,
   margin: 14,
-  palette: {
-    colours: ["var(--accent)", "var(--accent-2)", "var(--sky)", "var(--violet)"],
-    mix: (first, second, weight) => `color-mix(in oklch, ${first} ${Math.round(weight * 100)}%, ${second})`,
-  },
+  colours: ["var(--accent)", "var(--accent-2)", "var(--pink)", "var(--rose)"],
 };
 
 const renderApps = async () => {

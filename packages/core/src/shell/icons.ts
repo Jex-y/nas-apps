@@ -1,5 +1,5 @@
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
-import { artworkSvg, type Palette } from "./artwork";
+import { artworkSvg } from "./artwork";
 
 /**
  * The Home Screen icon: the launcher artwork seeded with the shell's reserved slug, in the dark theme's colours.
@@ -10,24 +10,10 @@ const ICON_SIZES = [180, 192, 512] as const;
 type IconSize = (typeof ICON_SIZES)[number];
 
 const ICON_SEED = "shell";
-const ICON_BACKGROUND = "#020617";
+const ICON_BACKGROUND = "#111413";
 
-const channels = (hex: string) => [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
-
-/** Theme colours from theme.css's dark scheme; resvg has neither CSS variables nor `color-mix()`. */
-const DARK_PALETTE: Palette = {
-  colours: ["#fdba74", "#4ade80", "#38bdf8", "#a78bfa"],
-  mix: (first, second, weight) => {
-    const [a, b] = [channels(first), channels(second)];
-    return `#${a
-      .map((channel, i) =>
-        Math.round(channel * weight + (b[i] ?? 0) * (1 - weight))
-          .toString(16)
-          .padStart(2, "0"),
-      )
-      .join("")}`;
-  },
-};
+/** Theme colours from theme.css's dark scheme; resvg has no CSS variables. */
+const DARK_COLOURS = ["#1fc7b8", "#2fd083", "#ea7fd0", "#f7a1b7"];
 
 /** Base64 PNGs by size; a macro can only return plain data. */
 export const renderIcons = async (): Promise<Record<IconSize, string>> => {
@@ -37,7 +23,7 @@ export const renderIcons = async (): Promise<Record<IconSize, string>> => {
     width: 200,
     height: 200,
     margin: 36,
-    palette: DARK_PALETTE,
+    colours: DARK_COLOURS,
     background: ICON_BACKGROUND,
   });
   const render = (size: IconSize) =>
