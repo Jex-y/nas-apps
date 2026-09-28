@@ -38,10 +38,10 @@ export type Notifier = {
   readonly send: (notification: Notification) => Promise<void>;
 };
 
-/** Gives each app a notifier for its own topic, named after its slug. */
-export type NotifierFactory = (topic: string) => Notifier;
+/** Gives each app a notifier for its own topic, named after its slug, reaching only `login`'s browsers if given. */
+export type NotifierFactory = (topic: string, login?: string) => Notifier;
 
 export const createNotifierFactory =
   (config: NotifyConfig, sql: SQL): NotifierFactory =>
-  (topic) =>
-    createWebPushNotifier({ config, sql, topic });
+  (topic, login) =>
+    createWebPushNotifier({ config, sql, topic, ...(login !== undefined && { login }) });
