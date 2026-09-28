@@ -85,7 +85,8 @@ kbd {
 
 .site-header nav {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
 }
 
 .nav-link {
@@ -100,6 +101,7 @@ kbd {
 
 .add-listing,
 .search-form,
+.destination-form,
 .reject-form,
 .card-actions {
   display: flex;
@@ -275,7 +277,9 @@ main {
 
 .history,
 .stations,
+.commutes,
 .searches,
+.destinations,
 .viewings {
   list-style: none;
   padding: 0;
@@ -284,6 +288,7 @@ main {
 }
 
 .searches li,
+.destinations li,
 .viewing {
   display: grid;
   gap: 0.375rem;

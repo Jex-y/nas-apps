@@ -106,6 +106,10 @@ Postgres and Garage keep their data in `/volume1/Ed/app/data`, inside the `Ed` s
   `GARAGE_RPC_SECRET` (`openssl rand -hex 32`), `GARAGE_DEFAULT_ACCESS_KEY` (`GK` + `openssl rand -hex 12`) and
   `GARAGE_DEFAULT_SECRET_KEY` (`openssl rand -hex 32`). Garage creates that key and the `apps` bucket on first
   start.
+- Optionally, `TFL_API_KEY` in the same file: the primary key of a subscription on the
+  [TfL API portal](https://api-portal.tfl.gov.uk/). Flats uses it to time commutes from each property to the places
+  saved on its Commutes page; without it they are left blank. It is read on start, so it takes effect from the next
+  deploy, and a daily sweep then times the properties already found.
 - Log in to GHCR so the NAS can pull the private image, using a classic PAT with only `read:packages`:
   `docker login ghcr.io -u Jex-y`
 - Install the deploy script and give CI a key that can run nothing else:

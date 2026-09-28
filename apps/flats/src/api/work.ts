@@ -40,6 +40,9 @@ export const isActiveHour = (at: Date): boolean => {
   return hour >= 7 && hour < 23;
 };
 
+/** Properties worth timing commutes for: not rejected and still advertised. */
+const inPlay = and(ne(properties.status, "rejected"), ne(properties.availability, "removed"));
+
 const formatPrice = (price: number | null) => (price === null ? "POA" : `£${price.toLocaleString("en-GB")}`);
 
 const describeChange = (change: ListingChange): string =>
@@ -140,7 +143,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       const [property] = await db
         .select({ latitude: properties.latitude, longitude: properties.longitude })
         .from(properties)
-        .where(eq(properties.id, propertyId));
+        .where(and(eq(properties.id, propertyId), inPlay));
       if (property?.latitude == null || property.longitude == null) {
         return;
       }
@@ -158,7 +161,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       for (const destination of untimed) {
         const minutes = await planner.fastestMinutes(
           from,
-          destination,
+          { latitude: destination.latitude, longitude: destination.longitude },
           nextTuesday(deps.now(), destination.arriveBy),
           signal,
         );
@@ -334,6 +337,20 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
   });
 
+  /** Queues timing for every property still in play; each job only asks TfL about places it has not timed yet. */
+  const enqueueCommutes = async () => {
+    const timeable = await db.select({ id: properties.id }).from(properties).where(inPlay);
+    for (const { id } of timeable) {
+      await queue.enqueue(computeCommutes, { propertyId: id }, { dedupeKey: id });
+    }
+  };
+
+  const sweepCommutes = defineJob({
+    name: "flats.sweep-commutes",
+    payload: z.object({}),
+    handle: enqueueCommutes,
+  });
+
   const jobs: readonly RegisteredJob[] = [
     pollSearches,
     pollSearch,
@@ -341,6 +358,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     addListing,
     mirrorPhotos,
     computeCommutes,
+    sweepCommutes,
     refreshTracked,
   ];
 
@@ -359,12 +377,28 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       job: refreshTracked,
       payload: {},
     }),
+    defineSchedule({
+      name: "flats.sweep-commutes",
+      everyMs: 24 * HOUR,
+      jitterMs: 2 * HOUR,
+      job: sweepCommutes,
+      payload: {},
+    }),
   ];
 
   return {
     jobs,
     schedules,
-    definitions: { pollSearches, pollSearch, fetchListing, addListing, mirrorPhotos, computeCommutes, refreshTracked },
+    definitions: {
+      pollSearches,
+      pollSearch,
+      fetchListing,
+      addListing,
+      mirrorPhotos,
+      computeCommutes,
+      sweepCommutes,
+      refreshTracked,
+    },
     /** Polls the first `pages` result pages of a new search, a minute apart, to seed it with current listings. */
     backfillSearch: async (searchId: string, pages: number) => {
       const start = deps.now().getTime();
@@ -377,15 +411,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       }
     },
     /** Times every property still in play to any place it has not been timed to yet, e.g. after adding a place. */
-    timeCommutes: async () => {
-      const inPlay = await db
-        .select({ id: properties.id })
-        .from(properties)
-        .where(and(ne(properties.status, "rejected"), ne(properties.availability, "removed")));
-      for (const { id } of inPlay) {
-        await queue.enqueue(computeCommutes, { propertyId: id }, { dedupeKey: id });
-      }
-    },
+    timeCommutes: enqueueCommutes,
     /** Starts tracking a listing by its URL; resolves `false` when that listing is already being added. */
     addListing: (portal: Portal, portalId: string) =>
       queue.enqueue(addListing, { portal, portalId }, { dedupeKey: `${portal}:${portalId}` }),

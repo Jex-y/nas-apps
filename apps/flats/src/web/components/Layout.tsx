@@ -48,6 +48,7 @@ export const Layout = ({ children }: { children: ReactNode }) => (
         <NavLink href="/board">Board</NavLink>
         <NavLink href="/rejected">Rejected</NavLink>
         <NavLink href="/searches">Searches</NavLink>
+        <NavLink href="/commutes">Commutes</NavLink>
       </nav>
       <AddListingForm />
     </header>

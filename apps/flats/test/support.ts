@@ -6,7 +6,7 @@ import { flatsDb } from "../src/api/db";
 import type { Download, Fetcher, FetchResult } from "../src/api/fetcher";
 import type { ArriveBy, Coordinates, Geocoder, JourneyPlanner } from "../src/api/places";
 import { rightmove } from "../src/api/portals/rightmove";
-import { listings, properties, searches } from "../src/api/schema";
+import { destinations, listings, properties, searches } from "../src/api/schema";
 import { createFlatsWork } from "../src/api/work";
 
 const fixture = (name: string) => Bun.file(new URL(`./fixtures/rightmove/${name}`, import.meta.url)).text();
@@ -126,10 +126,22 @@ export const createFlatsTestbed = () => {
     return row;
   };
 
+  /** A place to commute to, at Fora Chancery House. */
+  const addDestination = async (name = "Office", arriveBy = "09:00") => {
+    const [destination] = await db
+      .insert(destinations)
+      .values({ name, postcode: "WC2A 1QS", latitude: 51.5162, longitude: -0.1117, arriveBy })
+      .returning();
+    if (destination === undefined) {
+      throw new Error("no destination");
+    }
+    return destination;
+  };
+
   beforeEach(async () => {
-    await context.sql`truncate flats.searches, flats.properties cascade`;
+    await context.sql`truncate flats.searches, flats.properties, flats.destinations cascade`;
     await context.sql`delete from jobs.jobs where name like 'flats.%'`;
   });
 
-  return { context, db, blob, setup, addSearch, propertyByPortalId };
+  return { context, db, blob, setup, addSearch, addDestination, propertyByPortalId };
 };

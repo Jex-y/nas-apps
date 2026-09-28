@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { startTestServer, uniqueLogin } from "@nas/core/testing";
 import { drizzle } from "drizzle-orm/bun-sql";
 import { createFlatsTestbed, fakeGeocoder, fakePlanner } from "../../test/support";
-import { PropertyDetail, PropertyList, Search, SearchList } from "../contract";
+import { Destination, DestinationList, PropertyDetail, PropertyList, Search, SearchList } from "../contract";
 import { createFlatsApp } from "../module";
 import { collapseHistory } from "./routes";
 
@@ -234,4 +234,63 @@ test("history keeps only the changes", () => {
       point("2026-09-04T00:00:00Z", 390000, "sold_stc"),
     ]).map((kept) => kept.observedAt),
   ).toEqual(["2026-09-01T00:00:00Z", "2026-09-03T00:00:00Z", "2026-09-04T00:00:00Z"]);
+});
+
+describe("destinations", () => {
+  const office = { name: "Office", postcode: "wc2a1qs", arriveBy: "09:00" };
+
+  test("saves a place by postcode and times the properties still in play to it", async () => {
+    await seed();
+    const union = await propertyByPortalId("93524796");
+    const soldStc = await propertyByPortalId("128855633");
+    await context.sql`update flats.properties set status = 'rejected', rejected_reason = 'Too far' where id = ${soldStc.property.id}`;
+
+    const response = await request("/flats/api/destinations", { as: me, method: "POST", ...json(office) });
+
+    expect(response.status).toBe(201);
+    const created = Destination.parse(await response.json());
+    expect(created).toMatchObject({ name: "Office", postcode: "WC2A 1QS", arriveBy: "09:00" });
+    expect((await queuedJobs("flats.commute")).map((job) => job.payload)).toEqual([{ propertyId: union.property.id }]);
+    expect(DestinationList.parse(await (await request("/flats/api/destinations", { as: me })).json())).toEqual([
+      created,
+    ]);
+
+    await setup().drain();
+    const list = PropertyList.parse(await (await request("/flats/api/properties?status=new", { as: me })).json());
+    expect(list.find((property) => property.id === union.property.id)?.commutes).toEqual([
+      { destinationId: created.id, name: "Office", minutes: 43 },
+    ]);
+  });
+
+  test("refuses a postcode that does not exist or a malformed time", async () => {
+    const unknown = await request("/flats/api/destinations", {
+      as: me,
+      method: "POST",
+      ...json({ ...office, postcode: "ZZ1 1ZZ" }),
+    });
+    const badTime = await request("/flats/api/destinations", {
+      as: me,
+      method: "POST",
+      ...json({ ...office, arriveBy: "9am" }),
+    });
+
+    expect(unknown.status).toBe(400);
+    expect(badTime.status).toBe(400);
+    expect(DestinationList.parse(await (await request("/flats/api/destinations", { as: me })).json())).toEqual([]);
+  });
+
+  test("deleting a place drops its commutes", async () => {
+    await seed();
+    const created = Destination.parse(
+      await (await request("/flats/api/destinations", { as: me, method: "POST", ...json(office) })).json(),
+    );
+    await setup().drain();
+    const { property } = await propertyByPortalId("93524796");
+    expect(await context.sql`select 1 from flats.commutes where property_id = ${property.id}`).toHaveLength(1);
+
+    expect((await request(`/flats/api/destinations/${created.id}`, { as: me, method: "DELETE" })).status).toBe(204);
+
+    expect(await context.sql`select 1 from flats.commutes`).toHaveLength(0);
+    expect((await request(`/flats/api/destinations/${created.id}`, { as: me, method: "DELETE" })).status).toBe(404);
+  });
 });

@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { asc, eq } from "drizzle-orm";
-import { createFlatsTestbed, defaultPages, ok, searchPage } from "../../test/support";
-import { listings, photos, properties, searches, snapshots } from "./schema";
+import { createFlatsTestbed, defaultPages, fakePlanner, NOON, ok, searchPage } from "../../test/support";
+import type { JourneyPlanner } from "./places";
+import { commutes, listings, photos, properties, searches, snapshots } from "./schema";
 import { isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
 
-const { context, db, blob, setup, addSearch, propertyByPortalId } = createFlatsTestbed();
+const { context, db, blob, setup, addSearch, addDestination, propertyByPortalId } = createFlatsTestbed();
 
 describe("ingesting a search", () => {
   test("seeds a new search with its listings, their pages and photos", async () => {
@@ -194,5 +195,104 @@ describe("adding a listing by URL", () => {
     const { work, drain } = setup();
     await work.addListing("rightmove", "1");
     expect(await drain()).toMatchObject({ dead: 1 });
+  });
+});
+
+describe("commutes", () => {
+  const seed = async (planner: JourneyPlanner | null) => {
+    const seeded = setup(defaultPages, NOON, planner);
+    await seeded.work.backfillSearch((await addSearch()).id, 1);
+    await seeded.drain();
+    return seeded;
+  };
+
+  const timed = () =>
+    db
+      .select({ propertyId: commutes.propertyId, destinationId: commutes.destinationId, minutes: commutes.minutes })
+      .from(commutes);
+
+  test("times each property still on the market to each place, once", async () => {
+    const office = await addDestination("Office", "09:00");
+    const gym = await addDestination("Gym", "18:30");
+    const { planner, asked } = fakePlanner(43);
+
+    const { work, drain } = await seed(planner);
+
+    const union = await propertyByPortalId("93524796");
+    const soldStc = await propertyByPortalId("128855633");
+    expect(await timed()).toEqual(
+      expect.arrayContaining([
+        { propertyId: union.property.id, destinationId: office.id, minutes: 43 },
+        { propertyId: union.property.id, destinationId: gym.id, minutes: 43 },
+        { propertyId: soldStc.property.id, destinationId: office.id, minutes: 43 },
+        { propertyId: soldStc.property.id, destinationId: gym.id, minutes: 43 },
+      ]),
+    );
+    expect(await timed()).toHaveLength(4);
+    expect(asked).toContainEqual({
+      from: { latitude: 51.476311, longitude: -0.324446 },
+      to: { latitude: office.latitude, longitude: office.longitude },
+      arriveBy: { date: "20260922", time: "0900" },
+    });
+    expect(asked.map((question) => question.arriveBy.time)).toContain("1830");
+
+    await context.jobs.enqueue(work.definitions.computeCommutes, { propertyId: union.property.id });
+    await drain();
+    expect(asked).toHaveLength(4);
+  });
+
+  test("records a place TfL finds no route to", async () => {
+    const office = await addDestination();
+
+    await seed(fakePlanner(null).planner);
+
+    const { property } = await propertyByPortalId("93524796");
+    expect(await timed()).toContainEqual({ propertyId: property.id, destinationId: office.id, minutes: null });
+  });
+
+  test("leaves commutes untimed without TfL", async () => {
+    await addDestination();
+
+    await seed(null);
+
+    expect(await timed()).toEqual([]);
+  });
+
+  test("the daily sweep times what was missed, e.g. before TfL was configured", async () => {
+    await addDestination();
+    await seed(null);
+
+    const configured = setup(defaultPages, NOON, fakePlanner(31).planner);
+    await context.jobs.enqueue(configured.work.definitions.sweepCommutes, {});
+    await configured.drain();
+
+    const { property } = await propertyByPortalId("93524796");
+    expect((await timed()).filter((commute) => commute.propertyId === property.id)).toEqual([
+      expect.objectContaining({ minutes: 31 }),
+    ]);
+  });
+
+  test("skips properties without a location, rejected, or taken down", async () => {
+    const { planner, asked } = fakePlanner();
+    const { work, drain } = await seed(planner);
+    const union = await propertyByPortalId("93524796");
+    const soldStc = await propertyByPortalId("128855633");
+    const removed = await propertyByPortalId("93631518");
+    await db.update(properties).set({ latitude: null, longitude: null }).where(eq(properties.id, union.property.id));
+    await db
+      .update(properties)
+      .set({ status: "rejected", rejectedReason: "Too far" })
+      .where(eq(properties.id, soldStc.property.id));
+    await db.update(properties).set({ latitude: 51.5, longitude: -0.1 }).where(eq(properties.id, removed.property.id));
+    await addDestination();
+
+    await work.timeCommutes();
+    for (const { property } of [union, soldStc, removed]) {
+      await context.jobs.enqueue(work.definitions.computeCommutes, { propertyId: property.id });
+    }
+    await drain();
+
+    expect(asked).toEqual([]);
+    expect(await timed()).toEqual([]);
   });
 });

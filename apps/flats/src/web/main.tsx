@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Route, Router, Switch } from "wouter";
 import { Layout } from "./components/Layout";
+import { DestinationsPage } from "./features/destinations/components/DestinationsPage";
 import { BoardPage } from "./features/properties/components/BoardPage";
 import { InboxPage } from "./features/properties/components/InboxPage";
 import { PropertyPage } from "./features/properties/components/PropertyPage";
@@ -27,6 +28,7 @@ createRoot(root).render(
             <Route path="/board" component={BoardPage} />
             <Route path="/rejected" component={RejectedPage} />
             <Route path="/searches" component={SearchesPage} />
+            <Route path="/commutes" component={DestinationsPage} />
             <Route path="/properties/:id">{(params) => <PropertyPage id={params.id} />}</Route>
             <Route>
               <p className="muted">Nothing here.</p>
