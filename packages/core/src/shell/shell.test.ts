@@ -3,7 +3,7 @@ import { createECDH, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/bun-sql";
 import webpush from "web-push";
-import { parseNotifyConfig } from "../notify";
+import { createNotifierFactory, parseNotifyConfig } from "../notify";
 import { subscriptions } from "../push/schema";
 import { createWebPushNotifier, type WebPushConfig } from "../push/send";
 import { startServer } from "../server";
@@ -213,6 +213,32 @@ describe("web push notifier", () => {
     });
 
     expect(service.sent.map((request) => request.url)).toEqual([mine.endpoint]);
+  });
+
+  test("an app's notifier reaches only one person's browsers when given their login", async () => {
+    const received: string[] = [];
+    const pushService = Bun.serve({
+      port: 0,
+      fetch: (request) => {
+        received.push(new URL(request.url).pathname);
+        return new Response(null, { status: 201 });
+      },
+    });
+    afterAll(() => pushService.stop(true));
+    const me = uniqueLogin();
+    const subscribeAt = (login: string, path: string) => {
+      const { endpoint, keys } = browserSubscription(new URL(path, pushService.url).href);
+      return db.insert(subscriptions).values({ endpoint, ...keys, login });
+    };
+    await subscribeAt(me, "/mine");
+    await subscribeAt(uniqueLogin(), "/theirs");
+    const notifier = createNotifierFactory(webPush, context.sql);
+
+    await notifier("pet", me).send({ title: "Pip", message: "3,200 steps to go" });
+    expect(received).toEqual(["/mine"]);
+
+    await notifier("flats").send({ title: "New flat", message: "2 bed, Hackney" });
+    expect(received.toSorted()).toEqual(["/mine", "/mine", "/theirs"]);
   });
 
   test("forgets browsers the push service reports gone, and fails after trying the rest", async () => {
