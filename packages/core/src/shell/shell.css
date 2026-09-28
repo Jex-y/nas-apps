@@ -1,11 +1,6 @@
 @import "../web/theme.css";
 
-* {
-  box-sizing: border-box;
-}
-
 body {
-  margin: 0;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
@@ -63,7 +58,8 @@ h2 {
 }
 
 .apps a:hover {
-  border-color: var(--accent);
+  border-color: var(--fg);
+  box-shadow: var(--shadow-hard);
 }
 
 .apps a:active {
@@ -82,7 +78,10 @@ h2 {
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.6rem 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .app-title::after {
@@ -108,20 +107,4 @@ h2 {
 
 .actions:not(:has(button:not([hidden]))) {
   display: none;
-}
-
-button {
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.4rem 0.9rem;
-  cursor: pointer;
-}
-
-button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
 }

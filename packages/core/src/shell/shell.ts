@@ -17,7 +17,7 @@ const TILE_ARTWORK: ArtworkOptions = {
   height: 200,
   margin: 14,
   palette: {
-    colours: ["var(--accent)", "var(--accent-2)", "var(--warning-fg)", "var(--error)"],
+    colours: ["var(--accent)", "var(--accent-2)", "var(--sky)", "var(--violet)"],
     mix: (first, second, weight) => `color-mix(in oklch, ${first} ${Math.round(weight * 100)}%, ${second})`,
   },
 };

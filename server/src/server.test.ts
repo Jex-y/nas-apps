@@ -12,17 +12,17 @@ describe("server", () => {
 
   test("launcher lists every app", async () => {
     expect(await (await request("/")).text()).toContain(`<ul id="apps"`);
-    expect(await (await request("/shell/api/apps")).json()).toContainEqual({ slug: "notes", title: "Notes" });
+    expect(await (await request("/shell/api/apps")).json()).toContainEqual({ slug: "flats", title: "Flat hunt" });
   });
 
   test("app root redirects to its trailing-slash path", async () => {
-    const response = await request("/notes");
+    const response = await request("/flats");
     expect(response.status).toBe(308);
-    expect(response.headers.get("Location")).toBe("/notes/");
+    expect(response.headers.get("Location")).toBe("/flats/");
   });
 
   test("app page serves the bundled HTML", async () => {
-    const response = await request("/notes/");
+    const response = await request("/flats/");
     expect(response.status).toBe(200);
     expect(await response.text()).toContain('<div id="root">');
   });

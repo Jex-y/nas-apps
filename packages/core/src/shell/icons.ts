@@ -10,13 +10,13 @@ const ICON_SIZES = [180, 192, 512] as const;
 type IconSize = (typeof ICON_SIZES)[number];
 
 const ICON_SEED = "shell";
-const ICON_BACKGROUND = "#1a1a18";
+const ICON_BACKGROUND = "#020617";
 
 const channels = (hex: string) => [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
 
 /** Theme colours from theme.css's dark scheme; resvg has neither CSS variables nor `color-mix()`. */
 const DARK_PALETTE: Palette = {
-  colours: ["#ff7442", "#7fc079", "#f2c230", "#ff8a7a"],
+  colours: ["#fdba74", "#4ade80", "#38bdf8", "#a78bfa"],
   mix: (first, second, weight) => {
     const [a, b] = [channels(first), channels(second)];
     return `#${a

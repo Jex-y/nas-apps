@@ -1,16 +1,5 @@
 @import "@nas/core/theme.css";
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: var(--font-body);
-  background: var(--bg);
-  color: var(--fg);
-}
-
 main {
   max-width: 60rem;
   margin: 0 auto;
@@ -304,5 +293,6 @@ pre {
 .home-link {
   color: var(--muted);
   text-decoration: none;
-  font-size: 0.875rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
 }
