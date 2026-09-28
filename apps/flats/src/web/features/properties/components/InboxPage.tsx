@@ -8,7 +8,7 @@ const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
-/** New listings to triage: j/k to move, s to shortlist, x to reject with a reason, o to open. */
+/** New listings to triage: j/k to move, s to shortlist, x to reject, r to reject with a reason, o to open. */
 export const InboxPage = () => {
   const properties = useProperties("new");
   const updateStatus = useUpdateStatus();
@@ -28,7 +28,8 @@ export const InboxPage = () => {
         j: () => setCursor((index) => Math.min(index + 1, items.length - 1)),
         k: () => setCursor((index) => Math.max(index - 1, 0)),
         s: () => updateStatus.mutate({ id: selected.id, update: { status: "shortlisted" } }),
-        x: () => setRejecting(selected.id),
+        x: () => updateStatus.mutate({ id: selected.id, update: { status: "rejected", reason: null } }),
+        r: () => setRejecting(selected.id),
         o: () => navigate(`/properties/${selected.id}`),
       };
       const action = actions[event.key];
@@ -58,7 +59,7 @@ export const InboxPage = () => {
         <h1>Inbox</h1>
         <span className="muted">
           {items.length} new · <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>s</kbd> shortlist · <kbd>x</kbd> reject ·{" "}
-          <kbd>o</kbd> open
+          <kbd>r</kbd> with reason · <kbd>o</kbd> open
         </span>
       </div>
       {items.length === 0 && <p className="muted">Nothing new. Searches are polled every ten minutes.</p>}
@@ -87,8 +88,16 @@ export const InboxPage = () => {
                   >
                     Shortlist
                   </button>
-                  <button type="button" onClick={() => setRejecting(property.id)}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateStatus.mutate({ id: property.id, update: { status: "rejected", reason: null } })
+                    }
+                  >
                     Reject
+                  </button>
+                  <button type="button" onClick={() => setRejecting(property.id)}>
+                    Reject with reason…
                   </button>
                 </>
               )
