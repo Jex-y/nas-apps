@@ -73,13 +73,8 @@ h2 {
 .art {
   display: block;
   width: 100%;
-  aspect-ratio: 2;
+  aspect-ratio: 3 / 2;
   border-bottom: 1px solid var(--border);
-}
-
-/* Axis-aligned cell backgrounds, so neighbouring cells meet without anti-aliased seams. */
-.art path:first-child {
-  shape-rendering: crispEdges;
 }
 
 .app-title {
