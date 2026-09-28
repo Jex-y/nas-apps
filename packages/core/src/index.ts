@@ -8,4 +8,6 @@ export * from "./identity";
 export * from "./jobs";
 export * from "./migrations";
 export * from "./notify";
+export * from "./push/send";
 export * from "./server";
+export type { ShellOptions } from "./shell/routes";

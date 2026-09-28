@@ -1,3 +1,5 @@
+export { installShell } from "../shell/register";
+
 import type { z } from "zod";
 
 export class ApiError extends Error {

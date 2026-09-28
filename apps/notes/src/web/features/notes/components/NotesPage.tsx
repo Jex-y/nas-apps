@@ -14,6 +14,9 @@ export const NotesPage = () => {
 
   return (
     <main>
+      <a href="/" className="home-link">
+        ‹ Apps
+      </a>
       <h1>Notes</h1>
       <form onSubmit={submit}>
         <textarea

@@ -1,4 +1,11 @@
-import { collectAppWork, createJobQueue, createSql, parseWorkerConfig, runWorker } from "@nas/core";
+import {
+  collectAppWork,
+  createJobQueue,
+  createNotifierFactory,
+  createSql,
+  parseWorkerConfig,
+  runWorker,
+} from "@nas/core";
 import { createApps } from "./apps";
 
 /** The worker is unhealthy once its loops have been silent for this long; well above the idle poll and tick. */
@@ -11,7 +18,7 @@ const apps = createApps({
   publicUrl: config.publicUrl,
   sql,
   blob: config.blob,
-  notify: config.notify,
+  notifier: createNotifierFactory(config.notify, sql),
   jobs: createJobQueue(sql),
   identity: { kind: "tailscale" },
 });

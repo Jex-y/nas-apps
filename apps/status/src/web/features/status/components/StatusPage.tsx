@@ -28,6 +28,9 @@ export const StatusPage = () => {
 
   return (
     <main>
+      <a href="/" className="home-link">
+        ‹ Apps
+      </a>
       <header className="page-header">
         <h1>System status</h1>
         {report.data && (

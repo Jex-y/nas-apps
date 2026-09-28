@@ -3,6 +3,7 @@ import type { AppContext, AppModule } from "./app-module";
 import { parseRuntimeConfig } from "./config";
 import { createSql } from "./database";
 import { createJobQueue } from "./jobs/queue";
+import { createNotifierFactory } from "./notify";
 import { startServer } from "./server";
 
 /** A context built from the test environment, closed after the test file. Identity is Tailscale headers. */
@@ -15,7 +16,7 @@ export const createTestContext = (): AppContext => {
     publicUrl: config.publicUrl,
     sql,
     blob: config.blob,
-    notify: config.notify,
+    notifier: createNotifierFactory(config.notify, sql),
     jobs: createJobQueue(sql),
     identity: { kind: "tailscale" },
   };
@@ -33,7 +34,12 @@ export const startTestServer = (
   createApps: (context: AppContext) => readonly AppModule[],
   context: AppContext = createTestContext(),
 ): TestRequest => {
-  const server = startServer({ port: 0, development: false, apps: createApps(context) });
+  const server = startServer({
+    port: 0,
+    development: false,
+    apps: createApps(context),
+    shell: { identity: context.identity, sql: context.sql, webPush: null },
+  });
   afterAll(() => server.stop(true));
 
   return (path, { as, ...init } = {}) => {
