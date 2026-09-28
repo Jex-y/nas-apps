@@ -3,6 +3,7 @@ import { extractAssignedJson, unflatten } from "./flattened";
 import { decodeEntities, htmlToText } from "./html-text";
 import {
   type Availability,
+  mentionsSharedOwnership,
   type ParsedListing,
   ParseError,
   type PortalParser,
@@ -15,6 +16,8 @@ const ORIGIN = "https://www.rightmove.co.uk";
 const MEDIA = "https://media.rightmove.co.uk";
 /** Rightmove's "newest listed" search order. */
 const NEWEST_FIRST = "6";
+/** A value of the comma-separated `dontShow` search parameter, alongside e.g. `retirement` and `newHome`. */
+const HIDE_SHARED_OWNERSHIP = "sharedOwnership";
 
 const parse = <S extends z.ZodType>(schema: S, value: unknown, what: string): z.infer<S> => {
   const result = schema.safeParse(value);
@@ -84,6 +87,9 @@ const SearchProperty = z.object({
   displayAddress: z.string(),
   displayStatus: z.string().nullish(),
   auction: z.boolean().nullish(),
+  propertyTypeFullDescription: z.string().nullish(),
+  summary: z.string().nullish(),
+  keyFeatures: z.array(z.object({ description: z.string() })).nullish(),
   price: z.object({
     amount: z.number().nullish(),
     displayPrices: z.array(z.object({ displayPriceQualifier: z.string().nullish() })),
@@ -118,6 +124,11 @@ const parseSearch = (html: string): readonly SearchHit[] => {
     bedrooms: property.bedrooms ?? null,
     bathrooms: property.bathrooms ?? null,
     auction: property.auction ?? false,
+    sharedOwnership: mentionsSharedOwnership(
+      property.propertyTypeFullDescription ?? "",
+      property.summary ?? "",
+      ...(property.keyFeatures ?? []).map((feature) => feature.description),
+    ),
     photos: property.images.map((image) => ({ url: `${MEDIA}/${image.url}`, caption: image.caption ?? "" })),
   }));
 };
@@ -127,7 +138,7 @@ const Image = z.object({ url: z.string(), caption: z.string().nullish() });
 const PropertyData = z.object({
   status: z.object({ archived: z.boolean() }),
   tags: z.array(z.string()).nullish(),
-  text: z.object({ description: z.string() }),
+  text: z.object({ description: z.string(), pageTitle: z.string().nullish() }),
   prices: z.object({ primaryPrice: z.string(), displayPriceQualifier: z.string().nullish() }),
   address: z.object({ displayAddress: z.string(), outcode: z.string().nullish(), incode: z.string().nullish() }),
   location: z.object({ latitude: z.number(), longitude: z.number() }).nullish(),
@@ -169,6 +180,7 @@ const parseListing = (html: string, portalId: string): ParsedListing => {
   const outcode = property.address.outcode ?? null;
   const incode = property.address.incode ?? null;
   const agentName = property.customer?.branchDisplayName ?? null;
+  const keyFeatures = (property.keyFeatures ?? []).map(decodeEntities);
 
   return {
     portal: "rightmove",
@@ -190,9 +202,11 @@ const parseListing = (html: string, portalId: string): ParsedListing => {
     annualGroundRent: property.livingCosts?.annualGroundRent ?? null,
     councilTaxBand: statedBand(property.livingCosts?.councilTaxBand),
     sharedOwnership:
-      (property.sharedOwnership?.sharedOwnershipFlag ?? false) || (property.affordableBuyingScheme ?? false),
+      (property.sharedOwnership?.sharedOwnershipFlag ??
+        mentionsSharedOwnership(property.text.pageTitle ?? "", description, ...keyFeatures)) ||
+      (property.affordableBuyingScheme ?? false),
     description,
-    keyFeatures: (property.keyFeatures ?? []).map(decodeEntities),
+    keyFeatures,
     photos: (property.images ?? []).map((image) => ({ url: image.url, caption: image.caption ?? "" })),
     floorplans: (property.floorplans ?? []).map((image) => ({ url: image.url, caption: image.caption ?? "" })),
     nearestStations: (property.nearestStations ?? []).map((station) => ({
@@ -219,6 +233,8 @@ export const rightmove: PortalParser = {
     }
     url.searchParams.set("sortType", NEWEST_FIRST);
     url.searchParams.set("index", String(offset));
+    const hidden = (url.searchParams.get("dontShow") ?? "").split(",").filter(Boolean);
+    url.searchParams.set("dontShow", [...new Set([...hidden, HIDE_SHARED_OWNERSHIP])].join(","));
     return url.toString();
   },
   listingUrl,

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { rightmoveListingPage as listingPage } from "../../../test/rightmove-page";
 import { ParseError } from "./listing";
 import { rightmove } from "./rightmove";
 
@@ -98,40 +99,6 @@ describe("rightmove urls", () => {
   });
 });
 
-/** Encodes a value in Rightmove's flattened page-model format: every nested value becomes an index. */
-const flatten = (root: unknown): unknown[] => {
-  const flat: unknown[] = [];
-  const add = (value: unknown): number => {
-    const index = flat.length;
-    flat.push(null);
-    if (Array.isArray(value)) {
-      flat[index] = value.map(add);
-    } else if (value !== null && typeof value === "object") {
-      flat[index] = Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, add(inner)]));
-    } else {
-      flat[index] = value;
-    }
-    return index;
-  };
-  add(root);
-  return flat;
-};
-
-const listingPage = (overrides: Record<string, unknown>) => {
-  const propertyData = {
-    status: { archived: false },
-    tags: [],
-    text: { description: "A flat. 125 years remaining on the lease." },
-    prices: { primaryPrice: "£400,000", displayPriceQualifier: "" },
-    address: { displayAddress: "Somewhere, London", outcode: "E8", incode: "1AA" },
-    tenure: { tenureType: "LEASEHOLD", yearsRemainingOnLease: 0 },
-    livingCosts: { annualServiceCharge: 0, annualGroundRent: 0, councilTaxBand: "TBC" },
-    ...overrides,
-  };
-  const model = { data: JSON.stringify(flatten({ propertyData })), encoding: "on" };
-  return `<script>window.__PAGE_MODEL = ${JSON.stringify(model)};window.adInfo = {};</script>`;
-};
-
 describe("rightmove placeholders", () => {
   test("reads zero lease and service charge and a TBC band as not stated", () => {
     const listing = rightmove.parseListing(listingPage({}), "1");
@@ -149,5 +116,61 @@ describe("rightmove placeholders", () => {
       "1",
     );
     expect(listing).toMatchObject({ annualServiceCharge: 1200, annualGroundRent: 250, councilTaxBand: "C" });
+  });
+});
+
+describe("rightmove shared ownership", () => {
+  test("is read from a search result's own words, since results carry no flag", async () => {
+    const search = await fixture("search.html");
+    expect((await rightmove.parseSearch(search)).map((hit) => hit.sharedOwnership)).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+
+    const [marked] = rightmove.parseSearch(
+      search.replace('"summary":"A modern,', '"summary":"Shared Ownership: a 40% share of a modern,'),
+    );
+    expect(marked?.sharedOwnership).toBe(true);
+  });
+
+  test("is read from a listing's flag, then its affordable-scheme flag", () => {
+    const flagged = (sharedOwnershipFlag: boolean | null, affordableBuyingScheme = false) =>
+      rightmove.parseListing(listingPage({ sharedOwnership: { sharedOwnershipFlag }, affordableBuyingScheme }), "1")
+        .sharedOwnership;
+    expect(flagged(true)).toBe(true);
+    expect(flagged(false)).toBe(false);
+    expect(flagged(false, true)).toBe(true);
+  });
+
+  test("falls back to the listing's words only when the flag is missing", () => {
+    const text = { description: "Offered on a shared ownership basis.", pageTitle: "1 bedroom flat for sale" };
+    expect(rightmove.parseListing(listingPage({ text }), "1").sharedOwnership).toBe(true);
+    expect(
+      rightmove.parseListing(listingPage({ text, sharedOwnership: { sharedOwnershipFlag: false } }), "1")
+        .sharedOwnership,
+    ).toBe(false);
+    expect(
+      rightmove.parseListing(listingPage({ keyFeatures: ["Shared ownership - 25% share"] }), "1").sharedOwnership,
+    ).toBe(true);
+  });
+
+  test("is not in the real fixtures", async () => {
+    expect(rightmove.parseListing(await fixture("listing.html"), "93524796").sharedOwnership).toBe(false);
+    expect(rightmove.parseListing(await fixture("listing-sold-stc.html"), "128855633").sharedOwnership).toBe(false);
+  });
+
+  test("is hidden from polled searches, keeping what else the search hides", () => {
+    const polled = (search: string) =>
+      new URL(rightmove.newestFirst(`https://www.rightmove.co.uk/property-for-sale/find.html?${search}`, 0));
+
+    expect(polled("locationIdentifier=REGION%5E87490").searchParams.get("dontShow")).toBe("sharedOwnership");
+    expect(polled("dontShow=retirement%2CnewHome").searchParams.get("dontShow")).toBe(
+      "retirement,newHome,sharedOwnership",
+    );
+    expect(polled("dontShow=sharedOwnership%2Cretirement").searchParams.get("dontShow")).toBe(
+      "sharedOwnership,retirement",
+    );
   });
 });

@@ -15,6 +15,13 @@
       "when": 1790544810875,
       "tag": "0001_add_commutes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790577805285,
+      "tag": "0002_reject_shared_ownership",
+      "breakpoints": true
     }
   ]
 }

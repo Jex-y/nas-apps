@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { asc, eq } from "drizzle-orm";
-import { createFlatsTestbed, defaultPages, fakePlanner, NOON, ok, searchPage } from "../../test/support";
+import { rightmoveListingPage } from "../../test/rightmove-page";
+import { createFlatsTestbed, defaultPages, fakePlanner, NOON, ok, type Pages, searchPage } from "../../test/support";
+import { SHARED_OWNERSHIP_REASON } from "./ingest";
 import type { JourneyPlanner } from "./places";
 import { commutes, listings, photos, properties, searches, snapshots } from "./schema";
 import { isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
@@ -294,5 +296,64 @@ describe("commutes", () => {
 
     expect(asked).toEqual([]);
     expect(await timed()).toEqual([]);
+  });
+});
+
+describe("shared ownership", () => {
+  const sharedOwnershipPage = rightmoveListingPage({
+    sharedOwnership: { sharedOwnershipFlag: true },
+    location: { latitude: 51.476311, longitude: -0.324446 },
+  });
+  const withSharedOwnershipPage: Pages = {
+    ...defaultPages,
+    listing: (portalId) => (portalId === "93524796" ? ok(sharedOwnershipPage) : defaultPages.listing(portalId)),
+  };
+
+  test("never ingests a search result that says it is shared ownership", async () => {
+    const { work, fetcher, drain } = setup({
+      ...defaultPages,
+      search: () => ok(searchPage.replace('"summary":"A modern,', '"summary":"Shared ownership. A modern,')),
+    });
+
+    await work.backfillSearch((await addSearch()).id, 1);
+    await drain();
+
+    await expect(propertyByPortalId("93524796")).rejects.toThrow();
+    expect(fetcher.requested).not.toContain("https://www.rightmove.co.uk/properties/93524796");
+    expect((await propertyByPortalId("128855633")).property.status).toBe("new");
+  });
+
+  test("rejects an untriaged property whose page says it is shared ownership, and does not time it", async () => {
+    await addDestination();
+    const { work, drain } = setup(withSharedOwnershipPage);
+
+    await work.backfillSearch((await addSearch()).id, 1);
+    await drain();
+
+    const union = await propertyByPortalId("93524796");
+    expect(union.property).toMatchObject({
+      status: "rejected",
+      rejectedReason: SHARED_OWNERSHIP_REASON,
+      sharedOwnership: true,
+    });
+    const soldStc = await propertyByPortalId("128855633");
+    expect(soldStc.property.status).toBe("new");
+    expect((await db.select().from(commutes)).map((commute) => commute.propertyId)).toEqual([soldStc.property.id]);
+  });
+
+  test("leaves a property already being pursued to Ed", async () => {
+    const first = setup();
+    await first.work.backfillSearch((await addSearch()).id, 1);
+    await first.drain();
+    await db.update(properties).set({ status: "shortlisted" }).where(eq(properties.address, "Union Lane, Isleworth"));
+
+    const refresh = setup(withSharedOwnershipPage);
+    await context.jobs.enqueue(refresh.work.definitions.refreshTracked, {});
+    await refresh.drain();
+
+    expect((await propertyByPortalId("93524796")).property).toMatchObject({
+      status: "shortlisted",
+      sharedOwnership: true,
+    });
   });
 });
