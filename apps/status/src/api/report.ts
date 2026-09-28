@@ -6,7 +6,6 @@ import {
   createBlobStore,
   type JobStats,
   type JobsDatabase,
-  parseNotifyConfig,
   readJobQueue,
   readMigrationState,
   readSchedules,
@@ -104,19 +103,6 @@ const readPostgres = async ({ sql }: AppContext): Promise<PostgresInfo> => {
   };
 };
 
-const NtfyHealth = z.object({ healthy: z.boolean() });
-
-const readNotify = async ({ env }: AppContext, signal: AbortSignal) =>
-  timed(async () => {
-    const response = await fetch(`${parseNotifyConfig(env).ntfy.url}/v1/health`, { signal });
-    if (!response.ok) {
-      throw new Error(`ntfy answered ${response.status}`);
-    }
-    if (!NtfyHealth.parse(await response.json()).healthy) {
-      throw new Error("ntfy reports itself unhealthy");
-    }
-  });
-
 const iso = (date: Date | null): string | null => date?.toISOString() ?? null;
 
 const toJobSummary = (name: string, registered: boolean, stats: JobStats | undefined): JobSummary => ({
@@ -200,13 +186,10 @@ export const createStatusReporter = (deps: StatusDeps) => {
       bunVersion: Bun.version,
       uptimeSeconds: Math.round(process.uptime()),
     };
-    const [postgres, blobCheck, notify, queue, schedules, migrations] = await Promise.all([
+    const [postgres, blobCheck, queue, schedules, migrations] = await Promise.all([
       probe(() => readPostgres(context)),
       probe(async () => ({
         latencyMs: (await timed(() => blob.exists("probe"))).latencyMs,
-      })),
-      probe(async (signal) => ({
-        latencyMs: (await readNotify(context, signal)).latencyMs,
       })),
       probe(() => readQueue(db, registeredJobs)),
       probe(() => readScheduleStatuses(db, deps)),
@@ -225,7 +208,6 @@ export const createStatusReporter = (deps: StatusDeps) => {
       server,
       postgres,
       blob: blobCheck,
-      notify,
       queue,
       schedules,
       migrations,

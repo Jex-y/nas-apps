@@ -2,7 +2,7 @@ import type { SQL } from "bun";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/bun-sql";
 import type { AppModule } from "../app-module";
-import { HttpError, parseBody } from "../http";
+import { parseBody } from "../http";
 import { type IdentityMode, resolveViewer } from "../identity";
 import { subscriptions } from "../push/schema";
 import { createWebPushNotifier, type WebPushConfig } from "../push/send";
@@ -15,8 +15,7 @@ import serviceWorker from "./sw.js" with { type: "text" };
 export type ShellOptions = {
   readonly identity: IdentityMode;
   readonly sql: SQL;
-  /** `null` turns push off: the launcher hides it and subscribing is refused. */
-  readonly webPush: WebPushConfig | null;
+  readonly webPush: WebPushConfig;
 };
 
 /** Reserved so no app's routes can collide with the shell's. */
@@ -47,14 +46,7 @@ const icon = (size: number) => () =>
 export const createShellRoutes = (apps: readonly AppModule[], { identity, sql, webPush }: ShellOptions) => {
   const db = drizzle({ client: sql });
   const launchable: ShellApp[] = apps.map(({ slug, title }) => ({ slug, title }));
-  const settings: PushSettings =
-    webPush === null ? { enabled: false } : { enabled: true, publicKey: webPush.publicKey };
-  const requirePush = (): WebPushConfig => {
-    if (webPush === null) {
-      throw new HttpError(409, "Push notifications are not configured on this server");
-    }
-    return webPush;
-  };
+  const settings: PushSettings = { publicKey: webPush.publicKey };
 
   return {
     "/": page,
@@ -71,7 +63,6 @@ export const createShellRoutes = (apps: readonly AppModule[], { identity, sql, w
     [`${SHELL_API}/push/subscriptions`]: {
       POST: async (request: Request) => {
         const { login } = resolveViewer(identity, request);
-        requirePush();
         const { endpoint, keys } = await parseBody(request, PushSubscriptionInput);
         await db
           .insert(subscriptions)
@@ -89,7 +80,7 @@ export const createShellRoutes = (apps: readonly AppModule[], { identity, sql, w
     [`${SHELL_API}/push/test`]: {
       POST: async (request: Request) => {
         const { login } = resolveViewer(identity, request);
-        await createWebPushNotifier({ config: requirePush(), sql, topic: SHELL_SLUG, login }).send({
+        await createWebPushNotifier({ config: webPush, sql, topic: SHELL_SLUG, login }).send({
           title: "Notifications are on",
           message: "This is how updates from your apps will arrive.",
           clickUrl: "/",

@@ -6,10 +6,7 @@ export const ShellApp = z.object({ slug: z.string(), title: z.string() });
 export const ShellApps = z.array(ShellApp);
 export type ShellApp = z.infer<typeof ShellApp>;
 
-export const PushSettings = z.discriminatedUnion("enabled", [
-  z.object({ enabled: z.literal(false) }),
-  z.object({ enabled: z.literal(true), publicKey: z.string() }),
-]);
+export const PushSettings = z.object({ publicKey: z.string() });
 export type PushSettings = z.infer<typeof PushSettings>;
 
 /** The shape of `PushSubscription.toJSON()`, narrowed to what sending needs. */

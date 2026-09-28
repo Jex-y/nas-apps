@@ -6,7 +6,7 @@ const sql = createSql(config.database);
 const server = startServer({
   port: config.port,
   development: config.development,
-  shell: { identity: config.identity, sql, webPush: config.notify.webPush },
+  shell: { identity: config.identity, sql, webPush: config.notify },
   apps: createApps({
     env: process.env,
     publicUrl: config.publicUrl,

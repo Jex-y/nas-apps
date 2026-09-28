@@ -119,7 +119,6 @@ export const StatusReport = z.object({
   server: ServerInfo,
   postgres: probed(PostgresInfo),
   blob: probed(Reachable),
-  notify: probed(Reachable),
   queue: probed(JobQueue),
   schedules: probed(z.array(ScheduleStatus)),
   migrations: probed(z.array(Migrations)),

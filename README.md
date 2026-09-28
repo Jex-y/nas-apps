@@ -45,6 +45,12 @@ Migrations run before the new server starts, and a failed deploy rolls the serve
 Keep every migration compatible with the previous release: add columns nullable or with a default, and drop
 things only once no deployed code reads them.
 
+## Install and notify
+
+All the apps are one installable web app scoped to `/`: open `https://apps.tail12605.ts.net/` in Safari, Share →
+Add to Home Screen, then open it from the Home Screen and turn notifications on. iOS only offers Web Push to an
+installed app. An app sends with `context.notifier("<slug>").send(...)`, which reaches every subscribed device.
+
 ## Store files
 
 `createBlobStore(context.blob, "<slug>")` gives an app its own prefix in the shared `apps` bucket. Upload through
@@ -106,6 +112,9 @@ Postgres and Garage keep their data in `/volume1/Ed/app/data`, inside the `Ed` s
   `GARAGE_RPC_SECRET` (`openssl rand -hex 32`), `GARAGE_DEFAULT_ACCESS_KEY` (`GK` + `openssl rand -hex 12`) and
   `GARAGE_DEFAULT_SECRET_KEY` (`openssl rand -hex 32`). Garage creates that key and the `apps` bucket on first
   start.
+- The same file holds the Web Push keys: `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` from
+  `bunx web-push generate-vapid-keys`, and `VAPID_SUBJECT` (`mailto:` your address). Changing the pair invalidates
+  every subscription, so generate it once.
 - Optionally, `TFL_API_KEY` in the same file: the primary key of a subscription on the
   [TfL API portal](https://api-portal.tfl.gov.uk/). Flats uses it to time commutes from each property to the places
   saved on its Commutes page; without it they are left blank. It is read on start, so it takes effect from the next

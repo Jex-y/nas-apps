@@ -82,7 +82,6 @@ describe("ingesting a search", () => {
         message: "Price £350,000 → £325,000",
         clickUrl: `https://apps.example/flats/properties/${union.property.id}`,
         priority: "default",
-        tags: ["chart_with_downwards_trend"],
       },
     ]);
     expect((await propertyByPortalId("128855633")).property.price).toBe(440000);

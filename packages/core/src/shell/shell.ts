@@ -63,12 +63,6 @@ const VIEWS: Record<PushView["kind"], { readonly status: string; readonly button
 
 const setupPush = async (registration: ServiceWorkerRegistration | null) => {
   const settings = await requestJson(`${SHELL_API}/push`, PushSettings);
-  if (!settings.enabled) {
-    return;
-  }
-  const section = element("push");
-  section.hidden = false;
-
   const currentView = async (): Promise<PushView> => {
     if (needsInstall()) {
       return { kind: "install" };

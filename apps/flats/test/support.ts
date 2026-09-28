@@ -74,7 +74,7 @@ export const NOON = new Date("2026-09-21T11:00:00Z");
 
 /**
  * A flats pipeline over the real test database and blob store, with the portals replaced by the saved fixtures
- * and ntfy by a list. Call once per test file: it owns that file's connection, and empties the flats tables and
+ * and notifications by a list. Call once per test file: it owns that file's connection, and empties the flats tables and
  * flats jobs before each test.
  */
 export const createFlatsTestbed = () => {
