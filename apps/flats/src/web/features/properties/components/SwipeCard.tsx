@@ -1,10 +1,54 @@
 import { Link } from "wouter";
-import type { PropertySummary } from "../../../../contract";
+import type { Photo, PropertySummary } from "../../../../contract";
 import { Warnings } from "../../../components/PropertyCard";
 import { formatDate, formatPrice, keyFacts } from "../../../utils/format";
 import type { SwipeGesture } from "../hooks/useSwipeGesture";
 
-export const SwipeCard = ({ property, gesture }: { property: PropertySummary; gesture?: SwipeGesture }) => (
+export type GalleryPhoto = Pick<Photo, "kind" | "url">;
+
+/**
+ * The current photo, with the next one mounted but hidden so it has loaded by the time it is shown: photo URLs
+ * redirect to freshly signed ones, so a separately preloaded copy would never be a cache hit.
+ */
+const Gallery = ({ photos, index }: { photos: readonly GalleryPhoto[]; index: number }) => {
+  const current = photos[index];
+  if (current === undefined) {
+    return <div className="no-photo" />;
+  }
+  return (
+    <>
+      {photos.slice(index, index + 2).map((photo) => (
+        <img
+          key={photo.url}
+          src={photo.url}
+          alt=""
+          draggable={false}
+          className={[photo.kind, photo !== current && "preload"].filter(Boolean).join(" ")}
+        />
+      ))}
+      {photos.length > 1 && (
+        <ol className="photo-bars" aria-label={`Photo ${index + 1} of ${photos.length}`}>
+          {photos.map((photo, i) => (
+            <li key={photo.url} className={i === index ? "current" : undefined} />
+          ))}
+        </ol>
+      )}
+      {current.kind === "floorplan" && <span className="photo-label">Floorplan</span>}
+    </>
+  );
+};
+
+export const SwipeCard = ({
+  property,
+  photos = property.thumbnailUrl ? [{ kind: "photo", url: property.thumbnailUrl }] : [],
+  photoIndex = 0,
+  gesture,
+}: {
+  property: PropertySummary;
+  photos?: readonly GalleryPhoto[] | undefined;
+  photoIndex?: number;
+  gesture?: SwipeGesture;
+}) => (
   <article
     ref={gesture?.ref}
     className={["swipe-card", gesture && "top", gesture?.transform && "dragging"].filter(Boolean).join(" ")}
@@ -13,11 +57,7 @@ export const SwipeCard = ({ property, gesture }: { property: PropertySummary; ge
     {...gesture?.handlers}
   >
     <div className="swipe-photo">
-      {property.thumbnailUrl ? (
-        <img src={property.thumbnailUrl} alt="" draggable={false} />
-      ) : (
-        <div className="no-photo" />
-      )}
+      <Gallery photos={photos} index={photoIndex} />
       <span className="stamp shortlist" style={{ opacity: Math.max(0, gesture?.lean ?? 0) }}>
         Shortlist
       </span>

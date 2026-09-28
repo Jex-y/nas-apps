@@ -1,5 +1,5 @@
 import { requestEmpty, requestJson } from "@nas/core/web";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type CreateViewing,
   FLATS_API,
@@ -27,8 +27,17 @@ export const useProperties = (status: PropertyStatus | "all") =>
       ),
   });
 
-export const useProperty = (id: string) =>
-  useQuery({ queryKey: keys.detail(id), queryFn: () => requestJson(`${FLATS_API}/properties/${id}`, PropertyDetail) });
+const detailQuery = (id: string) =>
+  queryOptions({
+    queryKey: keys.detail(id),
+    queryFn: () => requestJson(`${FLATS_API}/properties/${id}`, PropertyDetail),
+  });
+
+export const useProperty = (id: string) => useQuery(detailQuery(id));
+
+/** Photos then floorplans, from the detail; nothing while `id` is undefined. */
+export const usePhotos = (id: string | undefined) =>
+  useQuery({ ...detailQuery(id ?? ""), enabled: id !== undefined, select: (detail) => detail.photos });
 
 const useInvalidatingMutation = <T>(mutationFn: (input: T) => Promise<void>) => {
   const queryClient = useQueryClient();
