@@ -125,8 +125,14 @@ export const createPetRoutes = ({ db, identity, work, now, random }: PetRoutesDe
         if (upload.days.some((day) => day.date > latestDate)) {
           throw new HttpError(400, `Dates after ${latestDate} have not happened yet`);
         }
-        // One insert cannot upsert a row twice, so a day sent twice keeps its last total.
-        const byDate = new Map(upload.days.map((day) => [day.date, day]));
+        // A day's totals only grow, so the highest wins: a run that read Health while the phone was locked sends 0s.
+        // One insert cannot upsert a row twice, so a day sent twice is folded first.
+        const byDate = new Map<string, HealthUpload["days"][number]>();
+        for (const day of upload.days) {
+          if (day.steps >= (byDate.get(day.date)?.steps ?? -1)) {
+            byDate.set(day.date, day);
+          }
+        }
         await db
           .insert(days)
           .values(
@@ -142,9 +148,9 @@ export const createPetRoutes = ({ db, identity, work, now, random }: PetRoutesDe
           .onConflictDoUpdate({
             target: [days.login, days.date],
             set: {
-              steps: sql`excluded.steps`,
-              distanceMeters: sql`excluded.distance_meters`,
-              activeEnergyKcal: sql`excluded.active_energy_kcal`,
+              steps: sql`greatest(${days.steps}, excluded.steps)`,
+              distanceMeters: sql`greatest(${days.distanceMeters}, excluded.distance_meters)`,
+              activeEnergyKcal: sql`greatest(${days.activeEnergyKcal}, excluded.active_energy_kcal)`,
               receivedAt: sql`excluded.received_at`,
             },
           });

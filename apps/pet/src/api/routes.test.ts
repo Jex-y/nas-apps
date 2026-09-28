@@ -42,7 +42,7 @@ describe("pet api", () => {
 });
 
 describe("health ingest", () => {
-  test("upserts each day, the latest total winning, and says what it took", async () => {
+  test("upserts each day, the highest total winning, and says what it took", async () => {
     const me = uniqueLogin();
 
     const response = await sendHealth(me, [
@@ -52,20 +52,21 @@ describe("health ingest", () => {
     expect(response.status).toBe(200);
     expect(HealthReceipt.parse(await response.json())).toEqual({ accepted: 2, lastReceivedAt: NOON.toISOString() });
 
-    await sendHealth(me, [{ date: "2026-09-21", steps: 2_500 }]);
+    await sendHealth(me, [{ date: "2026-09-21", steps: 4_200 }]);
+    await sendHealth(me, [{ date: "2026-09-21", steps: 0 }]);
     const view = await stateOf(me);
-    expect(view.today.steps).toBe(2_500);
+    expect(view.today.steps).toBe(4_200);
     expect(view.lastHealthAt).toBe(NOON.toISOString());
     const [yesterday] = await context.sql`select * from pet.days where login = ${me} and date = '2026-09-20'`;
     expect(yesterday).toMatchObject({ steps: 9_100, distance_meters: 6120.5, active_energy_kcal: 410.2 });
   });
 
-  test("keeps the last of a day sent twice in one request", async () => {
+  test("keeps the highest of a day sent twice in one request", async () => {
     const me = uniqueLogin();
 
     const response = await sendHealth(me, [
-      { date: "2026-09-21", steps: 1_000 },
       { date: "2026-09-21", steps: 1_500 },
+      { date: "2026-09-21", steps: 1_000 },
     ]);
 
     expect(await response.json()).toMatchObject({ accepted: 1 });

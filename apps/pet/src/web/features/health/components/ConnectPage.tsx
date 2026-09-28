@@ -36,8 +36,8 @@ export const ConnectPage = () => {
     <section className="panel connect">
       <h1>Connect Apple Health</h1>
       <p>
-        A Shortcut on your iPhone reads today's and yesterday's steps from Health and sends them here. Resending a day
-        replaces it, so it is safe to run as often as you like.
+        A Shortcut on your iPhone reads today's and yesterday's steps from Health and sends them here. The highest total
+        for a day wins, so it is safe to run as often as you like.
       </p>
       <LastArrival />
 

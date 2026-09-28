@@ -57,8 +57,8 @@ const percent = z.number().int().min(0).max(100);
 const measure = z.number().nonnegative().max(1_000_000);
 
 /**
- * What the iOS app (or the Shortcut) posts: each day's totals so far, keyed by the phone's local date. Every day is
- * an upsert, so resending a day replaces it.
+ * What the Shortcut posts: each day's totals so far, keyed by the phone's local date. Every day is an upsert that
+ * keeps the highest totals, so resending a day is always safe.
  */
 export const HealthUpload = z.object({
   days: z
