@@ -25,6 +25,10 @@ x-notify-env: &notify-env
   NTFY_URL: http://127.0.0.1:2586
   NTFY_TOKEN: ${NTFY_TOKEN:?}
 
+# Optional per-app secrets: an unset one reaches the app as an empty string, which the app reads as unset.
+x-app-secrets-env: &app-secrets-env
+  TFL_API_KEY: ${TFL_API_KEY:-}
+
 x-tailnet: &tailnet
   network_mode: service:tailscale
   depends_on:
@@ -101,7 +105,7 @@ services:
       garage:
         condition: service_started
     environment:
-      <<: [*runtime-env, *database-env, *blob-env, *notify-env]
+      <<: [*runtime-env, *database-env, *blob-env, *notify-env, *app-secrets-env]
     mem_limit: 256m
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
@@ -125,7 +129,7 @@ services:
       ntfy:
         condition: service_healthy
     environment:
-      <<: [*runtime-env, *database-env, *blob-env, *notify-env]
+      <<: [*runtime-env, *database-env, *blob-env, *notify-env, *app-secrets-env]
     mem_limit: 192m
     # Long enough for in-flight jobs to finish; job timeouts stay under a minute by default.
     stop_grace_period: 90s

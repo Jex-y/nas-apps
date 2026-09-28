@@ -1,4 +1,4 @@
-import type { PropertySummary } from "../../contract";
+import type { Commute, PropertySummary } from "../../contract";
 
 const money = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
 const date = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
@@ -25,6 +25,13 @@ const TENURES: Readonly<Record<PropertySummary["tenure"], string>> = {
   commonhold: "Commonhold",
   unknown: "Tenure unknown",
 };
+
+export const formatCommuteTime = (minutes: Commute["minutes"]): string =>
+  minutes === null ? "no route" : `${minutes} min`;
+
+/** e.g. "Office 43 min · Gym no route". */
+export const formatCommutes = (commutes: readonly Commute[]): string =>
+  commutes.map((commute) => `${commute.name} ${formatCommuteTime(commute.minutes)}`).join(" · ");
 
 export const formatTenure = (property: Pick<PropertySummary, "tenure" | "leaseYearsRemaining">): string =>
   property.leaseYearsRemaining === null

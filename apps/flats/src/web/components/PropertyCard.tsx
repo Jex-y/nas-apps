@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "wouter";
 import type { PropertySummary } from "../../contract";
-import { AVAILABILITY_LABELS, formatDate, formatPrice, keyFacts } from "../utils/format";
+import { AVAILABILITY_LABELS, formatCommutes, formatDate, formatPrice, keyFacts } from "../utils/format";
 
 export const Warnings = ({ property }: { property: PropertySummary }) => {
   const warnings = [
@@ -46,6 +46,7 @@ export const PropertyCard = ({
         {property.postcode && <span className="muted"> · {property.postcode}</span>}
       </p>
       <p className="facts">{keyFacts(property).join(" · ")}</p>
+      {property.commutes.length > 0 && <p className="facts">{formatCommutes(property.commutes)}</p>}
       <Warnings property={property} />
       {actions && <div className="card-actions">{actions}</div>}
     </div>

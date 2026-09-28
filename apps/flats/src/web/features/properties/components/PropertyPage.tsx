@@ -3,6 +3,7 @@ import type { PropertyDetail } from "../../../../contract";
 import { Warnings } from "../../../components/PropertyCard";
 import {
   AVAILABILITY_LABELS,
+  formatCommuteTime,
   formatDate,
   formatMoney,
   formatPrice,
@@ -130,6 +131,18 @@ export const PropertyPage = ({ id }: { id: string }) => {
         </div>
         <aside>
           <Notes property={detail} />
+          {detail.commutes.length > 0 && (
+            <section>
+              <h2>Commutes</h2>
+              <ul className="commutes">
+                {detail.commutes.map((commute) => (
+                  <li key={commute.destinationId}>
+                    {commute.name} <span className="muted">{formatCommuteTime(commute.minutes)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <section>
             <h2>History</h2>
             <ol className="history">

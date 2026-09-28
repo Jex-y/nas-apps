@@ -1,3 +1,4 @@
+import { PermanentJobError } from "@nas/core";
 import { z } from "zod";
 
 export type Coordinates = {
@@ -38,7 +39,10 @@ export type ArriveBy = {
 };
 
 export type JourneyPlanner = {
-  /** Minutes for the fastest public-transport journey arriving by `arriveBy`; `null` when TfL finds no route. */
+  /**
+   * Minutes for the fastest public-transport journey arriving by `arriveBy`; `null` when TfL finds no route.
+   * Throws `PermanentJobError` when TfL refuses the request itself (bad key, bad input), which retrying cannot fix.
+   */
   readonly fastestMinutes: (
     from: Coordinates,
     to: Coordinates,
@@ -65,8 +69,11 @@ export const createTflPlanner = (apiKey: string, send: typeof fetch = fetch): Jo
     if (response.status === 404) {
       return null;
     }
-    if (!response.ok) {
+    if (response.status === 429 || response.status >= 500) {
       throw new Error(`TfL journey planner failed: ${response.status}`);
+    }
+    if (!response.ok) {
+      throw new PermanentJobError(`TfL journey planner refused the request: ${response.status}`);
     }
     const { journeys } = JourneyResponse.parse(await response.json());
     return journeys.length === 0 ? null : Math.min(...journeys.map((journey) => journey.duration));
