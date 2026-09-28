@@ -1,13 +1,5 @@
 @import "@nas/core/theme.css";
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
 a {
   color: inherit;
 }
@@ -35,38 +27,9 @@ h2 {
   font-size: 0.875rem;
 }
 
-input,
-select,
-textarea,
-button {
-  font: inherit;
-  color: inherit;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.4rem 0.6rem;
-}
-
 textarea {
   width: 100%;
   resize: vertical;
-}
-
-button {
-  cursor: pointer;
-}
-
-button[type="submit"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
-}
-
-kbd {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-small);
-  padding: 0 0.3rem;
-  font-size: 0.8rem;
 }
 
 .site-header {
@@ -92,6 +55,8 @@ kbd {
 .nav-link {
   text-decoration: none;
   color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
 }
 
 .nav-link.active {
@@ -200,8 +165,8 @@ main {
 .badge.warning {
   background: var(--warning-bg);
   color: var(--warning-fg);
-  border-radius: 999px;
-  padding: 0.1rem 0.6rem;
+  border-radius: var(--radius-small);
+  padding: 0.1rem 0.5rem;
   font-size: 0.8rem;
 }
 
@@ -361,7 +326,7 @@ main:has(.swipe) {
   position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: calc(var(--radius) * 2);
   overflow: hidden;
   transform: translateY(0.5rem) scale(0.96);
   transition: transform 200ms ease-out;
@@ -494,12 +459,6 @@ main:has(.swipe) {
 
 .swipe-actions button {
   padding: 0.6rem 1rem;
-  border-radius: 999px;
-}
-
-.swipe-actions button:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .swipe-actions .reject {

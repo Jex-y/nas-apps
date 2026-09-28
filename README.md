@@ -55,16 +55,16 @@ installed app. An app sends with `context.notifier("<slug>").send(...)`, which r
 
 `createBlobStore(context.blob, "<slug>")` gives an app its own prefix in the shared `apps` bucket. Upload through
 the server with `write`, and hand browsers `downloadUrl` (a short-lived presigned URL) rather than streaming files
-through the server. `apps/notes` attachments are the worked example.
+through the server. `apps/flats` listing and viewing photos are the worked example.
 
 Blob keys and database rows are not transactional. Write the blob before inserting its row and delete the row
 before its blob, so a failure leaves at worst an unreferenced blob, never a row pointing at nothing.
 
 ## Add an app
 
-1. Copy `apps/notes` to `apps/<slug>` and rename `notes` throughout: package name, `pgSchema`, route
-   prefixes, `drizzle.config.ts`, `migrations.ts`.
-2. Delete its `drizzle/` folder and run `bun run --cwd apps/<slug> db:generate --name init`.
+1. Copy `apps/status` to `apps/<slug>` and rename `status` throughout: package name, route prefixes, module.
+2. For a database, add `src/api/schema.ts` (its own `pgSchema`), `drizzle.config.ts` and `migrations.ts` modelled
+   on `apps/flats`, then run `bun run --cwd apps/<slug> db:generate --name init`.
 3. Add `"@nas/<slug>": "workspace:*"` to `server/package.json`, register the app and its migrations in
    `server/src/apps.ts`, then `bun install`.
 

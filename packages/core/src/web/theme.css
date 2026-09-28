@@ -1,47 +1,51 @@
-/* The bundler inlines every font file it reaches as a data URI, so only the Latin woff2 faces are declared. */
+/*
+ * The bundler inlines every font file it reaches as a data URI, so only the Latin woff2 faces are declared. Plain
+ * `format("woff2")`: the bundler unquotes `format("woff2-variations")` into an invalid keyword, dropping the face.
+ */
 @font-face {
-  font-family: "Instrument Sans Variable";
+  font-family: "Geist Variable";
   font-style: normal;
   font-display: swap;
-  font-weight: 400 700;
-  src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2")
-    format("woff2-variations");
+  font-weight: 100 900;
+  src: url("@fontsource-variable/geist/files/geist-latin-wght-normal.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: "DM Mono";
+  font-family: "JetBrains Mono Variable";
   font-style: normal;
   font-display: swap;
-  font-weight: 400;
-  src: url("@fontsource/dm-mono/files/dm-mono-latin-400-normal.woff2") format("woff2");
+  font-weight: 100 800;
+  src: url("@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2") format("woff2");
 }
 
-@font-face {
-  font-family: "DM Mono";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 500;
-  src: url("@fontsource/dm-mono/files/dm-mono-latin-500-normal.woff2") format("woff2");
-}
-
+/*
+ * Cool slate neutrals with one warm accent: body text in Geist, headings, controls and figures in JetBrains Mono,
+ * square-ish corners and a hard offset shadow on primary actions.
+ */
 :root {
   color-scheme: light dark;
-  --bg: #ecebe7;
-  --surface: #f7f6f3;
-  --fg: #1d1d1b;
-  --muted: #66655f;
-  --border: #d8d6cf;
-  --accent: #be4a12;
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --fg: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --accent: #ea580c;
   --on-accent: #ffffff;
-  --accent-2: #3f7a3c;
-  --warning-bg: #f3e3b5;
-  --warning-fg: #6b4a00;
-  --error: #b3261e;
-  --success: #3f7a3c;
-  --radius: 6px;
-  --radius-small: 4px;
-  --font-body: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "DM Mono", ui-monospace, Menlo, monospace;
+  --accent-2: #16a34a;
+  --sky: #0284c7;
+  --violet: #7c3aed;
+  --warning-bg: #fef9c3;
+  --warning-fg: #a16207;
+  --error: #dc2626;
+  --success: #16a34a;
+  --shadow-hard: 2px 2px 0 var(--fg);
+  --shadow-float: 0 12px 32px -12px rgb(15 23 42 / 0.25);
+  --radius: 4px;
+  --radius-small: 2px;
+  --font-body: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, Menlo, monospace;
   font-family: var(--font-body);
   background: var(--bg);
   color: var(--fg);
@@ -49,31 +53,150 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1a1a18;
-    --surface: #232321;
-    --fg: #efeee9;
-    --muted: #9d9c96;
-    --border: #363532;
-    --accent: #ff7442;
-    --on-accent: #1a1a18;
-    --accent-2: #7fc079;
-    --warning-bg: #3a2c0c;
-    --warning-fg: #f2c230;
-    --error: #ff8a7a;
-    --success: #7fc079;
+    --bg: #020617;
+    --surface: #0b1222;
+    --surface-2: #111a2e;
+    --fg: #e2e8f0;
+    --muted: #8391a7;
+    --border: #1c2638;
+    --border-strong: #334155;
+    --accent: #fdba74;
+    --on-accent: #1c0f04;
+    --accent-2: #4ade80;
+    --sky: #38bdf8;
+    --violet: #a78bfa;
+    --warning-bg: rgb(250 204 21 / 0.12);
+    --warning-fg: #facc15;
+    --error: #f87171;
+    --success: #4ade80;
+    --shadow-hard: none;
+    --shadow-float: 0 16px 40px -12px rgb(0 0 0 / 0.7);
   }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1,
 h2,
 h3 {
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+select,
+textarea {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.7rem;
+  transition: border-color 120ms ease-out;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* Not on `[hidden]` buttons, where it would override the attribute's `display: none`. */
+:where(button, .button):not([hidden]) {
+  display: inline-flex;
+}
+
+button,
+.button {
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease-out,
+    background-color 120ms ease-out,
+    transform 80ms ease-out;
+}
+
+button:hover,
+.button:hover {
+  border-color: var(--fg);
+}
+
+button:active {
+  transform: translate(1px, 1px);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+button[type="submit"],
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-hard);
+}
+
+button[type="submit"]:active,
+button.primary:active {
+  box-shadow: none;
+  transform: translate(2px, 2px);
+}
+
+kbd {
+  display: inline-block;
+  padding: 0 0.35rem;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  font-size: 0.75rem;
+  line-height: 1.5;
 }
 
 time,
