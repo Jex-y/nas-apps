@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/icon.png" alt="" width="128" height="128"></p>
+
 # tailnet-apps
 
 Small personal web apps, self-hosted on any Docker host and served privately to your
