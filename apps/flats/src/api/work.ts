@@ -53,6 +53,19 @@ const describeChange = (change: ListingChange): string =>
     .filter(Boolean)
     .join(". ");
 
+const describeArrival = (arrival: {
+  readonly price: number | null;
+  readonly bedrooms: number | null;
+  readonly sizeSqft: number | null;
+}): string =>
+  [
+    formatPrice(arrival.price),
+    arrival.bedrooms !== null && `${arrival.bedrooms} bed`,
+    arrival.sizeSqft !== null && `${arrival.sizeSqft.toLocaleString("en-GB")} sq ft`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
 export const createFlatsWork = (deps: FlatsWorkDeps) => {
   const { db, blob, queue, notifier, fetcher } = deps;
 
@@ -63,6 +76,8 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     }
     return parser;
   };
+
+  const propertyUrl = (propertyId: string) => `${deps.publicUrl}/flats/properties/${propertyId}`;
 
   const alertIfTracked = async (change: ListingChange) => {
     const [property] = await db
@@ -75,8 +90,33 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     await notifier.send({
       title: property.address,
       message: describeChange(change),
-      clickUrl: `${deps.publicUrl}/flats/properties/${change.propertyId}`,
+      clickUrl: propertyUrl(change.propertyId),
       priority: change.availability === null ? "default" : "high",
+      tag: change.propertyId,
+    });
+  };
+
+  /** Announces a listing that survived its page's filters and is on the market, waiting to be triaged. */
+  const announceArrival = async (listingId: string) => {
+    const [arrival] = await db
+      .select({
+        id: properties.id,
+        address: properties.address,
+        price: properties.price,
+        bedrooms: properties.bedrooms,
+        sizeSqft: properties.sizeSqft,
+      })
+      .from(listings)
+      .innerJoin(properties, eq(properties.id, listings.propertyId))
+      .where(and(eq(listings.id, listingId), eq(properties.status, "new"), eq(properties.availability, "available")));
+    if (arrival === undefined) {
+      return;
+    }
+    await notifier.send({
+      title: `New: ${arrival.address}`,
+      message: describeArrival(arrival),
+      clickUrl: propertyUrl(arrival.id),
+      tag: arrival.id,
     });
   };
 
@@ -199,9 +239,10 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
 
   const fetchListing = defineJob({
     name: "flats.fetch-listing",
-    payload: z.object({ listingId: z.uuid() }),
+    /** `announce` notifies once the page shows the listing is worth triaging. */
+    payload: z.object({ listingId: z.uuid(), announce: z.boolean().default(false) }),
     maxAttempts: 4,
-    handle: async ({ listingId }, { signal }) => {
+    handle: async ({ listingId, announce }, { signal }) => {
       const [listing] = await db
         .select({ portal: listings.portal, portalId: listings.portalId })
         .from(listings)
@@ -218,6 +259,9 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       if (change !== null) {
         await alertIfTracked(change);
       }
+      if (announce) {
+        await announceArrival(listingId);
+      }
     },
   });
 
@@ -231,7 +275,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
         .from(listings)
         .where(and(eq(listings.portal, portal), eq(listings.portalId, portalId)));
       if (known !== undefined) {
-        await queue.enqueue(fetchListing, { listingId: known.id }, { dedupeKey: known.id });
+        await queue.enqueue(fetchListing, { listingId: known.id, announce: false }, { dedupeKey: known.id });
         return;
       }
       const parser = parserFor(portal);
@@ -283,10 +327,16 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
           throw new Error(result.kind === "blocked" ? `Blocked with ${result.status}` : "Search page not found");
         }
         const hits = parser.parseSearch(result.body).filter((hit) => !hit.sharedOwnership);
+        /** A search's first poll and the backfill's deeper pages turn up listings that were already there. */
+        const announce = offset === 0 && search.lastSucceededAt !== null;
         for (const hit of hits) {
           const outcome = await recordSearchHit(db, hit);
           if (outcome.kind === "new") {
-            await queue.enqueue(fetchListing, { listingId: outcome.listingId }, { dedupeKey: outcome.listingId });
+            await queue.enqueue(
+              fetchListing,
+              { listingId: outcome.listingId, announce },
+              { dedupeKey: outcome.listingId },
+            );
           } else if (outcome.kind === "changed") {
             await alertIfTracked(outcome.change);
           }
@@ -326,7 +376,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
         .where(and(inArray(properties.status, [...TRACKED_STATUSES]), ne(listings.availability, "removed")))
         .orderBy(asc(listings.lastSeenAt));
       for (const { id } of tracked) {
-        await queue.enqueue(fetchListing, { listingId: id }, { dedupeKey: id });
+        await queue.enqueue(fetchListing, { listingId: id, announce: false }, { dedupeKey: id });
       }
     },
   });

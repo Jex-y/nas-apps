@@ -20,7 +20,7 @@ const { context, db, blob, setup, addSearch, addDestination, propertyByPortalId 
 
 describe("ingesting a search", () => {
   test("seeds a new search with its listings, their pages and photos", async () => {
-    const { work, drain } = setup();
+    const { work, sent, drain } = setup();
     const search = await addSearch();
 
     await work.backfillSearch(search.id, 1);
@@ -64,6 +64,41 @@ describe("ingesting a search", () => {
     const [polled] = await db.select().from(searches).where(eq(searches.id, search.id));
     expect(polled).toMatchObject({ consecutiveFailures: 0, lastError: null });
     expect(polled?.lastSucceededAt).not.toBeNull();
+    expect(sent).toEqual([]);
+  });
+
+  const routinePoll = async (pages: Pages = defaultPages) => {
+    const polled = setup(pages);
+    const search = await addSearch();
+    await db.update(searches).set({ lastSucceededAt: NOON }).where(eq(searches.id, search.id));
+    await context.jobs.enqueue(polled.work.definitions.pollSearches, {});
+    await polled.drain();
+    return polled;
+  };
+
+  test("announces each new listing still on the market, opening on its property", async () => {
+    const { sent } = await routinePoll();
+
+    const union = await propertyByPortalId("93524796");
+    expect(sent).toEqual([
+      {
+        title: "New: Union Lane, Isleworth",
+        message: "£350,000 · 2 bed · 656 sq ft",
+        clickUrl: `https://apps.example/flats/properties/${union.property.id}`,
+        tag: union.property.id,
+      },
+    ]);
+  });
+
+  test("does not announce a new listing its page rules out", async () => {
+    const tooSmall = rightmoveListingPage({ sizings: [{ unit: "sqft", minimumSize: 649 }] });
+    const { sent } = await routinePoll({
+      ...defaultPages,
+      listing: (portalId) => (portalId === "93524796" ? ok(tooSmall) : defaultPages.listing(portalId)),
+    });
+
+    expect((await propertyByPortalId("93524796")).property.status).toBe("rejected");
+    expect(sent).toEqual([]);
   });
 
   test("records a price drop and alerts only for tracked properties", async () => {
@@ -91,6 +126,7 @@ describe("ingesting a search", () => {
         message: "Price £350,000 → £325,000",
         clickUrl: `https://apps.example/flats/properties/${union.property.id}`,
         priority: "default",
+        tag: union.property.id,
       },
     ]);
     expect((await propertyByPortalId("128855633")).property.price).toBe(440000);
