@@ -6,7 +6,6 @@
     "@apps/core": "workspace:*",
     "drizzle-orm": "^0.45.3",
     "@apps/flats": "workspace:*",
-    "@apps/pet": "workspace:*",
     "@apps/status": "workspace:*",
     "@apps/tasks": "workspace:*"
   }

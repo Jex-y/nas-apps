@@ -27,22 +27,6 @@
         "@types/react-dom": "^19.3.0",
       },
     },
-    "apps/pet": {
-      "name": "@apps/pet",
-      "dependencies": {
-        "@apps/core": "workspace:*",
-        "@tanstack/react-query": "^5.104.0",
-        "drizzle-orm": "^0.45.3",
-        "react": "^19.3.0",
-        "react-dom": "^19.3.0",
-        "wouter": "^3.11.0",
-        "zod": "^4.6.5",
-      },
-      "devDependencies": {
-        "@types/react": "^19.3.0",
-        "@types/react-dom": "^19.3.0",
-      },
-    },
     "apps/status": {
       "name": "@apps/status",
       "dependencies": {
@@ -94,7 +78,6 @@
       "dependencies": {
         "@apps/core": "workspace:*",
         "@apps/flats": "workspace:*",
-        "@apps/pet": "workspace:*",
         "@apps/status": "workspace:*",
         "@apps/tasks": "workspace:*",
         "drizzle-orm": "^0.45.3",
@@ -105,8 +88,6 @@
     "@apps/core": ["@apps/core@workspace:packages/core"],
 
     "@apps/flats": ["@apps/flats@workspace:apps/flats"],
-
-    "@apps/pet": ["@apps/pet@workspace:apps/pet"],
 
     "@apps/server": ["@apps/server@workspace:server"],
 

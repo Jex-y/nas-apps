@@ -7,7 +7,6 @@ request carries the viewer's tailnet login, so there are no accounts or password
 | App      | What it does                                                                                          |
 | -------- | ----------------------------------------------------------------------------------------------------- |
 | `flats`  | Watches Rightmove saved searches, triages new listings by swiping, and times commutes with the TfL API |
-| `pet`    | A Tamagotchi-style pixel pet kept alive by walking, fed by Apple Health step counts                    |
 | `tasks`  | A personal to-do list with dependencies, a board, a critical-path timeline and an MCP server          |
 | `status` | Health of the stack: services, job queue, schedules and recent failures                               |
 
@@ -95,29 +94,6 @@ To time commutes, set `TFL_API_KEY` to the primary key of a subscription on the
 [TfL API portal](https://api-portal.tfl.gov.uk/) and add places on the Commutes page. Without it commutes are left
 blank. It is read on start, so it takes effect from the next deploy, and a daily sweep then times the properties
 already found.
-
-### Pet
-
-Each tailnet login hatches one pet. Meeting the daily step goal (8,000 unless changed in Settings) feeds it, streaks
-raise its mood and bond and unlock accessories, and missed days make it hungry, then sad, then sick. After a week of
-them it runs away, and comes home on a day of one and a half times the goal. Its state is derived from the day-by-day
-step history each time it is read, never stored, so late or corrected Health data rewrites the story. It nudges its
-owner at 18:00 London time when short of the goal, when the goal is hit, and when steps stop arriving.
-
-Apple Health has no web API, so an iOS Shortcut sends the totals. The Pet app's Health page has the full recipe;
-in short:
-
-1. Build a shortcut that uses Find Health Samples (Steps, Group By Day) and Calculate Statistics (Sum) to total
-   today's and yesterday's steps, and posts them with Get Contents of URL to
-   `https://apps.<tailnet>.ts.net/pet/api/health` as JSON:
-   `{"days":[{"date":"2026-09-27","steps":9412},{"date":"2026-09-28","steps":3180}]}`. Each day may also carry
-   `distanceMeters` and `activeEnergyKcal`; resending a day replaces it.
-2. Run it once by hand with Tailscale on, allowing Health access and choosing Always Allow for the server, so later
-   runs need no confirmation.
-3. Add personal automations that Run Immediately: when a few everyday apps are opened, and at 17:45.
-
-The Shortcut cannot read Health while the iPhone is locked, so a run then fails and the next one with the phone
-unlocked catches up. The pet only warns about missing data after 36 hours without any.
 
 ### Tasks
 
