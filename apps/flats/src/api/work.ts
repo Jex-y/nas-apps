@@ -1,14 +1,16 @@
 import type { BlobStore, JobQueue, Notifier, RegisteredJob, Schedule } from "@apps/core";
 import { defineJob, defineSchedule, PermanentJobError } from "@apps/core";
-import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { TRACKED_STATUSES } from "../contract";
 import type { FlatsDb } from "./db";
+import type { FeatureExtractor } from "./extractor";
 import type { Fetcher } from "./fetcher";
 import { hitFromListing, type ListingChange, recordListingPage, recordSearchHit } from "./ingest";
 import { type JourneyPlanner, nextTuesday } from "./places";
 import { type ParsedListing, ParseError, PORTALS, type Portal, type PortalParser } from "./portals/listing";
-import { commutes, destinations, listings, photos, properties, searches } from "./schema";
+import { currentAnswers, exclusion, fingerprint, listingState, type Question, unanswered } from "./questions";
+import { answers, commutes, destinations, listings, photos, properties, searches } from "./schema";
 
 export type FlatsWorkDeps = {
   readonly db: FlatsDb;
@@ -18,6 +20,9 @@ export type FlatsWorkDeps = {
   readonly fetcher: Fetcher;
   /** `null` when no TfL key is configured; commutes are then left uncomputed. */
   readonly planner: JourneyPlanner | null;
+  /** `null` when no TypeSafe key is configured; listings are then left unread. */
+  readonly extractor: FeatureExtractor | null;
+  readonly questions: readonly Question[];
   readonly parsers: Readonly<Partial<Record<Portal, PortalParser>>>;
   readonly publicUrl: string;
   readonly now: () => Date;
@@ -40,7 +45,7 @@ export const isActiveHour = (at: Date): boolean => {
   return hour >= 7 && hour < 23;
 };
 
-/** Properties worth timing commutes for: not rejected and still advertised. */
+/** Properties worth timing and reading: not rejected and still advertised. */
 const inPlay = and(ne(properties.status, "rejected"), ne(properties.availability, "removed"));
 
 const formatPrice = (price: number | null) => (price === null ? "POA" : `£${price.toLocaleString("en-GB")}`);
@@ -205,6 +210,69 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
   });
 
+  const readListing = defineJob({
+    name: "flats.read-listing",
+    payload: z.object({ propertyId: z.uuid() }),
+    handle: async ({ propertyId }, { signal }) => {
+      const extractor = deps.extractor;
+      if (extractor === null) {
+        return;
+      }
+      const [advert] = await db
+        .select({ parsed: listings.parsed })
+        .from(listings)
+        .innerJoin(properties, eq(properties.id, listings.propertyId))
+        .where(and(eq(listings.propertyId, propertyId), isNotNull(listings.parsed), inPlay))
+        .orderBy(desc(listings.parsedAt))
+        .limit(1);
+      if (advert?.parsed == null) {
+        return;
+      }
+      const stored = await db
+        .select({ questionKey: answers.questionKey, fingerprint: answers.fingerprint, answer: answers.answer })
+        .from(answers)
+        .where(eq(answers.propertyId, propertyId));
+      const asking = unanswered(deps.questions, stored);
+      if (asking.length === 0) {
+        return;
+      }
+      const extraction = await extractor.answer(listingState(advert.parsed), asking, signal);
+      const read = asking.flatMap((question) => {
+        const answer = extraction.answers.get(question.key);
+        return answer === undefined
+          ? []
+          : [
+              {
+                propertyId,
+                questionKey: question.key,
+                fingerprint: fingerprint(question),
+                answer,
+                model: extraction.model,
+              },
+            ];
+      });
+      await db
+        .insert(answers)
+        .values(read)
+        .onConflictDoUpdate({
+          target: [answers.propertyId, answers.questionKey],
+          set: {
+            fingerprint: sql`excluded.fingerprint`,
+            answer: sql`excluded.answer`,
+            model: sql`excluded.model`,
+            extractedAt: sql`now()`,
+          },
+        });
+      const rejectedReason = exclusion(deps.questions, currentAnswers(deps.questions, [...stored, ...read]));
+      if (rejectedReason !== null) {
+        await db
+          .update(properties)
+          .set({ status: "rejected", rejectedReason })
+          .where(and(eq(properties.id, propertyId), eq(properties.status, "new")));
+      }
+    },
+  });
+
   const parsePage = (parser: PortalParser, html: string, portalId: string): ParsedListing => {
     try {
       return parser.parseListing(html, portalId);
@@ -225,6 +293,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       .where(eq(listings.id, listingId));
     if (listing !== undefined) {
       await queue.enqueue(computeCommutes, { propertyId: listing.propertyId }, { dedupeKey: listing.propertyId });
+      await queue.enqueue(readListing, { propertyId: listing.propertyId }, { dedupeKey: listing.propertyId });
     }
     return change;
   };
@@ -395,6 +464,18 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     handle: enqueueCommutes,
   });
 
+  /** Reads every property still in play, e.g. after a question is reworded or TypeSafe is configured. */
+  const sweepReadings = defineJob({
+    name: "flats.sweep-readings",
+    payload: z.object({}),
+    handle: async () => {
+      const readable = await db.select({ id: properties.id }).from(properties).where(inPlay);
+      for (const { id } of readable) {
+        await queue.enqueue(readListing, { propertyId: id }, { dedupeKey: id });
+      }
+    },
+  });
+
   const jobs: readonly RegisteredJob[] = [
     pollSearches,
     pollSearch,
@@ -403,6 +484,8 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     mirrorPhotos,
     computeCommutes,
     sweepCommutes,
+    readListing,
+    sweepReadings,
     refreshTracked,
   ];
 
@@ -428,6 +511,13 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       job: sweepCommutes,
       payload: {},
     }),
+    defineSchedule({
+      name: "flats.sweep-readings",
+      everyMs: 24 * HOUR,
+      jitterMs: 2 * HOUR,
+      job: sweepReadings,
+      payload: {},
+    }),
   ];
 
   return {
@@ -441,6 +531,8 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       mirrorPhotos,
       computeCommutes,
       sweepCommutes,
+      readListing,
+      sweepReadings,
       refreshTracked,
     },
     /** Polls the first `pages` result pages of a new search, a minute apart, to seed it with current listings. */

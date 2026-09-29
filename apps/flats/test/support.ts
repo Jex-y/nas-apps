@@ -3,9 +3,11 @@ import { type AppContext, createBlobStore, drainJobs, type Notification } from "
 import { createTestContext } from "@apps/core/testing";
 import { eq } from "drizzle-orm";
 import { flatsDb } from "../src/api/db";
+import type { FeatureExtractor } from "../src/api/extractor";
 import type { Download, Fetcher, FetchResult } from "../src/api/fetcher";
 import type { ArriveBy, Coordinates, Geocoder, JourneyPlanner } from "../src/api/places";
 import { rightmove } from "../src/api/portals/rightmove";
+import { type Answer, QUESTIONS, type Question } from "../src/api/questions";
 import { destinations, listings, properties, searches } from "../src/api/schema";
 import { createFlatsWork } from "../src/api/work";
 
@@ -63,6 +65,39 @@ export const fakePlanner = (minutes: number | null = 43) => {
   return { planner, asked };
 };
 
+/** A certain answer at a question's first option or level, or a confident no. */
+const certainFirst = (question: Question): Answer => {
+  switch (question.kind) {
+    case "exclusion":
+    case "feature":
+      return { kind: "noul", yes: 0.02 };
+    case "choice": {
+      const [first = ""] = Object.keys(question.options);
+      return { kind: "choice", probabilities: { [first]: 1 } };
+    }
+    case "score":
+      return { kind: "score", probabilities: question.levels.map((_, level) => (level === 0 ? 1 : 0)) };
+  }
+};
+
+/**
+ * A Jev that answers every question as `answers` says, else certain of its first option or a confident no, recording
+ * which questions each call asked.
+ */
+export const fakeExtractor = (answers: Readonly<Record<string, Answer>> = {}) => {
+  const asked: string[][] = [];
+  const extractor: FeatureExtractor = {
+    answer: async (_state, questions) => {
+      asked.push(questions.map((question) => question.key));
+      return {
+        model: "jev-fake",
+        answers: new Map(questions.map((question) => [question.key, answers[question.key] ?? certainFirst(question)])),
+      };
+    },
+  };
+  return { extractor, asked };
+};
+
 /** Knows Fora Chancery House's postcode and nothing else. */
 export const fakeGeocoder: Geocoder = {
   postcode: async (postcode) =>
@@ -84,7 +119,20 @@ export const createFlatsTestbed = () => {
   const db = flatsDb(context.sql);
   const blob = createBlobStore(context.blob, `flats-test/${crypto.randomUUID()}`);
 
-  const setup = (pages: Pages = defaultPages, now = NOON, planner: JourneyPlanner | null = fakePlanner().planner) => {
+  const setup = (
+    pages: Pages = defaultPages,
+    {
+      now = NOON,
+      planner = fakePlanner().planner,
+      extractor = fakeExtractor().extractor,
+      questions = QUESTIONS,
+    }: {
+      readonly now?: Date;
+      readonly planner?: JourneyPlanner | null;
+      readonly extractor?: FeatureExtractor | null;
+      readonly questions?: readonly Question[];
+    } = {},
+  ) => {
     const sent: Notification[] = [];
     const fetcher = fakeFetcher(pages);
     const work = createFlatsWork({
@@ -95,6 +143,8 @@ export const createFlatsTestbed = () => {
       fetcher,
       parsers: { rightmove },
       planner,
+      extractor,
+      questions,
       publicUrl: "https://apps.example",
       now: () => now,
     });
