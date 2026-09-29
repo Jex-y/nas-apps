@@ -3,7 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { HttpError } from "@nas/core";
 import { z } from "zod";
-import { CreateTask, DurationDays, type ProjectView, SaveProject, STATUSES, UpdateTask } from "../contract";
+import { CreateTask, DurationDays, STATUSES, type TaskList, UpdateTask } from "../contract";
 import { blockers, dateOfDay, schedule, topologicalOrder } from "../plan";
 import { londonDay } from "./calendar";
 import type { TasksService } from "./service";
@@ -13,31 +13,28 @@ export type TasksMcpDeps = {
   readonly now: () => Date;
 };
 
-const INSTRUCTIONS = `A to-do list whose tasks depend on one another, grouped into projects shared by the household.
+const INSTRUCTIONS = `The connected person's own to-do list, whose tasks can depend on one another.
 
-- A task waits on the tasks in its dependsOn; the graph never has a cycle and never crosses projects.
+- A task waits on the tasks in its dependsOn; the graph never has a cycle.
 - Status is todo, doing or done. A task can only leave todo once everything it waits on is done, and a done task
   can only be reopened while nothing that waits on it has started.
 - Each task has a duration estimate in days, an optional startOn (not before) and dueOn (last day to work on it).
-- Every project answer includes a critical-path schedule from today: each task's scheduled first and last day, its
+- The list comes with a critical-path schedule from today: each unfinished task's scheduled first and last day, its
   slack in days (negative when it will miss a due date) and whether it is critical.
-- Every change answers with the whole project as it now is. Ids are UUIDs; find them with list_projects and get_project.`;
+- Every change answers with the whole list as it now is. Ids are UUIDs; find them with list_tasks.`;
 
-const ProjectId = z.uuid().describe("The project's id");
 const TaskId = z.uuid().describe("The task's id");
 const LocalDate = z.iso.date();
 
-/** The project as the model reads it: tasks in dependency order, each with its schedule. */
-const planOf = (view: ProjectView, today: number) => {
-  const slots = schedule(view.tasks, today, londonDay);
-  const byId = new Map(view.tasks.map((task) => [task.id, task]));
-  const open = view.tasks.flatMap((task) => (task.status === "done" ? [] : (slots.get(task.id) ?? [])));
+/** The list as the model reads it: tasks in dependency order, each with its schedule. */
+const planOf = (list: TaskList, today: number) => {
+  const slots = schedule(list, today, londonDay);
+  const byId = new Map(list.map((task) => [task.id, task]));
+  const open = list.flatMap((task) => (task.status === "done" ? [] : (slots.get(task.id) ?? [])));
   return {
-    id: view.id,
-    name: view.name,
     today: dateOfDay(today),
     finishesOn: open.length === 0 ? null : dateOfDay(Math.max(...open.map((slot) => slot.finish)) - 1),
-    tasks: topologicalOrder(view.tasks).map((task) => {
+    tasks: topologicalOrder(list).map((task) => {
       const slot = slots.get(task.id);
       return {
         id: task.id,
@@ -76,67 +73,36 @@ const run = async (work: () => Promise<unknown>): Promise<CallToolResult> => {
   }
 };
 
-const createServer = ({ service, now }: TasksMcpDeps): McpServer => {
+const createServer = ({ service, now }: TasksMcpDeps, owner: string): McpServer => {
   const server = new McpServer({ name: "nas-tasks", version: "1.0.0" }, { instructions: INSTRUCTIONS });
-  const plan = async (view: Promise<ProjectView>) => planOf(await view, londonDay(now()));
+  const plan = async (list: Promise<TaskList>) => planOf(await list, londonDay(now()));
 
-  const readOnly = { readOnlyHint: true, openWorldHint: false } as const;
   const change = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
-  const destroy = { readOnlyHint: false, destructiveHint: true, openWorldHint: false } as const;
+  const edit = { ...change, idempotentHint: true } as const;
 
   server.registerTool(
-    "list_projects",
-    { description: "Lists every project with how many of its tasks are in each status.", annotations: readOnly },
-    () => run(() => service.listProjects()),
-  );
-  server.registerTool(
-    "get_project",
+    "list_tasks",
     {
-      description: "Reads a project's tasks in dependency order, with what each waits on and its schedule.",
-      inputSchema: { projectId: ProjectId },
-      annotations: readOnly,
+      description: "Reads every task in dependency order, with what each waits on and its schedule.",
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ projectId }) => run(() => plan(service.getProject(projectId))),
-  );
-  server.registerTool(
-    "create_project",
-    { description: "Creates an empty project.", inputSchema: SaveProject.shape, annotations: change },
-    (input) => run(() => plan(service.createProject(input))),
-  );
-  server.registerTool(
-    "rename_project",
-    {
-      description: "Renames a project.",
-      inputSchema: { projectId: ProjectId, ...SaveProject.shape },
-      annotations: { ...change, idempotentHint: true },
-    },
-    ({ projectId, ...input }) => run(() => plan(service.renameProject(projectId, input))),
-  );
-  server.registerTool(
-    "delete_project",
-    {
-      description: "Deletes a project and all of its tasks for everyone. Cannot be undone.",
-      inputSchema: { projectId: ProjectId },
-      annotations: destroy,
-    },
-    ({ projectId }) => run(() => service.deleteProject(projectId).then(() => ({ deleted: projectId }))),
+    () => run(() => plan(service.list(owner))),
   );
   server.registerTool(
     "create_task",
     {
-      description: "Adds a task at the bottom of a project's todo column.",
+      description: "Adds a task at the bottom of the todo column.",
       inputSchema: {
-        projectId: ProjectId,
         title: CreateTask.shape.title,
         notes: CreateTask.shape.notes,
         durationDays: CreateTask.shape.durationDays.describe("Estimated working days, 1 to 365"),
         startOn: CreateTask.shape.startOn.describe("Earliest day work may begin, YYYY-MM-DD"),
         dueOn: CreateTask.shape.dueOn.describe("Last day the task may be worked on, YYYY-MM-DD"),
-        dependsOn: CreateTask.shape.dependsOn.describe("Ids of tasks in the same project that must be done first"),
+        dependsOn: CreateTask.shape.dependsOn.describe("Ids of tasks that must be done first"),
       },
       annotations: change,
     },
-    ({ projectId, ...input }) => run(() => plan(service.createTask(projectId, input))),
+    (input) => run(() => plan(service.createTask(owner, input))),
   );
   server.registerTool(
     "update_task",
@@ -150,7 +116,7 @@ const createServer = ({ service, now }: TasksMcpDeps): McpServer => {
         startOn: LocalDate.nullable().optional().describe("Earliest day work may begin, YYYY-MM-DD"),
         dueOn: LocalDate.nullable().optional().describe("Last day the task may be worked on, YYYY-MM-DD"),
       },
-      annotations: { ...change, idempotentHint: true },
+      annotations: edit,
     },
     ({ taskId, ...fields }) =>
       run(async () => {
@@ -158,7 +124,7 @@ const createServer = ({ service, now }: TasksMcpDeps): McpServer => {
         if (!update.success) {
           throw new HttpError(400, z.prettifyError(update.error));
         }
-        return plan(service.updateTask(taskId, update.data));
+        return plan(service.updateTask(owner, taskId, update.data));
       }),
   );
   server.registerTool(
@@ -175,48 +141,48 @@ const createServer = ({ service, now }: TasksMcpDeps): McpServer => {
           .default(null)
           .describe("A task already in that column to place it above; the bottom of the column when omitted"),
       },
-      annotations: { ...change, idempotentHint: true },
+      annotations: edit,
     },
-    ({ taskId, ...move }) => run(() => plan(service.moveTask(taskId, move))),
+    ({ taskId, ...move }) => run(() => plan(service.moveTask(owner, taskId, move))),
   );
   server.registerTool(
     "delete_task",
     {
       description: "Deletes a task; tasks that waited on it stop doing so. Cannot be undone.",
       inputSchema: { taskId: TaskId },
-      annotations: destroy,
+      annotations: { ...change, destructiveHint: true },
     },
-    ({ taskId }) => run(() => plan(service.deleteTask(taskId))),
+    ({ taskId }) => run(() => plan(service.deleteTask(owner, taskId))),
   );
   server.registerTool(
     "add_dependency",
     {
-      description: "Makes a task wait on another in the same project. Refused if it would create a cycle.",
+      description: "Makes a task wait on another. Refused if it would create a cycle.",
       inputSchema: { taskId: TaskId, dependsOnId: z.uuid().describe("The task that must be done first") },
-      annotations: { ...change, idempotentHint: true },
+      annotations: edit,
     },
-    ({ taskId, dependsOnId }) => run(() => plan(service.addDependency(taskId, dependsOnId))),
+    ({ taskId, dependsOnId }) => run(() => plan(service.addDependency(owner, taskId, dependsOnId))),
   );
   server.registerTool(
     "remove_dependency",
     {
       description: "Stops a task waiting on another.",
       inputSchema: { taskId: TaskId, dependsOnId: z.uuid().describe("The task it should no longer wait on") },
-      annotations: { ...change, idempotentHint: true },
+      annotations: edit,
     },
-    ({ taskId, dependsOnId }) => run(() => plan(service.removeDependency(taskId, dependsOnId))),
+    ({ taskId, dependsOnId }) => run(() => plan(service.removeDependency(owner, taskId, dependsOnId))),
   );
   return server;
 };
 
 /**
- * Serves MCP over Streamable HTTP, statelessly: each request gets its own server and transport, and answers with
- * plain JSON, so nothing is held between requests and any server instance can answer.
+ * Serves `owner`'s list over MCP Streamable HTTP, statelessly: each request gets its own server and transport, and
+ * answers with plain JSON, so nothing is held between requests and any server instance can answer.
  */
 export const handleMcp =
   (deps: TasksMcpDeps) =>
-  async (request: Request): Promise<Response> => {
+  async (request: Request, owner: string): Promise<Response> => {
     const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });
-    await createServer(deps).connect(transport);
+    await createServer(deps, owner).connect(transport);
     return transport.handleRequest(request);
   };

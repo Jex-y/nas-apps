@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import type { ProjectView } from "../../../../contract";
+import type { TaskList } from "../../../../contract";
 import { type Day, dateOfDay, dayOfDate, dayOfInstant, schedule, topologicalOrder } from "../../../../plan";
 import { days, formatDay, STATUS_LABELS } from "../../../utils/format";
 
@@ -16,26 +16,23 @@ const dayOfMonth = (day: Day) => new Date(dateOfDay(day)).getUTCDate();
  * A Gantt chart of the critical-path schedule: one row per task, earliest first, with an elbow from each
  * dependency's finish to the start of the task waiting on it.
  */
-export const TimelinePage = ({ project }: { project: ProjectView }) => {
-  if (project.tasks.length === 0) {
+export const TimelinePage = ({ tasks }: { tasks: TaskList }) => {
+  if (tasks.length === 0) {
     return <p className="muted">Add tasks to see them scheduled.</p>;
   }
 
   const today = dayOfInstant(new Date());
-  const slots = schedule(project.tasks, today);
+  const slots = schedule(tasks, today);
   const slotOf = (id: string) => slots.get(id) ?? { start: today, finish: today + 1, slack: 0, critical: false };
-  const rows = topologicalOrder(project.tasks).toSorted((a, b) => slotOf(a.id).start - slotOf(b.id).start);
+  const rows = topologicalOrder(tasks).toSorted((a, b) => slotOf(a.id).start - slotOf(b.id).start);
   const rowOf = new Map(rows.map((task, index) => [task.id, index]));
 
   const all = [...slots.values()];
-  const dues = project.tasks.flatMap((task) => (task.dueOn === null ? [] : [dayOfDate(task.dueOn) + 1]));
+  const dues = tasks.flatMap((task) => (task.dueOn === null ? [] : [dayOfDate(task.dueOn) + 1]));
   const from = Math.min(today, ...all.map((slot) => slot.start)) - 1;
   const to = Math.max(today + 1, ...all.map((slot) => slot.finish), ...dues) + 2;
-  const end = Math.max(...project.tasks.filter((task) => task.status !== "done").map((task) => slotOf(task.id).finish));
-  const late = Math.min(
-    0,
-    ...project.tasks.filter((task) => task.status !== "done").map((task) => slotOf(task.id).slack),
-  );
+  const end = Math.max(...tasks.filter((task) => task.status !== "done").map((task) => slotOf(task.id).finish));
+  const late = Math.min(0, ...tasks.filter((task) => task.status !== "done").map((task) => slotOf(task.id).slack));
 
   const x = (day: Day) => (day - from) * DAY_WIDTH;
   const y = (row: number) => HEADER + row * ROW;
@@ -76,7 +73,7 @@ export const TimelinePage = ({ project }: { project: ProjectView }) => {
         <ol className="gantt-labels" style={{ paddingTop: HEADER }}>
           {rows.map((task) => (
             <li key={task.id} style={{ height: ROW }} className={slotOf(task.id).critical ? "critical" : undefined}>
-              <Link href={`/tasks/${task.id}`}>{task.title}</Link>
+              <Link href={`/task/${task.id}`}>{task.title}</Link>
             </li>
           ))}
         </ol>

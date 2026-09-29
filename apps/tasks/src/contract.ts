@@ -8,7 +8,6 @@ export type Status = (typeof STATUSES)[number];
 
 const LocalDate = z.iso.date();
 const count = z.number().int().nonnegative();
-const ProjectName = z.string().trim().min(1).max(80);
 const Title = z.string().trim().min(1).max(200);
 const Notes = z.string().max(10_000);
 export const DurationDays = z.number().int().min(1).max(365);
@@ -26,30 +25,14 @@ export const Task = z.object({
   dueOn: LocalDate.nullable(),
   startedAt: z.iso.datetime().nullable(),
   completedAt: z.iso.datetime().nullable(),
-  /** Tasks that must be done before this one can start. Always acyclic, and always within the project. */
+  /** Tasks that must be done before this one can start. Always acyclic, and always the same person's. */
   dependsOn: z.array(z.uuid()),
 });
 export type Task = z.infer<typeof Task>;
 
-export const ProjectSummary = z.object({
-  id: z.uuid(),
-  name: z.string(),
-  counts: z.object({ todo: count, doing: count, done: count }),
-});
-export type ProjectSummary = z.infer<typeof ProjectSummary>;
-
-export const ProjectList = z.array(ProjectSummary);
-
-export const ProjectView = z.object({
-  id: z.uuid(),
-  name: z.string(),
-  /** In board order: by column, then top to bottom. */
-  tasks: z.array(Task),
-});
-export type ProjectView = z.infer<typeof ProjectView>;
-
-export const SaveProject = z.object({ name: ProjectName });
-export type SaveProject = z.infer<typeof SaveProject>;
+/** Someone's whole list, in board order: by column, then top to bottom. */
+export const TaskList = z.array(Task);
+export type TaskList = z.infer<typeof TaskList>;
 
 export const CreateTask = z.object({
   title: Title,

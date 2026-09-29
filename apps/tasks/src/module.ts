@@ -12,12 +12,14 @@ export type TasksAdapters = { readonly now: () => Date };
 export const createTasksApp = (context: AppContext, { now }: TasksAdapters = { now: () => new Date() }): AppModule => {
   const db = tasksDb(context.sql);
   const service = createTasksService({ db, now });
-  const work = createTasksWork({ db, notifier: context.notifier("tasks"), publicUrl: context.publicUrl, now });
+  const work = createTasksWork({
+    db,
+    notifier: (owner) => context.notifier("tasks", owner),
+    publicUrl: context.publicUrl,
+    now,
+  });
   const mcp = handleMcp({ service, now });
-  const serveMcp = (request: Request) => {
-    resolveViewer(context.identity, request);
-    return mcp(request);
-  };
+  const serveMcp = (request: Request) => mcp(request, resolveViewer(context.identity, request).login);
 
   return {
     slug: "tasks",

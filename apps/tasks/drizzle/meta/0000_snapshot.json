@@ -1,5 +1,5 @@
 {
-  "id": "7efa213b-e402-431c-9a22-9409f20a9011",
+  "id": "4108874c-cbf9-400f-afa2-151955f8c831",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -87,46 +87,13 @@
       },
       "isRLSEnabled": false
     },
-    "tasks.projects": {
-      "name": "projects",
-      "schema": "tasks",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "tasks.reminders": {
       "name": "reminders",
       "schema": "tasks",
       "columns": {
-        "project_id": {
-          "name": "project_id",
-          "type": "uuid",
+        "owner": {
+          "name": "owner",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -145,27 +112,12 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "reminders_project_id_projects_id_fk": {
-          "name": "reminders_project_id_projects_id_fk",
-          "tableFrom": "reminders",
-          "tableTo": "projects",
-          "schemaTo": "tasks",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {
-        "reminders_project_id_date_pk": {
-          "name": "reminders_project_id_date_pk",
+        "reminders_owner_date_pk": {
+          "name": "reminders_owner_date_pk",
           "columns": [
-            "project_id",
+            "owner",
             "date"
           ]
         }
@@ -186,9 +138,9 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "project_id": {
-          "name": "project_id",
-          "type": "uuid",
+        "owner": {
+          "name": "owner",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -259,11 +211,11 @@
         }
       },
       "indexes": {
-        "tasks_project_id_status_position_index": {
-          "name": "tasks_project_id_status_position_index",
+        "tasks_owner_status_position_index": {
+          "name": "tasks_owner_status_position_index",
           "columns": [
             {
-              "expression": "project_id",
+              "expression": "owner",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -287,22 +239,7 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "tasks_project_id_projects_id_fk": {
-          "name": "tasks_project_id_projects_id_fk",
-          "tableFrom": "tasks",
-          "tableTo": "projects",
-          "schemaTo": "tasks",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

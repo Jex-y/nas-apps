@@ -9,20 +9,12 @@ export const status = tasksSchema.enum("status", STATUSES);
 const localDate = (name: string) => date(name, { mode: "string" });
 const instant = (name: string) => timestamp(name, { withTimezone: true });
 
-/** Shared by everyone on the tailnet, like a whiteboard. */
-export const projects = tasksSchema.table("projects", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  createdAt: instant("created_at").notNull().defaultNow(),
-});
-
+/** Each tailnet login keeps its own list; nobody else sees it. */
 export const tasks = tasksSchema.table(
   "tasks",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    projectId: uuid("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+    owner: text("owner").notNull(),
     title: text("title").notNull(),
     notes: text("notes").notNull().default(""),
     status: status("status").notNull().default("todo"),
@@ -35,12 +27,12 @@ export const tasks = tasksSchema.table(
     completedAt: instant("completed_at"),
     createdAt: instant("created_at").notNull().defaultNow(),
   },
-  (table) => [index().on(table.projectId, table.status, table.position)],
+  (table) => [index().on(table.owner, table.status, table.position)],
 );
 
 /**
- * `taskId` cannot start until `dependsOnId` is done. The API keeps the graph acyclic and within one project; the
- * database can only rule out the one-task cycle.
+ * `taskId` cannot start until `dependsOnId` is done. The API keeps the graph acyclic and within one owner's list;
+ * the database can only rule out the one-task cycle.
  */
 export const dependencies = tasksSchema.table(
   "dependencies",
@@ -59,15 +51,13 @@ export const dependencies = tasksSchema.table(
   ],
 );
 
-/** The morning reminder already sent for a project, so each goes out at most once per London day. */
+/** The morning reminder already sent to someone, so it goes out at most once per London day. */
 export const reminders = tasksSchema.table(
   "reminders",
   {
-    projectId: uuid("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+    owner: text("owner").notNull(),
     date: localDate("date").notNull(),
     sentAt: instant("sent_at").notNull().defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.projectId, table.date] })],
+  (table) => [primaryKey({ columns: [table.owner, table.date] })],
 );

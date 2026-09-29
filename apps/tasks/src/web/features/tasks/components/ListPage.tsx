@@ -1,12 +1,12 @@
 import { Link } from "wouter";
-import type { ProjectView, Task } from "../../../../contract";
+import type { Task, TaskList } from "../../../../contract";
 import { blockers, depths, topologicalOrder } from "../../../../plan";
 import { useMoveTask } from "../api/tasks";
 import { NewTaskForm } from "./NewTaskForm";
 import { TaskMeta } from "./TaskMeta";
 
-const TaskRow = ({ task, byId, projectId }: { task: Task; byId: ReadonlyMap<string, Task>; projectId: string }) => {
-  const move = useMoveTask(projectId);
+const TaskRow = ({ task, byId }: { task: Task; byId: ReadonlyMap<string, Task> }) => {
+  const move = useMoveTask();
   const done = task.status === "done";
   const waiting = blockers(task, byId);
 
@@ -20,7 +20,7 @@ const TaskRow = ({ task, byId, projectId }: { task: Task; byId: ReadonlyMap<stri
         onChange={() => move.mutate({ taskId: task.id, status: done ? "todo" : "done", beforeId: null })}
       />
       <div>
-        <Link href={`/tasks/${task.id}`} className="task-title">
+        <Link href={`/task/${task.id}`} className="task-title">
           {task.title}
         </Link>
         <TaskMeta task={task} byId={byId} />
@@ -40,17 +40,15 @@ const TaskRow = ({ task, byId, projectId }: { task: Task; byId: ReadonlyMap<stri
 };
 
 /** The graph as stages: every task waits only on tasks in earlier stages, so a stage's tasks can run side by side. */
-export const ListPage = ({ project }: { project: ProjectView }) => {
-  const byId = new Map(project.tasks.map((task) => [task.id, task]));
-  const depth = depths(project.tasks);
-  const stages = Map.groupBy(topologicalOrder(project.tasks), (task) => depth.get(task.id) ?? 0);
+export const ListPage = ({ tasks }: { tasks: TaskList }) => {
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const depth = depths(tasks);
+  const stages = Map.groupBy(topologicalOrder(tasks), (task) => depth.get(task.id) ?? 0);
 
   return (
     <section>
-      <NewTaskForm projectId={project.id} />
-      {project.tasks.length === 0 && (
-        <p className="muted">No tasks yet. Add one, then open it to set what it waits on.</p>
-      )}
+      <NewTaskForm />
+      {tasks.length === 0 && <p className="muted">No tasks yet. Add one, then open it to set what it waits on.</p>}
       {[...stages].map(([stage, tasks]) => (
         <section key={stage} className="stage">
           <h2>
@@ -61,7 +59,7 @@ export const ListPage = ({ project }: { project: ProjectView }) => {
           </h2>
           <ul className="task-list">
             {tasks.map((task) => (
-              <TaskRow key={task.id} task={task} byId={byId} projectId={project.id} />
+              <TaskRow key={task.id} task={task} byId={byId} />
             ))}
           </ul>
         </section>

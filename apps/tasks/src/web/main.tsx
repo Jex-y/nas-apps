@@ -2,12 +2,10 @@ import { installShell } from "@nas/core/web";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { Route, Router, Switch } from "wouter";
+import { Router } from "wouter";
 import { Layout } from "./components/Layout";
-import { ProjectLayout } from "./features/projects/components/ProjectLayout";
-import { ProjectsPage } from "./features/projects/components/ProjectsPage";
+import { Pages } from "./components/Pages";
 import { queryClient } from "./lib/query-client";
-import { BASE } from "./lib/routes";
 
 void installShell();
 
@@ -19,14 +17,9 @@ if (!root) {
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <Router base={BASE}>
+      <Router base="/tasks">
         <Layout>
-          <Switch>
-            <Route path="/" component={ProjectsPage} />
-            <Route path="/:projectId" nest>
-              {({ projectId }) => <ProjectLayout projectId={projectId} />}
-            </Route>
-          </Switch>
+          <Pages />
         </Layout>
       </Router>
     </QueryClientProvider>

@@ -6,39 +6,40 @@ import {
   type RegisteredJob,
   type Schedule,
 } from "@nas/core";
+import { and, isNotNull, ne } from "drizzle-orm";
 import { z } from "zod";
-import type { ProjectView } from "../contract";
+import type { TaskList } from "../contract";
 import { dateOfDay, dayOfDate, schedule } from "../plan";
 import { londonDate, londonDay, londonHour } from "./calendar";
 import type { TasksDb } from "./db";
-import { projects, reminders } from "./schema";
-import { readProjectView } from "./views";
+import { reminders, tasks } from "./schema";
+import { readTasks } from "./views";
 
 export type TasksWorkDeps = {
   readonly db: TasksDb;
-  /** Reaches everyone: projects are shared across the tailnet. */
-  readonly notifier: Notifier;
+  /** Reaches only the list's owner. */
+  readonly notifier: (owner: string) => Notifier;
   readonly publicUrl: string;
   readonly now: () => Date;
 };
 
 const MINUTE = 60_000;
 
-/** London hour from which each project's reminder goes out. */
+/** London hour from which each person's reminder goes out. */
 export const REMINDER_HOUR = 8;
 
 const dayMonth = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
 const days = (count: number) => `${count} ${count === 1 ? "day" : "days"}`;
-const list = (titles: readonly string[]) => titles.join(", ");
+const joined = (titles: readonly string[]) => titles.join(", ");
 
 /**
- * This morning's reminder for a project: what is overdue, due today or tomorrow, and what the schedule says will
- * miss its due date further out. `null` when nothing needs saying.
+ * This morning's reminder: what is overdue, due today or tomorrow, and what the schedule says will miss its due date
+ * further out. `null` when nothing needs saying.
  */
-export const projectReminder = (view: ProjectView, now: Date, publicUrl: string): Notification | null => {
+export const reminderFor = (list: TaskList, now: Date, publicUrl: string): Notification | null => {
   const today = londonDay(now);
-  const slots = schedule(view.tasks, today, londonDay);
-  const dated = view.tasks.flatMap((task) =>
+  const slots = schedule(list, today, londonDay);
+  const dated = list.flatMap((task) =>
     task.status === "done" || task.dueOn === null ? [] : [{ task, due: dayOfDate(task.dueOn) }],
   );
   const titlesWhere = (test: (due: number) => boolean) =>
@@ -59,9 +60,9 @@ export const projectReminder = (view: ProjectView, now: Date, publicUrl: string)
 
   const message = lines
     .filter(([, titles]) => titles.length > 0)
-    .map(([label, titles]) => `${label}: ${list(titles)}`)
+    .map(([label, titles]) => `${label}: ${joined(titles)}`)
     .join("\n");
-  return message === "" ? null : { title: view.name, message, clickUrl: `${publicUrl}/tasks/${view.id}` };
+  return message === "" ? null : { title: "Tasks", message, clickUrl: `${publicUrl}/tasks/` };
 };
 
 export const createTasksWork = ({ db, notifier, publicUrl, now }: TasksWorkDeps) => {
@@ -74,19 +75,23 @@ export const createTasksWork = ({ db, notifier, publicUrl, now }: TasksWorkDeps)
       if (londonHour(at) < REMINDER_HOUR) {
         return;
       }
-      for (const { id } of await db.select({ id: projects.id }).from(projects)) {
-        const notification = projectReminder(await readProjectView(db, id), at, publicUrl);
+      const owners = await db
+        .selectDistinct({ owner: tasks.owner })
+        .from(tasks)
+        .where(and(ne(tasks.status, "done"), isNotNull(tasks.dueOn)));
+      for (const { owner } of owners) {
+        const notification = reminderFor(await readTasks(db, owner), at, publicUrl);
         if (notification === null) {
           continue;
         }
         await db.transaction(async (tx) => {
           const claimed = await tx
             .insert(reminders)
-            .values({ projectId: id, date: londonDate(at) })
+            .values({ owner, date: londonDate(at) })
             .onConflictDoNothing()
-            .returning({ projectId: reminders.projectId });
+            .returning({ owner: reminders.owner });
           if (claimed.length > 0) {
-            await notifier.send(notification);
+            await notifier(owner).send(notification);
           }
         });
       }
