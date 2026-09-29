@@ -17,7 +17,7 @@ export type PushPayload = {
   readonly title: string;
   readonly body: string;
   readonly url: string;
-  /** Collapses notifications from the same app on the lock screen. */
+  /** Collapses notifications that share it on the lock screen. */
   readonly tag: string;
 };
 
@@ -31,11 +31,11 @@ const URGENCY = {
 
 const DAY_SECONDS = 24 * 60 * 60;
 
-export const toPushPayload = (topic: string, { title, message, clickUrl }: Notification): PushPayload => ({
+export const toPushPayload = (topic: string, { title, message, clickUrl, tag }: Notification): PushPayload => ({
   title,
   body: message,
   url: clickUrl ?? `/${topic}/`,
-  tag: topic,
+  tag: tag ?? topic,
 });
 
 export type WebPushNotifierOptions = {
