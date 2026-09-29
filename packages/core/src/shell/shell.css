@@ -17,6 +17,21 @@ h1 {
   margin: 0;
 }
 
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.back {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
 h2 {
   font-size: 1.1rem;
   margin: 0;
@@ -91,7 +106,7 @@ h2 {
   transform: translateX(0.2rem);
 }
 
-.push {
+.push:not([hidden]) {
   display: grid;
   gap: 0.5rem;
 }

@@ -34,7 +34,8 @@ An app sends with `context.notifier("<slug>").send(...)`, which reaches every su
 `context.notifier("<slug>", login)` to reach only that person's.
 
 To receive them on iOS, open `https://apps.<tailnet>.ts.net/` in Safari, Share → Add to Home Screen, then open it
-from the Home Screen and turn notifications on. iOS only offers Web Push to an installed app.
+from the Home Screen and turn notifications on. Test or turn them off under Settings (`/shell/settings`). iOS only
+offers Web Push to an installed app.
 
 ## Store files
 
