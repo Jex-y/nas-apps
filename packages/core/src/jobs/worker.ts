@@ -82,7 +82,9 @@ const claimNext = async (
       attempts: raw`${jobs.attempts} + 1`,
       lockedUntil: plus(clock(now), JOB_LEASE_MS),
     })
-    .where(inArray(jobs.id, candidate))
+    // `= (…)` runs the subquery once; behind `IN`, Postgres may rescan it per row, and SKIP LOCKED then hands each
+    // rescan another job, leasing many while only the first is run.
+    .where(raw`${jobs.id} = (${candidate})`)
     .returning({
       id: jobs.id,
       name: jobs.name,
