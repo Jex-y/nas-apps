@@ -1,6 +1,6 @@
 import { type DragEvent, useState } from "react";
 import { Link } from "wouter";
-import { type ProjectView, STATUSES, type Status, type Task } from "../../../../contract";
+import { STATUSES, type Status, type Task, type TaskList } from "../../../../contract";
 import { blockers } from "../../../../plan";
 import { STATUS_LABELS } from "../../../utils/format";
 import { useMoveTask } from "../../tasks/api/tasks";
@@ -13,11 +13,11 @@ type Target = { readonly status: Status; readonly beforeId: string | null };
  * Cards drag between and within columns on a pointer; on touch, where HTML drag and drop is unreliable, each card's
  * menu moves it to the bottom of another column. A task still waiting on others cannot leave To do.
  */
-export const BoardPage = ({ project }: { project: ProjectView }) => {
-  const move = useMoveTask(project.id);
+export const BoardPage = ({ tasks }: { tasks: TaskList }) => {
+  const move = useMoveTask();
   const [dragging, setDragging] = useState<Task | null>(null);
   const [target, setTarget] = useState<Target | null>(null);
-  const byId = new Map(project.tasks.map((task) => [task.id, task]));
+  const byId = new Map(tasks.map((task) => [task.id, task]));
 
   const canEnter = (task: Task, status: Status) => status === "todo" || blockers(task, byId).length === 0;
 
@@ -44,11 +44,11 @@ export const BoardPage = ({ project }: { project: ProjectView }) => {
 
   return (
     <section>
-      <NewTaskForm projectId={project.id} />
+      <NewTaskForm />
       {move.error && <p className="error">{move.error.message}</p>}
       <div className="board">
         {STATUSES.map((status) => {
-          const column = project.tasks.filter((task) => task.status === status);
+          const column = tasks.filter((task) => task.status === status);
           const endTarget = target?.status === status && target.beforeId === null;
           return (
             <section
@@ -84,7 +84,7 @@ export const BoardPage = ({ project }: { project: ProjectView }) => {
                   onDragOver={(event) => over(event, { status, beforeId: task.id })}
                   onDrop={drop}
                 >
-                  <Link href={`/tasks/${task.id}`} className="task-title" draggable={false}>
+                  <Link href={`/task/${task.id}`} className="task-title" draggable={false}>
                     {task.title}
                   </Link>
                   <TaskMeta task={task} byId={byId} />

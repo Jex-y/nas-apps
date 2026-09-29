@@ -10,11 +10,11 @@ const context = createTasksTestContext();
 const request = startTestServer((ctx) => [createTasksApp(ctx, { now: () => NOW })], context);
 const me = uniqueLogin();
 
-/** The SDK's own client, reaching the test server as a tailnet member. */
-const connect = async () => {
+/** The SDK's own client, reaching the test server as `as` from a tailnet device. */
+const connect = async (as = me) => {
   const client = new Client({ name: "test", version: "1.0.0" });
   const transport = new StreamableHTTPClientTransport(new URL("http://apps.test/tasks/mcp"), {
-    fetch: (url, init) => request(new URL(url).pathname, { ...init, as: me }),
+    fetch: (url, init) => request(new URL(url).pathname, { ...init, as }),
   });
   // The SDK's optional `sessionId` is typed without `| undefined`, which `exactOptionalPropertyTypes` rejects.
   await client.connect(transport as Transport);
@@ -22,7 +22,6 @@ const connect = async () => {
 };
 
 type Plan = {
-  id: string;
   finishesOn: string | null;
   tasks: { id: string; title: string; status: string; waitingOn: string[]; scheduled: object }[];
 };
@@ -46,37 +45,31 @@ describe("tasks mcp", () => {
     expect(response.status).toBe(401);
   });
 
-  test("offers tools for projects, tasks and dependencies", async () => {
+  test("offers tools for the person's tasks and their dependencies", async () => {
     const client = await connect();
     const { tools } = await client.listTools();
 
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       "add_dependency",
-      "create_project",
       "create_task",
-      "delete_project",
       "delete_task",
-      "get_project",
-      "list_projects",
+      "list_tasks",
       "move_task",
       "remove_dependency",
-      "rename_project",
       "update_task",
     ]);
     expect(client.getInstructions()).toContain("dependsOn");
   });
 
-  test("builds a project and reads back its schedule", async () => {
+  test("builds a list and reads back its schedule, for the connected person only", async () => {
     const client = await connect();
-    const { id } = await plan(client, "create_project", { name: "Move house" });
-    const packed = await plan(client, "create_task", { projectId: id, title: "Pack", durationDays: 3 });
-    const pack = packed.tasks[0]?.id;
-    await plan(client, "create_task", { projectId: id, title: "Move", dependsOn: [pack], dueOn: "2026-09-25" });
+    const [pack] = (await plan(client, "create_task", { title: "Pack", durationDays: 3 })).tasks;
+    await plan(client, "create_task", { title: "Move", dependsOn: [pack?.id], dueOn: "2026-09-25" });
 
-    const project = await plan(client, "get_project", { projectId: id });
+    const list = await plan(client, "list_tasks", {});
 
-    expect(project.finishesOn).toBe("2026-09-24");
-    expect(project.tasks).toEqual([
+    expect(list.finishesOn).toBe("2026-09-24");
+    expect(list.tasks).toEqual([
       expect.objectContaining({
         title: "Pack",
         waitingOn: [],
@@ -84,18 +77,22 @@ describe("tasks mcp", () => {
       }),
       expect.objectContaining({
         title: "Move",
-        dependsOn: [pack],
-        waitingOn: [pack],
+        dependsOn: [pack?.id],
+        waitingOn: [pack?.id],
         scheduled: { firstDay: "2026-09-24", lastDay: "2026-09-24", slackDays: 0, critical: true },
       }),
     ]);
+    expect((await plan(await connect(uniqueLogin()), "list_tasks", {})).tasks).toEqual([]);
+    expect(await call(await connect(uniqueLogin()), "delete_task", { taskId: pack?.id })).toEqual({
+      isError: true,
+      text: "Not found",
+    });
   });
 
   test("hands refusals back as tool errors", async () => {
     const client = await connect();
-    const { id } = await plan(client, "create_project", { name: "Move house" });
-    const [pack] = (await plan(client, "create_task", { projectId: id, title: "Pack" })).tasks;
-    const [, move] = (await plan(client, "create_task", { projectId: id, title: "Move", dependsOn: [pack?.id] })).tasks;
+    const [pack] = (await plan(client, "create_task", { title: "Pack" })).tasks;
+    const [, move] = (await plan(client, "create_task", { title: "Move", dependsOn: [pack?.id] })).tasks;
 
     expect(await call(client, "move_task", { taskId: move?.id, status: "doing" })).toEqual({
       isError: true,

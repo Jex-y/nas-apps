@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { DurationDays, type ProjectView, STATUSES, type Status, type Task } from "../../../../contract";
+import { DurationDays, STATUSES, type Status, type Task, type TaskList } from "../../../../contract";
 import { canDependOn, dayOfInstant, schedule } from "../../../../plan";
 import { days, formatDay, STATUS_LABELS } from "../../../utils/format";
 import { useAddDependency, useDeleteTask, useMoveTask, useRemoveDependency, useUpdateTask } from "../api/tasks";
@@ -62,14 +62,14 @@ const TaskForm = ({ task }: { task: Task }) => {
   );
 };
 
-const Dependencies = ({ project, task }: { project: ProjectView; task: Task }) => {
+const Dependencies = ({ tasks, task }: { tasks: TaskList; task: Task }) => {
   const add = useAddDependency();
   const remove = useRemoveDependency();
-  const byId = new Map(project.tasks.map((other) => [other.id, other]));
-  const candidates = project.tasks.filter(
-    (other) => !task.dependsOn.includes(other.id) && canDependOn(project.tasks, task.id, other.id),
+  const byId = new Map(tasks.map((other) => [other.id, other]));
+  const candidates = tasks.filter(
+    (other) => !task.dependsOn.includes(other.id) && canDependOn(tasks, task.id, other.id),
   );
-  const dependents = project.tasks.filter((other) => other.dependsOn.includes(task.id));
+  const dependents = tasks.filter((other) => other.dependsOn.includes(task.id));
 
   return (
     <div className="dependencies">
@@ -80,7 +80,7 @@ const Dependencies = ({ project, task }: { project: ProjectView; task: Task }) =
             .flatMap((id) => byId.get(id) ?? [])
             .map((dependency) => (
               <li key={dependency.id}>
-                <Link href={`/tasks/${dependency.id}`}>{dependency.title}</Link>
+                <Link href={`/task/${dependency.id}`}>{dependency.title}</Link>
                 <span className="muted">{STATUS_LABELS[dependency.status]}</span>
                 <button
                   type="button"
@@ -115,7 +115,7 @@ const Dependencies = ({ project, task }: { project: ProjectView; task: Task }) =
         <ul className="links">
           {dependents.map((dependent) => (
             <li key={dependent.id}>
-              <Link href={`/tasks/${dependent.id}`}>{dependent.title}</Link>
+              <Link href={`/task/${dependent.id}`}>{dependent.title}</Link>
               <span className="muted">{STATUS_LABELS[dependent.status]}</span>
             </li>
           ))}
@@ -125,16 +125,16 @@ const Dependencies = ({ project, task }: { project: ProjectView; task: Task }) =
   );
 };
 
-export const TaskPage = ({ project, taskId }: { project: ProjectView; taskId: string }) => {
-  const move = useMoveTask(project.id);
+export const TaskPage = ({ tasks, taskId }: { tasks: TaskList; taskId: string }) => {
+  const move = useMoveTask();
   const remove = useDeleteTask();
   const [, navigate] = useLocation();
-  const task = project.tasks.find((other) => other.id === taskId);
+  const task = tasks.find((other) => other.id === taskId);
 
   if (task === undefined) {
     return <p className="muted">That task is gone.</p>;
   }
-  const slot = schedule(project.tasks, dayOfInstant(new Date())).get(task.id);
+  const slot = schedule(tasks, dayOfInstant(new Date())).get(task.id);
 
   const confirmDelete = () => {
     if (confirm(`Delete "${task.title}"?`)) {
@@ -174,12 +174,12 @@ export const TaskPage = ({ project, taskId }: { project: ProjectView; taskId: st
           </p>
         )}
         <button type="button" onClick={confirmDelete} disabled={remove.isPending}>
-          Delete task
+          Delete
         </button>
       </div>
       {move.error && <p className="error">{move.error.message}</p>}
       <TaskForm task={task} />
-      <Dependencies project={project} task={task} />
+      <Dependencies tasks={tasks} task={task} />
     </section>
   );
 };

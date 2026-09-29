@@ -9,7 +9,7 @@ export const NOW = new Date("2026-09-21T08:30:00Z");
 export const createTasksTestContext = () => {
   const context = createTestContext();
   beforeEach(async () => {
-    await context.sql`truncate tasks.projects cascade`;
+    await context.sql`truncate tasks.tasks, tasks.reminders cascade`;
     await context.sql`delete from jobs.jobs where name like 'tasks.%'`;
   });
   return context;

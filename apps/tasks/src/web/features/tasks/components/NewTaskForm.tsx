@@ -2,8 +2,8 @@ import { type FormEvent, useState } from "react";
 import { DurationDays } from "../../../../contract";
 import { useCreateTask } from "../api/tasks";
 
-export const NewTaskForm = ({ projectId }: { projectId: string }) => {
-  const create = useCreateTask(projectId);
+export const NewTaskForm = () => {
+  const create = useCreateTask();
   const [title, setTitle] = useState("");
   const [duration, setDuration] = useState("1");
 
