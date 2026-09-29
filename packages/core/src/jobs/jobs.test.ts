@@ -73,6 +73,25 @@ describe("job queue", () => {
     expect(queue.enqueue(job, { value: "nope" } as unknown as { value: number })).rejects.toThrow();
   });
 
+  test("claims one job at a time, leaving the rest free for other workers", async () => {
+    const name = uniqueName();
+    const leasedWhileRunning: number[] = [];
+    const job = defineJob({
+      name,
+      payload: z.object({ value: z.number() }),
+      handle: async () => {
+        const leased = await db.select().from(jobs).where(eq(jobs.name, name));
+        leasedWhileRunning.push(leased.filter((row) => row.lockedUntil !== null).length);
+      },
+    });
+    for (const value of [1, 2, 3, 4, 5]) {
+      await queue.enqueue(job, { value });
+    }
+
+    expect(await drainJobs(sql, [job])).toEqual({ completed: 5, retrying: 0, dead: 0 });
+    expect(leasedWhileRunning).toEqual([1, 1, 1, 1, 1]);
+  });
+
   test("two concurrent workers never run the same job", async () => {
     const { job, seen } = recordingJob();
     await Promise.all(Array.from({ length: 30 }, (_, value) => queue.enqueue(job, { value })));
