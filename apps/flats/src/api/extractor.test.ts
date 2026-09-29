@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { PermanentJobError } from "@apps/core";
+import type { Question } from "../contract";
 import { createJevExtractor } from "./extractor";
-import type { ListingState, Question } from "./questions";
+import type { ListingState } from "./questions";
 
 /** A `fetch` that answers every request with `response`, recording the requests' bodies and headers. */
 const sendingBack = (response: () => Response) => {
@@ -42,10 +43,10 @@ const outdoor: Question = {
   kind: "choice",
   label: "Outdoor space",
   instructions: "Outdoor space?",
-  options: {
-    balcony: { label: "Balcony", description: "A balcony", points: 2 },
-    none: { label: "None", description: "None", points: 0 },
-  },
+  options: [
+    { key: "balcony", label: "Balcony", description: "A balcony", points: 2 },
+    { key: "none", label: "None", description: "None", points: 0 },
+  ],
 };
 const light: Question = {
   key: "light",

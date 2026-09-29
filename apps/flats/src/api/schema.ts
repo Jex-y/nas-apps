@@ -1,7 +1,9 @@
 import { jsonb } from "@apps/core/columns";
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   doublePrecision,
   index,
   integer,
@@ -14,9 +16,9 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { Answer, Requirements } from "../contract";
 import { PROPERTY_STATUSES } from "../contract";
 import { AVAILABILITIES, type ParsedListing, PORTALS, TENURES } from "./portals/listing";
-import type { Answer } from "./questions";
 
 export const flatsSchema = pgSchema("flats");
 
@@ -220,4 +222,15 @@ export const answers = flatsSchema.table(
     extractedAt: timestamp("extracted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.propertyId, table.questionKey] })],
+);
+
+/** The one saved `Requirements` document; until it is first saved, the defaults in code apply. */
+export const requirements = flatsSchema.table(
+  "requirements",
+  {
+    id: smallint("id").primaryKey().default(1),
+    document: jsonb<Requirements>("document").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [check("requirements_single_row", sql`${table.id} = 1`)],
 );

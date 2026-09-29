@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { type Answer, EXCLUSION_THRESHOLD, type Question } from "../contract";
 import type { ParsedListing } from "./portals/listing";
 
 /** The listing text a question is answered from; instructions name its fields in backticks. */
@@ -14,23 +15,6 @@ export const listingState = (parsed: ParsedListing): ListingState => ({
   description: parsed.description,
 });
 
-export type Option = { readonly label: string; readonly description: string; readonly points: number };
-
-type Base = { readonly key: string; readonly label: string; readonly instructions: string };
-
-/** How a question is asked and what its answer is worth to the ranking. */
-export type Question =
-  /** Rules the property out when the answer is a confident yes. */
-  | (Base & { readonly kind: "exclusion"; readonly reason: string })
-  | (Base & {
-      readonly kind: "feature";
-      readonly points: number;
-      readonly criteria?: { readonly yes: string; readonly no: string };
-    })
-  | (Base & { readonly kind: "choice"; readonly options: Readonly<Record<string, Option>> })
-  /** Levels run from worst to best. */
-  | (Base & { readonly kind: "score"; readonly levels: readonly Option[] });
-
 /** A Jev System One question, as sent. */
 export type Prompt =
   | {
@@ -40,14 +24,6 @@ export type Prompt =
     }
   | { readonly type: "choice"; readonly instructions: string; readonly criteria: Readonly<Record<string, string>> }
   | { readonly type: "score"; readonly instructions: string; readonly criteria: readonly string[] };
-
-export type Answer =
-  /** Probability that the answer is yes. */
-  | { readonly kind: "noul"; readonly yes: number }
-  /** Probability of each option, by option key. */
-  | { readonly kind: "choice"; readonly probabilities: Readonly<Record<string, number>> }
-  /** Probability of each level, in the question's order. */
-  | { readonly kind: "score"; readonly probabilities: readonly number[] };
 
 export const prompt = (question: Question): Prompt => {
   switch (question.kind) {
@@ -63,9 +39,7 @@ export const prompt = (question: Question): Prompt => {
       return {
         type: "choice",
         instructions: question.instructions,
-        criteria: Object.fromEntries(
-          Object.entries(question.options).map(([key, option]) => [key, option.description]),
-        ),
+        criteria: Object.fromEntries(question.options.map((option) => [option.key, option.description])),
       };
     case "score":
       return {
@@ -105,9 +79,6 @@ export const unanswered = (questions: readonly Question[], stored: readonly Stor
   const answered = currentAnswers(questions, stored);
   return questions.filter((question) => !answered.has(question.key));
 };
-
-/** How sure Jev must be before an exclusion rules a property out. */
-const EXCLUSION_THRESHOLD = 0.8;
 
 /** Why the answers rule the property out, or `null`; an unanswered exclusion rules nothing out. */
 export const exclusion = (questions: readonly Question[], answers: ReadonlyMap<string, Answer>): string | null => {
@@ -182,50 +153,52 @@ export const QUESTIONS: readonly Question[] = [
     label: "Outdoor space",
     instructions:
       "What outdoor space do `description` and `key_features` say the flat has for its own use? Pick the best one if there are several.",
-    options: {
-      private_garden: { label: "Private garden", description: "A garden only this flat can use", points: 3 },
-      terrace: { label: "Terrace", description: "A roof terrace or terrace", points: 3 },
-      balcony: { label: "Balcony", description: "A balcony", points: 2 },
-      communal_garden: {
+    options: [
+      { key: "private_garden", label: "Private garden", description: "A garden only this flat can use", points: 3 },
+      { key: "terrace", label: "Terrace", description: "A roof terrace or terrace", points: 3 },
+      { key: "balcony", label: "Balcony", description: "A balcony", points: 2 },
+      {
+        key: "communal_garden",
         label: "Communal garden",
         description: "Only a garden or grounds shared with other residents",
         points: 1,
       },
-      none: { label: "None", description: "No outdoor space is mentioned", points: 0 },
-    },
+      { key: "none", label: "None", description: "No outdoor space is mentioned", points: 0 },
+    ],
   },
   {
     key: "floor",
     kind: "choice",
     label: "Floor",
     instructions: "Which floor of the building is the flat on, according to `description` and `key_features`?",
-    options: {
-      basement: { label: "Basement", description: "Basement or lower ground floor", points: -3 },
-      ground: { label: "Ground", description: "Ground floor", points: -1 },
-      low: { label: "1st–2nd", description: "First or second floor", points: 0 },
-      mid: { label: "3rd–6th", description: "Third to sixth floor", points: 1 },
-      high: { label: "7th+", description: "Seventh floor or above, but not the top floor", points: 1 },
-      top: { label: "Top", description: "The top floor or a penthouse", points: 2 },
-      not_stated: { label: "Not stated", description: "The floor is not stated", points: 0 },
-    },
+    options: [
+      { key: "basement", label: "Basement", description: "Basement or lower ground floor", points: -3 },
+      { key: "ground", label: "Ground", description: "Ground floor", points: -1 },
+      { key: "low", label: "1st–2nd", description: "First or second floor", points: 0 },
+      { key: "mid", label: "3rd–6th", description: "Third to sixth floor", points: 1 },
+      { key: "high", label: "7th+", description: "Seventh floor or above, but not the top floor", points: 1 },
+      { key: "top", label: "Top", description: "The top floor or a penthouse", points: 2 },
+      { key: "not_stated", label: "Not stated", description: "The floor is not stated", points: 0 },
+    ],
   },
   {
     key: "heating",
     kind: "choice",
     label: "Heating",
     instructions: "How is the flat heated, according to `description` and `key_features`?",
-    options: {
-      gas_central: { label: "Gas central", description: "Gas central heating or a gas boiler", points: 1 },
-      electric: {
+    options: [
+      { key: "gas_central", label: "Gas central", description: "Gas central heating or a gas boiler", points: 1 },
+      {
+        key: "electric",
         label: "Electric",
         description: "Electric heaters, storage heaters or electric boiler",
         points: -2,
       },
-      communal: { label: "Communal", description: "Communal or district heating", points: -1 },
-      heat_pump: { label: "Heat pump", description: "An air or ground source heat pump", points: 1 },
-      underfloor: { label: "Underfloor", description: "Underfloor heating with no source stated", points: 0 },
-      not_stated: { label: "Not stated", description: "Heating is not stated", points: 0 },
-    },
+      { key: "communal", label: "Communal", description: "Communal or district heating", points: -1 },
+      { key: "heat_pump", label: "Heat pump", description: "An air or ground source heat pump", points: 1 },
+      { key: "underfloor", label: "Underfloor", description: "Underfloor heating with no source stated", points: 0 },
+      { key: "not_stated", label: "Not stated", description: "Heating is not stated", points: 0 },
+    ],
   },
   {
     key: "natural_light",

@@ -23,6 +23,78 @@ export const Commute = z.object({
 });
 export type Commute = z.infer<typeof Commute>;
 
+/** A question or option key: sent to Jev as a map key, so it must stay stable and readable. */
+const Key = z.string().regex(/^[a-z][a-z0-9_]*$/, "Use lower_snake_case");
+const Text = z.string().trim().min(1);
+
+export const Option = z.strictObject({ label: Text, description: Text, points: z.number() });
+export type Option = z.infer<typeof Option>;
+
+export const ChoiceOption = z.strictObject({ key: Key, ...Option.shape });
+export type ChoiceOption = z.infer<typeof ChoiceOption>;
+
+const questionBase = { key: Key, label: Text, instructions: Text };
+
+/** How a question is asked and what its answer is worth to the ranking. Strict, so a misspelt field is an error. */
+export const Question = z.discriminatedUnion("kind", [
+  /** Rules the property out when Jev is sure the answer is yes. */
+  z.strictObject({ ...questionBase, kind: z.literal("exclusion"), reason: Text }),
+  z.strictObject({
+    ...questionBase,
+    kind: z.literal("feature"),
+    points: z.number(),
+    criteria: z.strictObject({ yes: Text, no: Text }).optional(),
+  }),
+  z.strictObject({
+    ...questionBase,
+    kind: z.literal("choice"),
+    /** A list, not a map: Postgres reorders a jsonb object's keys, which would change the question's wording. */
+    options: z
+      .array(ChoiceOption)
+      .min(2)
+      .max(255)
+      .refine((options) => new Set(options.map((option) => option.key)).size === options.length, {
+        message: "Option keys must be unique",
+      }),
+  }),
+  /** Levels run from worst to best. */
+  z.strictObject({ ...questionBase, kind: z.literal("score"), levels: z.array(Option).min(2).max(10) }),
+]);
+export type Question = z.infer<typeof Question>;
+
+/** How sure Jev must be before an exclusion rules a property out. */
+export const EXCLUSION_THRESHOLD = 0.8;
+
+/** Facts a listing states that rule a property out; `null` turns a limit off. */
+export const Limits = z.strictObject({
+  minSizeSqft: z.number().int().positive().nullable(),
+  maxAnnualServiceCharge: z.number().nonnegative().nullable(),
+  minLeaseYears: z.number().int().positive().nullable(),
+});
+export type Limits = z.infer<typeof Limits>;
+
+/** What a flat must be to stay in the hunt, and what makes one better than another. */
+export const Requirements = z.strictObject({
+  limits: Limits,
+  questions: z
+    .array(Question)
+    .max(50)
+    .refine((questions) => new Set(questions.map((question) => question.key)).size === questions.length, {
+      message: "Question keys must be unique",
+    }),
+});
+export type Requirements = z.infer<typeof Requirements>;
+
+export const Answer = z.discriminatedUnion("kind", [
+  /** Probability that the answer is yes. */
+  z.object({ kind: z.literal("noul"), yes: z.number() }),
+  /** Probability of each option, by option key. */
+  z.object({ kind: z.literal("choice"), probabilities: z.record(z.string(), z.number()) }),
+  /** Probability of each level, in the question's order. */
+  z.object({ kind: z.literal("score"), probabilities: z.array(z.number()) }),
+]);
+export type Answer = z.infer<typeof Answer>;
+
 /** One reason a property scores as it does, e.g. `{ label: "Outdoor space", detail: "Balcony", points: 1.8 }`. */
 export const Contribution = z.object({ label: z.string(), detail: z.string(), points: z.number() });
 export type Contribution = z.infer<typeof Contribution>;
@@ -170,3 +242,20 @@ export const CreateDestination = z.object({
   arriveBy: z.string().regex(ARRIVE_BY),
 });
 export type CreateDestination = z.infer<typeof CreateDestination>;
+
+export const TrialRequest = z.object({ requirements: Requirements, propertyId: z.uuid() });
+export type TrialRequest = z.infer<typeof TrialRequest>;
+
+/** How a draft of the requirements judges one property, without saving anything. */
+export const Trial = z.object({
+  /** The limit the property's facts break, if any. */
+  rejectedBy: z.string().nullable(),
+  ranking: Ranking,
+  /** Each draft question's answer, in order; `null` for one Jev did not answer. */
+  answers: z.array(z.object({ key: z.string(), answer: Answer.nullable() })),
+  /** How many questions went to Jev; the rest were already answered in the same words. */
+  asked: z.number(),
+  /** What Jev read. */
+  listing: z.object({ propertyType: z.string(), keyFeatures: z.array(z.string()), description: z.string() }),
+});
+export type Trial = z.infer<typeof Trial>;

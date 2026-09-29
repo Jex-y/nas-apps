@@ -9,7 +9,8 @@ import type { Fetcher } from "./fetcher";
 import { hitFromListing, type ListingChange, recordListingPage, recordSearchHit } from "./ingest";
 import { type JourneyPlanner, nextTuesday } from "./places";
 import { type ParsedListing, ParseError, PORTALS, type Portal, type PortalParser } from "./portals/listing";
-import { currentAnswers, exclusion, fingerprint, listingState, type Question, unanswered } from "./questions";
+import { currentAnswers, exclusion, fingerprint, listingState, unanswered } from "./questions";
+import { breach, loadRequirements } from "./requirements";
 import { answers, commutes, destinations, listings, photos, properties, searches } from "./schema";
 
 export type FlatsWorkDeps = {
@@ -22,7 +23,6 @@ export type FlatsWorkDeps = {
   readonly planner: JourneyPlanner | null;
   /** `null` when no TypeSafe key is configured; listings are then left unread. */
   readonly extractor: FeatureExtractor | null;
-  readonly questions: readonly Question[];
   readonly parsers: Readonly<Partial<Record<Portal, PortalParser>>>;
   readonly publicUrl: string;
   readonly now: () => Date;
@@ -101,8 +101,8 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     });
   };
 
-  /** Announces a listing that survived its page's filters and is on the market, waiting to be triaged. */
-  const announceArrival = async (listingId: string) => {
+  /** Announces a property that survived the limits and Jev's exclusions and is on the market, waiting to be triaged. */
+  const announceArrival = async (propertyId: string) => {
     const [arrival] = await db
       .select({
         id: properties.id,
@@ -111,9 +111,10 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
         bedrooms: properties.bedrooms,
         sizeSqft: properties.sizeSqft,
       })
-      .from(listings)
-      .innerJoin(properties, eq(properties.id, listings.propertyId))
-      .where(and(eq(listings.id, listingId), eq(properties.status, "new"), eq(properties.availability, "available")));
+      .from(properties)
+      .where(
+        and(eq(properties.id, propertyId), eq(properties.status, "new"), eq(properties.availability, "available")),
+      );
     if (arrival === undefined) {
       return;
     }
@@ -210,65 +211,75 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
   });
 
+  /** Asks Jev whatever the current questions have no answer for, and rejects the property if it is now excluded. */
+  const read = async (propertyId: string, signal: AbortSignal) => {
+    const extractor = deps.extractor;
+    if (extractor === null) {
+      return;
+    }
+    const { questions } = await loadRequirements(db);
+    const [advert] = await db
+      .select({ parsed: listings.parsed })
+      .from(listings)
+      .innerJoin(properties, eq(properties.id, listings.propertyId))
+      .where(and(eq(listings.propertyId, propertyId), isNotNull(listings.parsed), inPlay))
+      .orderBy(desc(listings.parsedAt))
+      .limit(1);
+    if (advert?.parsed == null) {
+      return;
+    }
+    const stored = await db
+      .select({ questionKey: answers.questionKey, fingerprint: answers.fingerprint, answer: answers.answer })
+      .from(answers)
+      .where(eq(answers.propertyId, propertyId));
+    const asking = unanswered(questions, stored);
+    if (asking.length === 0) {
+      return;
+    }
+    const extraction = await extractor.answer(listingState(advert.parsed), asking, signal);
+    const fresh = asking.flatMap((question) => {
+      const answer = extraction.answers.get(question.key);
+      return answer === undefined
+        ? []
+        : [
+            {
+              propertyId,
+              questionKey: question.key,
+              fingerprint: fingerprint(question),
+              answer,
+              model: extraction.model,
+            },
+          ];
+    });
+    await db
+      .insert(answers)
+      .values(fresh)
+      .onConflictDoUpdate({
+        target: [answers.propertyId, answers.questionKey],
+        set: {
+          fingerprint: sql`excluded.fingerprint`,
+          answer: sql`excluded.answer`,
+          model: sql`excluded.model`,
+          extractedAt: sql`now()`,
+        },
+      });
+    const rejectedReason = exclusion(questions, currentAnswers(questions, [...stored, ...fresh]));
+    if (rejectedReason !== null) {
+      await db
+        .update(properties)
+        .set({ status: "rejected", rejectedReason })
+        .where(and(eq(properties.id, propertyId), eq(properties.status, "new")));
+    }
+  };
+
   const readListing = defineJob({
     name: "flats.read-listing",
-    payload: z.object({ propertyId: z.uuid() }),
-    handle: async ({ propertyId }, { signal }) => {
-      const extractor = deps.extractor;
-      if (extractor === null) {
-        return;
-      }
-      const [advert] = await db
-        .select({ parsed: listings.parsed })
-        .from(listings)
-        .innerJoin(properties, eq(properties.id, listings.propertyId))
-        .where(and(eq(listings.propertyId, propertyId), isNotNull(listings.parsed), inPlay))
-        .orderBy(desc(listings.parsedAt))
-        .limit(1);
-      if (advert?.parsed == null) {
-        return;
-      }
-      const stored = await db
-        .select({ questionKey: answers.questionKey, fingerprint: answers.fingerprint, answer: answers.answer })
-        .from(answers)
-        .where(eq(answers.propertyId, propertyId));
-      const asking = unanswered(deps.questions, stored);
-      if (asking.length === 0) {
-        return;
-      }
-      const extraction = await extractor.answer(listingState(advert.parsed), asking, signal);
-      const read = asking.flatMap((question) => {
-        const answer = extraction.answers.get(question.key);
-        return answer === undefined
-          ? []
-          : [
-              {
-                propertyId,
-                questionKey: question.key,
-                fingerprint: fingerprint(question),
-                answer,
-                model: extraction.model,
-              },
-            ];
-      });
-      await db
-        .insert(answers)
-        .values(read)
-        .onConflictDoUpdate({
-          target: [answers.propertyId, answers.questionKey],
-          set: {
-            fingerprint: sql`excluded.fingerprint`,
-            answer: sql`excluded.answer`,
-            model: sql`excluded.model`,
-            extractedAt: sql`now()`,
-          },
-        });
-      const rejectedReason = exclusion(deps.questions, currentAnswers(deps.questions, [...stored, ...read]));
-      if (rejectedReason !== null) {
-        await db
-          .update(properties)
-          .set({ status: "rejected", rejectedReason })
-          .where(and(eq(properties.id, propertyId), eq(properties.status, "new")));
+    /** `announce` notifies once the property is read, if it is still worth triaging. */
+    payload: z.object({ propertyId: z.uuid(), announce: z.boolean().default(false) }),
+    handle: async ({ propertyId, announce }, { signal }) => {
+      await read(propertyId, signal);
+      if (announce) {
+        await announceArrival(propertyId);
       }
     },
   });
@@ -281,11 +292,20 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     }
   };
 
-  /** Keeps the raw page for re-parsing, records what it says, and queues its photos. */
-  const ingestPage = async (listingId: string, parsed: ParsedListing, html: string): Promise<ListingChange | null> => {
+  /**
+   * Keeps the raw page for re-parsing, records what it says, and queues its photos, commutes and reading; `announce`
+   * notifies once it has been read.
+   */
+  const ingestPage = async (
+    listingId: string,
+    parsed: ParsedListing,
+    html: string,
+    announce: boolean,
+  ): Promise<ListingChange | null> => {
     const pageKey = `pages/${listingId}/${Bun.randomUUIDv7()}.html.gz`;
     await blob.write(pageKey, new Blob([Bun.gzipSync(html)]), "application/gzip");
-    const change = await recordListingPage(db, listingId, { kind: "page", parsed, pageKey });
+    const { limits } = await loadRequirements(db);
+    const change = await recordListingPage(db, listingId, { kind: "page", parsed, pageKey, limits });
     await queue.enqueue(mirrorPhotos, { listingId }, { dedupeKey: listingId });
     const [listing] = await db
       .select({ propertyId: listings.propertyId })
@@ -293,7 +313,12 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       .where(eq(listings.id, listingId));
     if (listing !== undefined) {
       await queue.enqueue(computeCommutes, { propertyId: listing.propertyId }, { dedupeKey: listing.propertyId });
-      await queue.enqueue(readListing, { propertyId: listing.propertyId }, { dedupeKey: listing.propertyId });
+      // A distinct key, so a sweep's pending read of the same property cannot swallow the announcement.
+      await queue.enqueue(
+        readListing,
+        { propertyId: listing.propertyId, announce },
+        { dedupeKey: announce ? `${listing.propertyId}:announce` : listing.propertyId },
+      );
     }
     return change;
   };
@@ -308,7 +333,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
 
   const fetchListing = defineJob({
     name: "flats.fetch-listing",
-    /** `announce` notifies once the page shows the listing is worth triaging. */
+    /** `announce` notifies once the listing is read, if it is still worth triaging. */
     payload: z.object({ listingId: z.uuid(), announce: z.boolean().default(false) }),
     maxAttempts: 4,
     handle: async ({ listingId, announce }, { signal }) => {
@@ -324,12 +349,9 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       const change =
         result.kind === "gone"
           ? await recordListingPage(db, listingId, { kind: "gone" })
-          : await ingestPage(listingId, parsePage(parser, result.body, listing.portalId), result.body);
+          : await ingestPage(listingId, parsePage(parser, result.body, listing.portalId), result.body, announce);
       if (change !== null) {
         await alertIfTracked(change);
-      }
-      if (announce) {
-        await announceArrival(listingId);
       }
     },
   });
@@ -354,7 +376,12 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       }
       const parsed = parsePage(parser, result.body, portalId);
       const outcome = await recordSearchHit(db, hitFromListing(parsed));
-      await ingestPage(outcome.kind === "changed" ? outcome.change.listingId : outcome.listingId, parsed, result.body);
+      await ingestPage(
+        outcome.kind === "changed" ? outcome.change.listingId : outcome.listingId,
+        parsed,
+        result.body,
+        false,
+      );
     },
   });
 
@@ -465,15 +492,18 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
   });
 
   /** Reads every property still in play, e.g. after a question is reworded or TypeSafe is configured. */
+  /** Queues a read of every property still in play; each only asks Jev what the current questions lack. */
+  const enqueueReadings = async () => {
+    const readable = await db.select({ id: properties.id }).from(properties).where(inPlay);
+    for (const { id } of readable) {
+      await queue.enqueue(readListing, { propertyId: id, announce: false }, { dedupeKey: id });
+    }
+  };
+
   const sweepReadings = defineJob({
     name: "flats.sweep-readings",
     payload: z.object({}),
-    handle: async () => {
-      const readable = await db.select({ id: properties.id }).from(properties).where(inPlay);
-      for (const { id } of readable) {
-        await queue.enqueue(readListing, { propertyId: id }, { dedupeKey: id });
-      }
-    },
+    handle: enqueueReadings,
   });
 
   const jobs: readonly RegisteredJob[] = [
@@ -548,6 +578,29 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
     /** Times every property still in play to any place it has not been timed to yet, e.g. after adding a place. */
     timeCommutes: enqueueCommutes,
+    /** Rejects untriaged properties the saved limits now rule out, and reads the rest against the saved questions. */
+    applyRequirements: async () => {
+      const { limits } = await loadRequirements(db);
+      const untriaged = await db
+        .select({
+          id: properties.id,
+          sizeSqft: properties.sizeSqft,
+          annualServiceCharge: properties.annualServiceCharge,
+          leaseYearsRemaining: properties.leaseYearsRemaining,
+        })
+        .from(properties)
+        .where(eq(properties.status, "new"));
+      for (const property of untriaged) {
+        const rejectedReason = breach(property, limits);
+        if (rejectedReason !== null) {
+          await db
+            .update(properties)
+            .set({ status: "rejected", rejectedReason })
+            .where(and(eq(properties.id, property.id), eq(properties.status, "new")));
+        }
+      }
+      await enqueueReadings();
+    },
     /** Starts tracking a listing by its URL; resolves `false` when that listing is already being added. */
     addListing: (portal: Portal, portalId: string) =>
       queue.enqueue(addListing, { portal, portalId }, { dedupeKey: `${portal}:${portalId}` }),

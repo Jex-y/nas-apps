@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Answer, Question } from "./questions";
+import type { Answer, Question } from "../contract";
 import { type RankingInput, scoreProperty } from "./ranking";
 
 const QUESTIONS: readonly Question[] = [
@@ -10,10 +10,10 @@ const QUESTIONS: readonly Question[] = [
     kind: "choice",
     label: "Outdoor space",
     instructions: "?",
-    options: {
-      balcony: { label: "Balcony", description: "", points: 2 },
-      none: { label: "None", description: "", points: 0 },
-    },
+    options: [
+      { key: "balcony", label: "Balcony", description: "", points: 2 },
+      { key: "none", label: "None", description: "", points: 0 },
+    ],
   },
   {
     key: "condition",
