@@ -11,7 +11,7 @@ import {
   searchPage,
   soldStcPage,
 } from "../../test/support";
-import { SERVICE_CHARGE_REASON, SHARED_OWNERSHIP_REASON, TOO_SMALL_REASON } from "./ingest";
+import { SERVICE_CHARGE_REASON, SHARED_OWNERSHIP_REASON, SHORT_LEASE_REASON, TOO_SMALL_REASON } from "./ingest";
 import type { JourneyPlanner } from "./places";
 import { commutes, listings, photos, properties, searches, snapshots } from "./schema";
 import { isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
@@ -417,6 +417,7 @@ describe("size and service charge", () => {
   const charged = (annualServiceCharge: number) => ({
     livingCosts: { annualServiceCharge, annualGroundRent: 0, councilTaxBand: "TBC" },
   });
+  const leased = (yearsRemainingOnLease: number) => ({ tenure: { tenureType: "LEASEHOLD", yearsRemainingOnLease } });
 
   test("rejects an untriaged property under 650 sq ft", async () => {
     expect(await ingestUnionLane(sized(649))).toMatchObject({
@@ -449,8 +450,16 @@ describe("size and service charge", () => {
     });
   });
 
-  test("keeps a property on either limit, or that states neither", async () => {
-    expect((await ingestUnionLane({ ...sized(650), ...charged(6000) })).status).toBe("new");
+  test("rejects an untriaged property with under 90 years left on its lease", async () => {
+    expect(await ingestUnionLane(leased(89))).toMatchObject({
+      status: "rejected",
+      rejectedReason: SHORT_LEASE_REASON,
+      leaseYearsRemaining: 89,
+    });
+  });
+
+  test("keeps a property on each limit, or that states none", async () => {
+    expect((await ingestUnionLane({ ...sized(650), ...charged(6000), ...leased(90) })).status).toBe("new");
     expect((await ingestUnionLane({})).status).toBe("new");
   });
 });
