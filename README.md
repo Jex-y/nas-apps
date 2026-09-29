@@ -85,6 +85,23 @@ The API refuses any dependency that would close a cycle or reach into another pr
 To do once everything it waits on is done (and a done task reopen only while nothing that waits on it has started).
 The graph and schedule logic in `src/plan.ts` is pure and shared by the server and the UI.
 
+From 08:00 London time each project with anything overdue, due today or tomorrow, or scheduled to miss its due date
+sends one push notification a day to every subscribed device.
+
+### Manage tasks from Claude
+
+The app serves an MCP server at `https://apps.tail12605.ts.net/tasks/mcp` (Streamable HTTP, stateless), with tools
+to list and read projects (each with its critical-path schedule) and to create, edit, move, link and delete tasks.
+It trusts the same Tailscale identity as the web app, so it works from any client on a tailnet device, e.g.
+Claude Code:
+
+```sh
+claude mcp add --transport http --scope user tasks https://apps.tail12605.ts.net/tasks/mcp
+```
+
+Clients that connect from the cloud rather than your device, such as claude.ai's custom connectors, cannot reach
+the tailnet.
+
 ## Deploy
 
 Every push to `main` runs lint, typecheck, the migration check and the tests. It then builds

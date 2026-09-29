@@ -60,6 +60,7 @@ export const CreateTask = z.object({
   dependsOn: z.array(z.uuid()).max(100).default([]),
 });
 export type CreateTask = z.input<typeof CreateTask>;
+export type NewTask = z.output<typeof CreateTask>;
 
 export const UpdateTask = z
   .object({

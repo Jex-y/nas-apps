@@ -58,3 +58,16 @@ export const dependencies = tasksSchema.table(
     check("no_self_dependency", sql`${table.taskId} <> ${table.dependsOnId}`),
   ],
 );
+
+/** The morning reminder already sent for a project, so each goes out at most once per London day. */
+export const reminders = tasksSchema.table(
+  "reminders",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    date: localDate("date").notNull(),
+    sentAt: instant("sent_at").notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.projectId, table.date] })],
+);

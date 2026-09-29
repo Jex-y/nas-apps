@@ -14,6 +14,13 @@ CREATE TABLE "tasks"."projects" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "tasks"."reminders" (
+	"project_id" uuid NOT NULL,
+	"date" date NOT NULL,
+	"sent_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "reminders_project_id_date_pk" PRIMARY KEY("project_id","date")
+);
+--> statement-breakpoint
 CREATE TABLE "tasks"."tasks" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"project_id" uuid NOT NULL,
@@ -31,6 +38,7 @@ CREATE TABLE "tasks"."tasks" (
 --> statement-breakpoint
 ALTER TABLE "tasks"."dependencies" ADD CONSTRAINT "dependencies_task_id_tasks_id_fk" FOREIGN KEY ("task_id") REFERENCES "tasks"."tasks"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tasks"."dependencies" ADD CONSTRAINT "dependencies_depends_on_id_tasks_id_fk" FOREIGN KEY ("depends_on_id") REFERENCES "tasks"."tasks"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks"."reminders" ADD CONSTRAINT "reminders_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "tasks"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tasks"."tasks" ADD CONSTRAINT "tasks_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "tasks"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "dependencies_depends_on_id_index" ON "tasks"."dependencies" USING btree ("depends_on_id");--> statement-breakpoint
 CREATE INDEX "tasks_project_id_status_position_index" ON "tasks"."tasks" USING btree ("project_id","status","position");
