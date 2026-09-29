@@ -1,20 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { task as taskOf } from "../test/support";
 import type { Task } from "./contract";
 import { blockers, canDependOn, dateOfDay, dayOfDate, depths, reaches, schedule, topologicalOrder } from "./plan";
 
-const task = (id: string, dependsOn: string[] = [], fields: Partial<Task> = {}): Task => ({
-  id,
-  title: id,
-  notes: "",
-  status: "todo",
-  durationDays: 1,
-  startOn: null,
-  dueOn: null,
-  startedAt: null,
-  completedAt: null,
-  dependsOn,
-  ...fields,
-});
+const task = (id: string, dependsOn: string[] = [], fields: Partial<Task> = {}) => taskOf(id, { dependsOn, ...fields });
 
 const MONDAY = dayOfDate("2026-09-21");
 const ids = (tasks: readonly Task[]) => tasks.map((t) => t.id);

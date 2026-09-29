@@ -104,16 +104,21 @@ type Scheduled = Node & Pick<Task, "status" | "durationDays" | "startOn" | "dueO
  * running on past their estimate until done; the rest start as soon as their dependencies and start dates allow.
  * A backward pass from the project's end and each due date then gives every task its slack.
  */
-export const schedule = (tasks: readonly Scheduled[], today: Day): Map<string, Slot> => {
+export const schedule = (
+  tasks: readonly Scheduled[],
+  today: Day,
+  /** Which calendar day an instant falls on; the viewer's own time zone by default. */
+  dayOf: (instant: string) => Day = dayOfInstant,
+): Map<string, Slot> => {
   const order = topologicalOrder(tasks);
   const earliest = new Map<string, { start: Day; finish: Day }>();
 
   for (const task of order) {
     if (task.status === "done") {
-      const finish = task.completedAt === null ? today : dayOfInstant(task.completedAt) + 1;
+      const finish = task.completedAt === null ? today : dayOf(task.completedAt) + 1;
       earliest.set(task.id, { start: finish - task.durationDays, finish });
     } else if (task.status === "doing") {
-      const start = task.startedAt === null ? today : dayOfInstant(task.startedAt);
+      const start = task.startedAt === null ? today : dayOf(task.startedAt);
       earliest.set(task.id, { start, finish: Math.max(start + task.durationDays, today + 1) });
     } else {
       const start = Math.max(

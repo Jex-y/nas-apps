@@ -1,16 +1,12 @@
-import { beforeEach, describe, expect, test } from "bun:test";
-import { createTestContext, startTestServer, uniqueLogin } from "@nas/core/testing";
+import { describe, expect, test } from "bun:test";
+import { startTestServer, uniqueLogin } from "@nas/core/testing";
+import { createTasksTestContext, NOW } from "../../test/support";
 import { type CreateTask, ProjectList, ProjectView, type Status } from "../contract";
 import { createTasksApp } from "../module";
 
-const NOW = new Date("2026-09-21T11:00:00Z");
-const context = createTestContext();
+const context = createTasksTestContext();
 const request = startTestServer((ctx) => [createTasksApp(ctx, { now: () => NOW })], context);
 const me = uniqueLogin();
-
-beforeEach(async () => {
-  await context.sql`truncate tasks.projects cascade`;
-});
 
 const send = (path: string, method: string, body?: unknown) =>
   request(`/tasks/api${path}`, {
