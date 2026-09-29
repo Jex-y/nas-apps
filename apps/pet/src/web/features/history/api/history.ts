@@ -1,4 +1,4 @@
-import { requestJson } from "@nas/core/web";
+import { requestJson } from "@apps/core/web";
 import { useQuery } from "@tanstack/react-query";
 import { History, PET_API } from "../../../../contract";
 

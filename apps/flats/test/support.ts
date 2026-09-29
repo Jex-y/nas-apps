@@ -1,6 +1,6 @@
 import { beforeEach } from "bun:test";
-import { type AppContext, createBlobStore, drainJobs, type Notification } from "@nas/core";
-import { createTestContext } from "@nas/core/testing";
+import { type AppContext, createBlobStore, drainJobs, type Notification } from "@apps/core";
+import { createTestContext } from "@apps/core/testing";
 import { eq } from "drizzle-orm";
 import { flatsDb } from "../src/api/db";
 import type { Download, Fetcher, FetchResult } from "../src/api/fetcher";

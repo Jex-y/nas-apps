@@ -1,4 +1,4 @@
-import { type AppContext, type AppModule, appRoutes, trailingSlashRedirect } from "@nas/core";
+import { type AppContext, type AppModule, appRoutes, trailingSlashRedirect } from "@apps/core";
 import type { StatusDeps } from "./api/report";
 import { createStatusRoutes } from "./api/routes";
 import page from "./web/index.html";

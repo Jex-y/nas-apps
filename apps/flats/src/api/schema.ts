@@ -1,4 +1,4 @@
-import { jsonb } from "@nas/core/columns";
+import { jsonb } from "@apps/core/columns";
 import {
   bigint,
   boolean,

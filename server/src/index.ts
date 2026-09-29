@@ -1,4 +1,4 @@
-import { createJobQueue, createNotifierFactory, createSql, parseServerConfig, startServer } from "@nas/core";
+import { createJobQueue, createNotifierFactory, createSql, parseServerConfig, startServer } from "@apps/core";
 import { createApps } from "./apps";
 
 const config = parseServerConfig(process.env);

@@ -1,12 +1,12 @@
 {
-  "name": "@nas/server",
+  "name": "@apps/server",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@nas/core": "workspace:*",
+    "@apps/core": "workspace:*",
     "drizzle-orm": "^0.45.3",
-    "@nas/flats": "workspace:*",
-    "@nas/pet": "workspace:*",
-    "@nas/status": "workspace:*"
+    "@apps/flats": "workspace:*",
+    "@apps/pet": "workspace:*",
+    "@apps/status": "workspace:*"
   }
 }

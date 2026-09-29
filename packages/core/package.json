@@ -1,5 +1,5 @@
 {
-  "name": "@nas/core",
+  "name": "@apps/core",
   "private": true,
   "type": "module",
   "exports": {

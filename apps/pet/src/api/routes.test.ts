@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { startTestServer, uniqueLogin } from "@nas/core/testing";
+import { startTestServer, uniqueLogin } from "@apps/core/testing";
 import { createPetTestbed, NOON } from "../../test/support";
 import { HealthReceipt, History, PetView } from "../contract";
 import { createPetApp } from "../module";

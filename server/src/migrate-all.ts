@@ -1,4 +1,4 @@
-import { migrateApp } from "@nas/core";
+import { migrateApp } from "@apps/core";
 import type { SQL } from "bun";
 import { appMigrations } from "./apps";
 

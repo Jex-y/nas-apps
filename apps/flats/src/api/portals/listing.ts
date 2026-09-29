@@ -82,7 +82,7 @@ export class ParseError extends Error {}
 
 export type PortalParser = {
   readonly portal: Portal;
-  /** The search URL to fetch for the newest listings, from the saved-search URL Ed pasted. */
+  /** The search URL to fetch for the newest listings, from the saved-search URL someone pasted. */
   readonly newestFirst: (searchUrl: string, offset: number) => string;
   readonly listingUrl: (portalId: string) => string;
   /** Recognises this portal's listing URLs, e.g. from the add-by-URL bookmarklet. */

@@ -1,9 +1,9 @@
-import { type AppContext, type AppMigrations, type AppModule, coreMigrations } from "@nas/core";
-import { createFlatsApp } from "@nas/flats";
-import { flatsMigrations } from "@nas/flats/migrations";
-import { createPetApp } from "@nas/pet";
-import { petMigrations } from "@nas/pet/migrations";
-import { createStatusApp, parseBuildInfo } from "@nas/status";
+import { type AppContext, type AppMigrations, type AppModule, coreMigrations } from "@apps/core";
+import { createFlatsApp } from "@apps/flats";
+import { flatsMigrations } from "@apps/flats/migrations";
+import { createPetApp } from "@apps/pet";
+import { petMigrations } from "@apps/pet/migrations";
+import { createStatusApp, parseBuildInfo } from "@apps/status";
 
 export const appMigrations: readonly AppMigrations[] = [coreMigrations, flatsMigrations, petMigrations];
 

@@ -1,4 +1,4 @@
-import { type AppContext, type AppModule, appRoutes, createBlobStore, trailingSlashRedirect } from "@nas/core";
+import { type AppContext, type AppModule, appRoutes, createBlobStore, trailingSlashRedirect } from "@apps/core";
 import { parseFlatsConfig } from "./api/config";
 import { flatsDb } from "./api/db";
 import { BROWSER_USER_AGENT, createHttpFetcher } from "./api/fetcher";

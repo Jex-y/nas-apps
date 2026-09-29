@@ -5,7 +5,7 @@ import {
   createSql,
   parseWorkerConfig,
   runWorker,
-} from "@nas/core";
+} from "@apps/core";
 import { createApps } from "./apps";
 
 /** The worker is unhealthy once its loops have been silent for this long; well above the idle poll and tick. */

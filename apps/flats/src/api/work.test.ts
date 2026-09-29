@@ -349,7 +349,7 @@ describe("shared ownership", () => {
     expect((await db.select().from(commutes)).map((commute) => commute.propertyId)).toEqual([soldStc.property.id]);
   });
 
-  test("leaves a property already being pursued to Ed", async () => {
+  test("leaves a property already being pursued to its owner", async () => {
     const first = setup();
     await first.work.backfillSearch((await addSearch()).id, 1);
     await first.drain();

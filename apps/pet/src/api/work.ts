@@ -1,5 +1,5 @@
-import type { JobQueue, Notification, Notifier, RegisteredJob, Schedule } from "@nas/core";
-import { defineJob, defineSchedule } from "@nas/core";
+import type { JobQueue, Notification, Notifier, RegisteredJob, Schedule } from "@apps/core";
+import { defineJob, defineSchedule } from "@apps/core";
 import { z } from "zod";
 import { type Condition, type PetView, STALE_HEALTH_HOURS, type Trait } from "../contract";
 import { londonDate, londonHour } from "./calendar";

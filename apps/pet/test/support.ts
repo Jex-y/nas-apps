@@ -1,6 +1,6 @@
 import { beforeEach } from "bun:test";
-import { type AppContext, drainJobs, type Notification } from "@nas/core";
-import { createTestContext } from "@nas/core/testing";
+import { type AppContext, drainJobs, type Notification } from "@apps/core";
+import { createTestContext } from "@apps/core/testing";
 import { londonDate } from "../src/api/calendar";
 import { petDb } from "../src/api/db";
 import type { DayTotal } from "../src/api/life";

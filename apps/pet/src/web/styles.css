@@ -1,4 +1,4 @@
-@import "@nas/core/theme.css";
+@import "@apps/core/theme.css";
 
 /* The screen is part of the device, not the page, so it keeps its pale LCD green in both themes. */
 :root {

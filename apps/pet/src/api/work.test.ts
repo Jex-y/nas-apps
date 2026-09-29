@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { uniqueLogin } from "@nas/core/testing";
+import { uniqueLogin } from "@apps/core/testing";
 import { eq } from "drizzle-orm";
 import { createPetTestbed } from "../../test/support";
 import { nudges } from "./schema";

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { PermanentJobError } from "@nas/core";
+import { PermanentJobError } from "@apps/core";
 import { createPostcodesIo, createTflPlanner, nextTuesday } from "./places";
 
 const journey = await Bun.file(new URL("../../test/fixtures/tfl/journey.json", import.meta.url)).text();

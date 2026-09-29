@@ -1,5 +1,5 @@
 {
-  "name": "@nas/flats",
+  "name": "@apps/flats",
   "private": true,
   "type": "module",
   "exports": {
@@ -10,7 +10,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
-    "@nas/core": "workspace:*",
+    "@apps/core": "workspace:*",
     "@tanstack/react-query": "^5.104.0",
     "drizzle-orm": "^0.45.3",
     "react": "^19.3.0",

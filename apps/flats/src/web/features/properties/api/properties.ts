@@ -1,4 +1,4 @@
-import { requestEmpty, requestJson } from "@nas/core/web";
+import { requestEmpty, requestJson } from "@apps/core/web";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type CreateViewing,

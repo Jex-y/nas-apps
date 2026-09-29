@@ -1,4 +1,4 @@
-import { defineRoutes, HttpError, type IdentityMode, parseBody, resolveViewer } from "@nas/core";
+import { defineRoutes, HttpError, type IdentityMode, parseBody, resolveViewer } from "@apps/core";
 import { eq, sql } from "drizzle-orm";
 import {
   DEFAULT_STEP_GOAL,

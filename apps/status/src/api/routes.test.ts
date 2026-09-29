@@ -8,8 +8,8 @@ import {
   drainJobs,
   enqueueDueSchedules,
   type JobsDatabase,
-} from "@nas/core";
-import { createTestContext, startTestServer, uniqueLogin } from "@nas/core/testing";
+} from "@apps/core";
+import { createTestContext, startTestServer, uniqueLogin } from "@apps/core/testing";
 import { drizzle } from "drizzle-orm/bun-sql";
 import { z } from "zod";
 import { type Probed, StatusReport } from "../contract";

@@ -1,4 +1,4 @@
-import { type AppContext, type AppModule, appRoutes, trailingSlashRedirect } from "@nas/core";
+import { type AppContext, type AppModule, appRoutes, trailingSlashRedirect } from "@apps/core";
 import { petDb } from "./api/db";
 import { createPetRoutes } from "./api/routes";
 import { createPetWork } from "./api/work";

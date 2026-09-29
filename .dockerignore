@@ -4,4 +4,4 @@
 .github
 .env*
 compose.dev.yaml
-deploy/nas-deploy.sh
+deploy/deploy.sh

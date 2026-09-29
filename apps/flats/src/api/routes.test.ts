@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { startTestServer, uniqueLogin } from "@nas/core/testing";
+import { startTestServer, uniqueLogin } from "@apps/core/testing";
 import { drizzle } from "drizzle-orm/bun-sql";
 import { createFlatsTestbed, fakeGeocoder, fakePlanner } from "../../test/support";
 import { Destination, DestinationList, PropertyDetail, PropertyList, Search, SearchList } from "../contract";

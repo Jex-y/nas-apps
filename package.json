@@ -1,5 +1,5 @@
 {
-  "name": "nas-apps",
+  "name": "tailnet-apps",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.4.2",

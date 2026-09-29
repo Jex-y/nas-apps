@@ -1,4 +1,4 @@
-import { requestJson } from "@nas/core/web";
+import { requestJson } from "@apps/core/web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Hatch, type Interaction, PET_API, PetView, type UpdatePet } from "../../../../contract";
 import { historyKey } from "../../history/api/history";

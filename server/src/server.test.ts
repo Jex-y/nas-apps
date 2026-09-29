@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { startTestServer } from "@nas/core/testing";
+import { startTestServer } from "@apps/core/testing";
 import { createApps } from "./apps";
 
 const request = startTestServer(createApps);

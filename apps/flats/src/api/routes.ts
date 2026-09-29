@@ -6,7 +6,7 @@ import {
   parseBody,
   parseParam,
   resolveViewer,
-} from "@nas/core";
+} from "@apps/core";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {

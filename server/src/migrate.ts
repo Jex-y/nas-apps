@@ -1,4 +1,4 @@
-import { createSql, parseDatabaseConfig } from "@nas/core";
+import { createSql, parseDatabaseConfig } from "@apps/core";
 import { migrateAll } from "./migrate-all";
 
 const sql = createSql(parseDatabaseConfig(process.env));
