@@ -7,6 +7,7 @@ import {
   formatCommuteTime,
   formatDate,
   formatMoney,
+  formatPoints,
   formatPrice,
   formatTenure,
   pricePerSqft,
@@ -157,6 +158,21 @@ export const PropertyPage = ({ id }: { id: string }) => {
                 {detail.commutes.map((commute) => (
                   <li key={commute.destinationId}>
                     {commute.name} <span className="muted">{formatCommuteTime(commute.minutes)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {detail.ranking.kind === "scored" && detail.ranking.contributions.length > 0 && (
+            <section>
+              <h2>Score {formatPoints(detail.ranking.total)}</h2>
+              <ul className="contributions">
+                {detail.ranking.contributions.map((contribution) => (
+                  <li key={contribution.label}>
+                    <span>
+                      {contribution.label} <span className="muted">{contribution.detail}</span>
+                    </span>
+                    <span className="points">{formatPoints(contribution.points)}</span>
                   </li>
                 ))}
               </ul>

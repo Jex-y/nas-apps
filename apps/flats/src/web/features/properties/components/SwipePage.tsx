@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { PropertySummary, UpdateStatus } from "../../../../contract";
-import { usePhotos, useProperties, useTriage } from "../api/properties";
+import { useInbox, usePhotos, useTriage } from "../api/properties";
 import { type SwipeDirection, useSwipeGesture } from "../hooks/useSwipeGesture";
 import { isTyping } from "../utils/keyboard";
 import { SwipeCard } from "./SwipeCard";
@@ -17,7 +17,7 @@ type Swipe = { property: PropertySummary; direction: SwipeDirection };
  * space for the next photo, its left third or shift+space for the previous one.
  */
 export const SwipePage = () => {
-  const properties = useProperties("new");
+  const properties = useInbox();
   const triage = useTriage();
   const [history, setHistory] = useState<readonly Swipe[]>([]);
 

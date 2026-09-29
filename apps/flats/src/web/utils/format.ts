@@ -65,3 +65,9 @@ export const AVAILABILITY_LABELS = {
   sold_stc: "Sold STC",
   removed: "Taken down",
 } as const satisfies Record<PropertySummary["availability"], string | null>;
+
+/** e.g. "+1.8", "−2.5", "0.0". */
+export const formatPoints = (points: number): string => {
+  const rounded = Math.round(points * 10) / 10;
+  return `${rounded > 0 ? "+" : rounded < 0 ? "−" : ""}${Math.abs(rounded).toFixed(1)}`;
+};

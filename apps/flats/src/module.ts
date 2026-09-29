@@ -53,7 +53,15 @@ export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = re
     routes: appRoutes({
       "/flats": trailingSlashRedirect("flats"),
       "/flats/*": page,
-      ...createFlatsRoutes({ db, blob, identity: context.identity, work, parsers, geocoder: adapters.geocoder }),
+      ...createFlatsRoutes({
+        db,
+        blob,
+        identity: context.identity,
+        work,
+        parsers,
+        geocoder: adapters.geocoder,
+        questions: QUESTIONS,
+      }),
     }),
     jobs: work.jobs,
     schedules: work.schedules,

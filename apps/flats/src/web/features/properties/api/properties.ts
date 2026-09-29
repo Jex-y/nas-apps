@@ -9,6 +9,7 @@ import {
   type PropertySummary,
   type UpdateStatus,
 } from "../../../../contract";
+import { bestFirst } from "../utils/ranking";
 
 const keys = {
   all: ["properties"] as const,
@@ -17,8 +18,8 @@ const keys = {
   triage: ["properties", "triage"] as const,
 };
 
-export const useProperties = (status: PropertyStatus | "all") =>
-  useQuery({
+const listQuery = (status: PropertyStatus | "all") =>
+  queryOptions({
     queryKey: keys.list(status),
     queryFn: () =>
       requestJson(
@@ -26,6 +27,11 @@ export const useProperties = (status: PropertyStatus | "all") =>
         PropertyList,
       ),
   });
+
+export const useProperties = (status: PropertyStatus | "all") => useQuery(listQuery(status));
+
+/** New properties best first, excluded ones last. */
+export const useInbox = () => useQuery({ ...listQuery("new"), select: bestFirst });
 
 const detailQuery = (id: string) =>
   queryOptions({
