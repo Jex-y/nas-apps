@@ -1,9 +1,11 @@
 import { type AppContext, type AppModule, appRoutes, createBlobStore, trailingSlashRedirect } from "@apps/core";
 import { parseFlatsConfig } from "./api/config";
 import { flatsDb } from "./api/db";
+import { createJevExtractor, type FeatureExtractor } from "./api/extractor";
 import { BROWSER_USER_AGENT, createHttpFetcher } from "./api/fetcher";
 import { createPostcodesIo, createTflPlanner, type Geocoder, type JourneyPlanner } from "./api/places";
 import { rightmove } from "./api/portals/rightmove";
+import { QUESTIONS } from "./api/questions";
 import { createFlatsRoutes } from "./api/routes";
 import { createFlatsWork } from "./api/work";
 import page from "./web/index.html";
@@ -15,11 +17,16 @@ const intervalMs = (host: string): number => (host.startsWith("www.") ? 5_000 : 
 export type FlatsAdapters = {
   readonly geocoder: Geocoder;
   readonly planner: JourneyPlanner | null;
+  readonly extractor: FeatureExtractor | null;
 };
 
 const realAdapters = (context: AppContext): FlatsAdapters => {
-  const { tflApiKey } = parseFlatsConfig(context.env);
-  return { geocoder: createPostcodesIo(), planner: tflApiKey === null ? null : createTflPlanner(tflApiKey) };
+  const { tflApiKey, typesafeApiKey } = parseFlatsConfig(context.env);
+  return {
+    geocoder: createPostcodesIo(),
+    planner: tflApiKey === null ? null : createTflPlanner(tflApiKey),
+    extractor: typesafeApiKey === null ? null : createJevExtractor(typesafeApiKey),
+  };
 };
 
 export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = realAdapters(context)): AppModule => {
@@ -34,6 +41,8 @@ export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = re
     fetcher: createHttpFetcher({ userAgent: BROWSER_USER_AGENT, intervalMs }),
     parsers: { rightmove },
     planner: adapters.planner,
+    extractor: adapters.extractor,
+    questions: QUESTIONS,
     publicUrl: context.publicUrl,
     now: () => new Date(),
   });

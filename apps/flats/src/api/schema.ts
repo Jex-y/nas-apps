@@ -16,6 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { PROPERTY_STATUSES } from "../contract";
 import { AVAILABILITIES, type ParsedListing, PORTALS, TENURES } from "./portals/listing";
+import type { Answer } from "./questions";
 
 export const flatsSchema = pgSchema("flats");
 
@@ -202,4 +203,21 @@ export const commutes = flatsSchema.table(
     computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.propertyId, table.destinationId] })],
+);
+
+/** What Jev read from a property's listing text, one row per question. */
+export const answers = flatsSchema.table(
+  "answers",
+  {
+    propertyId: uuid("property_id")
+      .notNull()
+      .references(() => properties.id, { onDelete: "cascade" }),
+    questionKey: text("question_key").notNull(),
+    /** The wording answered; an answer to an older wording is stale and gets asked again. */
+    fingerprint: text("fingerprint").notNull(),
+    answer: jsonb<Answer>("answer").notNull(),
+    model: text("model").notNull(),
+    extractedAt: timestamp("extracted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.propertyId, table.questionKey] })],
 );

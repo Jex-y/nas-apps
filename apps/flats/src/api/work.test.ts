@@ -4,6 +4,7 @@ import { rightmoveListingPage } from "../../test/rightmove-page";
 import {
   createFlatsTestbed,
   defaultPages,
+  fakeExtractor,
   fakePlanner,
   NOON,
   ok,
@@ -11,9 +12,11 @@ import {
   searchPage,
   soldStcPage,
 } from "../../test/support";
+import type { FeatureExtractor } from "./extractor";
 import { SERVICE_CHARGE_REASON, SHARED_OWNERSHIP_REASON, SHORT_LEASE_REASON, TOO_SMALL_REASON } from "./ingest";
 import type { JourneyPlanner } from "./places";
-import { commutes, listings, photos, properties, searches, snapshots } from "./schema";
+import { fingerprint, QUESTIONS } from "./questions";
+import { answers, commutes, listings, photos, properties, searches, snapshots } from "./schema";
 import { isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
 
 const { context, db, blob, setup, addSearch, addDestination, propertyByPortalId } = createFlatsTestbed();
@@ -199,7 +202,7 @@ describe("polling hours", () => {
   });
 
   test("skips the scheduled poll overnight", async () => {
-    const { work, fetcher, drain } = setup(defaultPages, new Date("2026-09-28T01:00:00Z"));
+    const { work, fetcher, drain } = setup(defaultPages, { now: new Date("2026-09-28T01:00:00Z") });
     await addSearch();
     await context.jobs.enqueue(work.definitions.pollSearches, {});
     await drain();
@@ -246,7 +249,7 @@ describe("adding a listing by URL", () => {
 
 describe("commutes", () => {
   const seed = async (planner: JourneyPlanner | null) => {
-    const seeded = setup(defaultPages, NOON, planner);
+    const seeded = setup(defaultPages, { planner });
     await seeded.work.backfillSearch((await addSearch()).id, 1);
     await seeded.drain();
     return seeded;
@@ -308,7 +311,7 @@ describe("commutes", () => {
     await addDestination();
     await seed(null);
 
-    const configured = setup(defaultPages, NOON, fakePlanner(31).planner);
+    const configured = setup(defaultPages, { planner: fakePlanner(31).planner });
     await context.jobs.enqueue(configured.work.definitions.sweepCommutes, {});
     await configured.drain();
 
@@ -461,5 +464,89 @@ describe("size and service charge", () => {
   test("keeps a property on each limit, or that states none", async () => {
     expect((await ingestUnionLane({ ...sized(650), ...charged(6000), ...leased(90) })).status).toBe("new");
     expect((await ingestUnionLane({})).status).toBe("new");
+  });
+});
+
+describe("reading listings with Jev", () => {
+  const seed = async (extractor: FeatureExtractor | null) => {
+    const seeded = setup(defaultPages, { extractor });
+    await seeded.work.backfillSearch((await addSearch()).id, 1);
+    await seeded.drain();
+    return seeded;
+  };
+
+  const answersFor = (propertyId: string) =>
+    db
+      .select({ questionKey: answers.questionKey, fingerprint: answers.fingerprint, model: answers.model })
+      .from(answers)
+      .where(eq(answers.propertyId, propertyId));
+
+  test("asks every question about each property still in play, once", async () => {
+    const { extractor, asked } = fakeExtractor();
+    const { work, drain } = await seed(extractor);
+
+    const union = await propertyByPortalId("93524796");
+    expect(await answersFor(union.property.id)).toEqual(
+      expect.arrayContaining(
+        QUESTIONS.map((question) => ({
+          questionKey: question.key,
+          fingerprint: fingerprint(question),
+          model: "jev-fake",
+        })),
+      ),
+    );
+    expect(await answersFor(union.property.id)).toHaveLength(QUESTIONS.length);
+    const removed = await propertyByPortalId("93631518");
+    expect(await answersFor(removed.property.id)).toEqual([]);
+
+    const calls = asked.length;
+    await context.jobs.enqueue(work.definitions.readListing, { propertyId: union.property.id });
+    await drain();
+    expect(asked).toHaveLength(calls);
+  });
+
+  test("asks a reworded question again, and only that one", async () => {
+    await seed(fakeExtractor().extractor);
+    const reworded = QUESTIONS.map((question) =>
+      question.key === "lift" ? { ...question, instructions: `${question.instructions} Or an elevator?` } : question,
+    );
+    const again = fakeExtractor();
+    const { work, drain } = setup(defaultPages, { extractor: again.extractor, questions: reworded });
+
+    await context.jobs.enqueue(work.definitions.sweepReadings, {});
+    await drain();
+
+    expect(again.asked).toEqual([["lift"], ["lift"]]);
+  });
+
+  test("rejects an untriaged property Jev is sure is excluded, leaving one being pursued", async () => {
+    await seed(fakeExtractor().extractor);
+    const soldStc = await propertyByPortalId("128855633");
+    await db.update(properties).set({ status: "shortlisted" }).where(eq(properties.id, soldStc.property.id));
+    await db.delete(answers);
+
+    const retirement = fakeExtractor({ retirement: { kind: "noul", yes: 0.97 } });
+    const { work, drain } = setup(defaultPages, { extractor: retirement.extractor });
+    await context.jobs.enqueue(work.definitions.sweepReadings, {});
+    await drain();
+
+    expect((await propertyByPortalId("93524796")).property).toMatchObject({
+      status: "rejected",
+      rejectedReason: "Retirement property",
+    });
+    expect((await propertyByPortalId("128855633")).property.status).toBe("shortlisted");
+  });
+
+  test("leaves listings unread without TypeSafe, until the daily sweep", async () => {
+    await seed(null);
+    const { property } = await propertyByPortalId("93524796");
+    expect(await answersFor(property.id)).toEqual([]);
+
+    const configured = fakeExtractor();
+    const { work, drain } = setup(defaultPages, { extractor: configured.extractor });
+    await context.jobs.enqueue(work.definitions.sweepReadings, {});
+    await drain();
+
+    expect(await answersFor(property.id)).toHaveLength(QUESTIONS.length);
   });
 });

@@ -22,6 +22,13 @@
       "when": 1790577805285,
       "tag": "0002_reject_shared_ownership",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790713897803,
+      "tag": "0003_read_listings_with_jev",
+      "breakpoints": true
     }
   ]
 }
