@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { startTestServer, uniqueLogin } from "@apps/core/testing";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { startTestServer, uniqueLogin } from "@nas/core/testing";
 import { createTasksTestContext, NOW } from "../../test/support";
 import { createTasksApp } from "../module";
 

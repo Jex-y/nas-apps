@@ -11,7 +11,7 @@ import {
   readSchedules,
   ZERO_OUTCOMES,
   ZERO_QUEUE,
-} from "@nas/core";
+} from "@apps/core";
 import { drizzle } from "drizzle-orm/bun-sql";
 import { z } from "zod";
 import type {

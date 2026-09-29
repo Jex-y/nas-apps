@@ -1,5 +1,5 @@
 import { beforeEach } from "bun:test";
-import { createTestContext } from "@nas/core/testing";
+import { createTestContext } from "@apps/core/testing";
 import type { Task } from "../src/contract";
 
 /** 09:30 on a British Summer Time Monday, after the morning reminders start. */

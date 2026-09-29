@@ -1,4 +1,4 @@
-import { defineRoutes, type IdentityMode, parseBody, parseParam, resolveViewer } from "@nas/core";
+import { defineRoutes, type IdentityMode, parseBody, parseParam, resolveViewer } from "@apps/core";
 import { z } from "zod";
 import { CreateTask, MoveTask, type TaskList, UpdateTask } from "../contract";
 import type { TasksService } from "./service";

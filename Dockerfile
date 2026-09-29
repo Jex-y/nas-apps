@@ -7,7 +7,9 @@ COPY . .
 RUN bun run build
 
 FROM oven/bun:1.4-alpine
-LABEL org.opencontainers.image.source="https://github.com/Jex-y/nas-apps"
+# Links the image to its repository on GHCR; the deploy script prunes old images by it.
+ARG SOURCE_URL=""
+LABEL org.opencontainers.image.source=$SOURCE_URL
 ENV NODE_ENV=production PORT=3000
 WORKDIR /app
 COPY --from=build /repo/deploy/stack /stack

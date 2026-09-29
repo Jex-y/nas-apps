@@ -5,7 +5,7 @@ import {
   type Notifier,
   type RegisteredJob,
   type Schedule,
-} from "@nas/core";
+} from "@apps/core";
 import { and, isNotNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import type { TaskList } from "../contract";

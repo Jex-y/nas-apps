@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { drainJobs, type Notification } from "@nas/core";
-import { uniqueLogin } from "@nas/core/testing";
+import { drainJobs, type Notification } from "@apps/core";
+import { uniqueLogin } from "@apps/core/testing";
 import { createTasksTestContext, NOW, task } from "../../test/support";
 import { tasksDb } from "./db";
 import { createTasksService } from "./service";

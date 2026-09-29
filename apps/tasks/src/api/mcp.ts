@@ -1,7 +1,7 @@
+import { HttpError } from "@apps/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { HttpError } from "@nas/core";
 import { z } from "zod";
 import { CreateTask, DurationDays, STATUSES, type TaskList, UpdateTask } from "../contract";
 import { blockers, dateOfDay, schedule, topologicalOrder } from "../plan";

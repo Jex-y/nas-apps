@@ -1,4 +1,4 @@
-import { HttpError } from "@nas/core";
+import { HttpError } from "@apps/core";
 import { and, asc, eq, inArray, max, ne, sql } from "drizzle-orm";
 import type { MoveTask, NewTask, Status, Task, TaskList, UpdateTask } from "../contract";
 import { blockers, canDependOn } from "../plan";

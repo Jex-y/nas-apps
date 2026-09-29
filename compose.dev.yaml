@@ -1,4 +1,4 @@
-name: nas-apps-dev
+name: tailnet-apps-dev
 
 services:
   postgres:

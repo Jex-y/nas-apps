@@ -1,4 +1,4 @@
-import { defineRoutes, resolveViewer } from "@nas/core";
+import { defineRoutes, resolveViewer } from "@apps/core";
 import { createStatusReporter, type StatusDeps } from "./report";
 
 export const createStatusRoutes = (deps: StatusDeps) => {

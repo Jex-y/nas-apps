@@ -1,12 +1,13 @@
 #!/bin/sh
 # Forced command for the CI deploy key (see README). Its only input is a commit SHA: the stack files are read
-# from that commit's image, so the key can only move the NAS between images CI has already published.
-# Installed by hand so CI cannot change what its own key may run.
+# from that commit's image, so the key can only move the host between images CI has already published.
+# Installed by hand, and configured by IMAGE and APP_DIR in the key's authorized_keys entry, so CI cannot change
+# what its own key may run.
 set -eu
 export PATH=/usr/local/bin:/usr/bin:/bin
 
-image=ghcr.io/jex-y/nas-apps
-app_dir=/volume1/Ed/app
+: "${IMAGE:?set IMAGE, e.g. ghcr.io/<owner>/<repo>, in the forced command}"
+: "${APP_DIR:?set APP_DIR, the directory holding .env, releases/ and data/, in the forced command}"
 keep_releases=5
 
 tag=$(printf '%s' "${SSH_ORIGINAL_COMMAND:-}" | grep -xE '[0-9a-f]{40}') || {
@@ -14,19 +15,19 @@ tag=$(printf '%s' "${SSH_ORIGINAL_COMMAND:-}" | grep -xE '[0-9a-f]{40}') || {
   exit 2
 }
 
-cd "$app_dir"
+cd "$APP_DIR"
 mkdir -p releases data/postgres data/garage
 
 compose() {
   release_tag=$1
   shift
-  APP_TAG=$release_tag docker compose -f "releases/$release_tag/compose.yaml" "$@"
+  APP_IMAGE=$IMAGE APP_TAG=$release_tag docker compose -f "releases/$release_tag/compose.yaml" "$@"
 }
 
-docker pull --quiet "$image:$tag"
+docker pull --quiet "$IMAGE:$tag"
 rm -rf "releases/$tag"
 mkdir "releases/$tag"
-container=$(docker create "$image:$tag")
+container=$(docker create "$IMAGE:$tag")
 docker cp "$container:/stack/." "releases/$tag/"
 docker rm "$container" >/dev/null
 ln -s ../../.env "releases/$tag/.env"
@@ -40,7 +41,10 @@ compose "$tag" run --rm migrate
 if compose "$tag" up -d --wait --remove-orphans server worker; then
   ln -sfn "releases/$tag" current
   ls -1t releases | tail -n "+$((keep_releases + 1))" | while read -r old; do rm -rf "releases/$old"; done
-  docker image prune -af --filter "label=org.opencontainers.image.source=https://github.com/Jex-y/nas-apps" >/dev/null
+  source_url=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.source"}}' "$IMAGE:$tag")
+  if [ -n "$source_url" ]; then
+    docker image prune -af --filter "label=org.opencontainers.image.source=$source_url" >/dev/null
+  fi
   echo "deployed $tag"
   exit 0
 fi

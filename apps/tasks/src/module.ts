@@ -1,4 +1,4 @@
-import { type AppContext, type AppModule, appRoutes, resolveViewer, trailingSlashRedirect } from "@nas/core";
+import { type AppContext, type AppModule, appRoutes, resolveViewer, trailingSlashRedirect } from "@apps/core";
 import { tasksDb } from "./api/db";
 import { handleMcp } from "./api/mcp";
 import { createTasksRoutes } from "./api/routes";

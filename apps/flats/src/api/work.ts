@@ -1,5 +1,5 @@
-import type { BlobStore, JobQueue, Notifier, RegisteredJob, Schedule } from "@nas/core";
-import { defineJob, defineSchedule, PermanentJobError } from "@nas/core";
+import type { BlobStore, JobQueue, Notifier, RegisteredJob, Schedule } from "@apps/core";
+import { defineJob, defineSchedule, PermanentJobError } from "@apps/core";
 import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { TRACKED_STATUSES } from "../contract";

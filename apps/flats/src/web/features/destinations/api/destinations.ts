@@ -1,4 +1,4 @@
-import { requestEmpty, requestJson } from "@nas/core/web";
+import { requestEmpty, requestJson } from "@apps/core/web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type CreateDestination, Destination, DestinationList, FLATS_API } from "../../../../contract";
 

@@ -1,10 +1,10 @@
-# Baked into the image at /stack and run from /volume1/Ed/app/releases/<sha>/ on the NAS by deploy/nas-deploy.sh.
-# Secrets come from the NAS's /volume1/Ed/app/.env, symlinked into each release. Postgres and Garage keep
-# their data under /volume1/Ed/app/data, which the deploy script creates, so Hyper Backup covers it with the share.
-name: nas-apps
+# Baked into the image at /stack and run from $APP_DIR/releases/<sha>/ on the host by deploy/deploy.sh, which
+# sets APP_IMAGE and APP_TAG. Settings and secrets come from $APP_DIR/.env (see deploy/.env.example), symlinked
+# into each release. Postgres and Garage keep their data under $APP_DIR/data, which the deploy script creates.
+name: tailnet-apps
 
 x-runtime-env: &runtime-env
-  PUBLIC_URL: https://apps.tail12605.ts.net
+  PUBLIC_URL: https://${PUBLIC_HOST:?}
 
 x-database-env: &database-env
   PGHOST: 127.0.0.1
@@ -15,7 +15,7 @@ x-database-env: &database-env
 
 x-blob-env: &blob-env
   S3_ENDPOINT: http://127.0.0.1:3900
-  S3_PUBLIC_ENDPOINT: https://apps.tail12605.ts.net:3900
+  S3_PUBLIC_ENDPOINT: https://${PUBLIC_HOST:?}:3900
   S3_REGION: garage
   S3_BUCKET: apps
   S3_ACCESS_KEY_ID: ${GARAGE_DEFAULT_ACCESS_KEY:?}
@@ -71,7 +71,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       POSTGRES_DB: apps
     volumes:
-      - /volume1/Ed/app/data/postgres:/var/lib/postgresql
+      - ../../data/postgres:/var/lib/postgresql
     shm_size: 128mb
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -93,11 +93,11 @@ services:
       GARAGE_DEFAULT_BUCKET: apps
     volumes:
       - ./garage.toml:/etc/garage.toml:ro
-      - /volume1/Ed/app/data/garage:/var/lib/garage
+      - ../../data/garage:/var/lib/garage
 
   server:
     <<: *tailnet
-    image: ghcr.io/jex-y/nas-apps:${APP_TAG:?}
+    image: ${APP_IMAGE:?}:${APP_TAG:?}
     restart: unless-stopped
     depends_on:
       tailscale:
@@ -118,7 +118,7 @@ services:
 
   worker:
     <<: *tailnet
-    image: ghcr.io/jex-y/nas-apps:${APP_TAG:?}
+    image: ${APP_IMAGE:?}:${APP_TAG:?}
     restart: unless-stopped
     command: ["bun", "worker.js"]
     depends_on:
@@ -142,7 +142,7 @@ services:
 
   migrate:
     <<: *tailnet
-    image: ghcr.io/jex-y/nas-apps:${APP_TAG:?}
+    image: ${APP_IMAGE:?}:${APP_TAG:?}
     profiles: [tools]
     depends_on:
       postgres:

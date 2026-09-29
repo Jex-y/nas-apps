@@ -1,4 +1,4 @@
-import { PermanentJobError } from "@nas/core";
+import { PermanentJobError } from "@apps/core";
 import { z } from "zod";
 
 export type Coordinates = {

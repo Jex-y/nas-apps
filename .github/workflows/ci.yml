@@ -9,11 +9,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  IMAGE: ghcr.io/jex-y/nas-apps
-  NAS_HOST: nas.tail12605.ts.net
-  NAS_KNOWN_HOST: nas.tail12605.ts.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAWAEJgoYhvxInk8JEcCpfBeXtxgmsqInnv0nzFoXzZk
-
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -42,7 +37,9 @@ jobs:
       - run: bun run build
       - name: Deploy stack is valid
         env:
+          APP_IMAGE: ci
           APP_TAG: ${{ github.sha }}
+          PUBLIC_HOST: apps.example.ts.net
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           GARAGE_RPC_SECRET: ci
@@ -62,6 +59,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v5
+      - name: Name the image after the repository
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         if: github.event_name == 'push'
@@ -74,16 +73,20 @@ jobs:
           context: .
           platforms: linux/amd64
           push: ${{ github.event_name == 'push' }}
-          build-args: GIT_SHA=${{ github.sha }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
           tags: |
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:main
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Runs once the repository variables name a deploy host (see the README), so forks build without deploying.
+  # Repository rather than environment variables, because a job's `if` is evaluated before it enters its environment.
   deploy:
     needs: [check, image]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_HOST != ''
     runs-on: ubuntu-latest
     environment: production
     concurrency:
@@ -97,11 +100,14 @@ jobs:
           tags: tag:ci
       - name: Deploy over SSH
         env:
-          NAS_DEPLOY_KEY: ${{ secrets.NAS_DEPLOY_KEY }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_KNOWN_HOST: ${{ vars.DEPLOY_KNOWN_HOST }}
         run: |
           install -m 700 -d ~/.ssh
           install -m 600 /dev/null ~/.ssh/deploy
-          printf '%s\n' "$NAS_DEPLOY_KEY" > ~/.ssh/deploy
-          printf '%s\n' "$NAS_KNOWN_HOST" >> ~/.ssh/known_hosts
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOST" >> ~/.ssh/known_hosts
           ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            "ed@$NAS_HOST" "$GITHUB_SHA" < /dev/null
+            "$DEPLOY_USER@$DEPLOY_HOST" "$GITHUB_SHA" < /dev/null

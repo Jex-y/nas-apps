@@ -12,9 +12,9 @@
       },
     },
     "apps/flats": {
-      "name": "@nas/flats",
+      "name": "@apps/flats",
       "dependencies": {
-        "@nas/core": "workspace:*",
+        "@apps/core": "workspace:*",
         "@tanstack/react-query": "^5.104.0",
         "drizzle-orm": "^0.45.3",
         "react": "^19.3.0",
@@ -28,9 +28,9 @@
       },
     },
     "apps/status": {
-      "name": "@nas/status",
+      "name": "@apps/status",
       "dependencies": {
-        "@nas/core": "workspace:*",
+        "@apps/core": "workspace:*",
         "@tanstack/react-query": "^5.104.0",
         "drizzle-orm": "^0.45.3",
         "react": "^19.3.0",
@@ -43,10 +43,10 @@
       },
     },
     "apps/tasks": {
-      "name": "@nas/tasks",
+      "name": "@apps/tasks",
       "dependencies": {
+        "@apps/core": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.31.0",
-        "@nas/core": "workspace:*",
         "@tanstack/react-query": "^5.104.0",
         "drizzle-orm": "^0.45.3",
         "react": "^19.3.0",
@@ -60,7 +60,7 @@
       },
     },
     "packages/core": {
-      "name": "@nas/core",
+      "name": "@apps/core",
       "dependencies": {
         "@fontsource-variable/inter": "5.3.0",
         "@fontsource-variable/jetbrains-mono": "5.3.0",
@@ -74,17 +74,27 @@
       },
     },
     "server": {
-      "name": "@nas/server",
+      "name": "@apps/server",
       "dependencies": {
-        "@nas/core": "workspace:*",
-        "@nas/flats": "workspace:*",
-        "@nas/status": "workspace:*",
-        "@nas/tasks": "workspace:*",
+        "@apps/core": "workspace:*",
+        "@apps/flats": "workspace:*",
+        "@apps/status": "workspace:*",
+        "@apps/tasks": "workspace:*",
         "drizzle-orm": "^0.45.3",
       },
     },
   },
   "packages": {
+    "@apps/core": ["@apps/core@workspace:packages/core"],
+
+    "@apps/flats": ["@apps/flats@workspace:apps/flats"],
+
+    "@apps/server": ["@apps/server@workspace:server"],
+
+    "@apps/status": ["@apps/status@workspace:apps/status"],
+
+    "@apps/tasks": ["@apps/tasks@workspace:apps/tasks"],
+
     "@biomejs/biome": ["@biomejs/biome@2.5.14", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "2.5.14", "@biomejs/cli-darwin-x64": "2.5.14", "@biomejs/cli-linux-arm64": "2.5.14", "@biomejs/cli-linux-arm64-musl": "2.5.14", "@biomejs/cli-linux-x64": "2.5.14", "@biomejs/cli-linux-x64-musl": "2.5.14", "@biomejs/cli-win32-arm64": "2.5.14", "@biomejs/cli-win32-x64": "2.5.14" }, "bin": { "biome": "bin/biome" } }, "sha512-0FabLIjd4M/dm8VFI86RMaLLdgepzbdfiAL2R8cr7V81OYYrP1w7Z73KfAwPK5h9SrEBXTzNG2y+mBwPo9xRnw=="],
 
     "@biomejs/cli-darwin-arm64": ["@biomejs/cli-darwin-arm64@2.5.14", "", { "os": "darwin", "cpu": "arm64" }, "sha512-UnzaXO65L4tsZimFITFP2M121GyhDcWFrT3pL5ZJ5U4XcS/0L5VHYytVohdCf/gnDUFHgl2I9xnt5bV/J1kxHQ=="],
@@ -168,16 +178,6 @@
     "@hono/node-server": ["@hono/node-server@2.1.3", "", { "peerDependencies": { "hono": "^4" } }, "sha512-TA//nWMqPhbfdfneACk6t5a9eqbS9lABEPyKn0/xZTah3H3U2XaVg85rJFl0/Fyit0I552YDHgXGVSf3GwqbUw=="],
 
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.31.0", "", { "dependencies": { "@hono/node-server": "^1.19.9 || ^2.0.5", "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.2.1", "express-rate-limit": "^8.2.1", "hono": "^4.11.4", "jose": "^6.1.3", "json-schema-typed": "^8.0.2", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.1" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-UvTMgnNlnIBO/22ob2RcVGDlcvOslQs8T59+FTGdA0L27a39fdGF/EDETNtDVK4DZGpwomlsYpRdA8UXcVL/pw=="],
-
-    "@nas/core": ["@nas/core@workspace:packages/core"],
-
-    "@nas/flats": ["@nas/flats@workspace:apps/flats"],
-
-    "@nas/server": ["@nas/server@workspace:server"],
-
-    "@nas/status": ["@nas/status@workspace:apps/status"],
-
-    "@nas/tasks": ["@nas/tasks@workspace:apps/tasks"],
 
     "@resvg/resvg-wasm": ["@resvg/resvg-wasm@2.6.2", "", {}, "sha512-FqALmHI8D4o6lk/LRWDnhw95z5eO+eAa6ORjVg09YRR7BkcM6oPHU9uyC0gtQG5vpFLvgpeU4+zEAz2H8APHNw=="],
 

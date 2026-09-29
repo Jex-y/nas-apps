@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { startTestServer, uniqueLogin } from "@nas/core/testing";
+import { startTestServer, uniqueLogin } from "@apps/core/testing";
 import { createTasksTestContext, NOW } from "../../test/support";
 import { type CreateTask, type Status, TaskList } from "../contract";
 import { createTasksApp } from "../module";

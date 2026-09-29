@@ -1,4 +1,4 @@
-import { requestJson } from "@nas/core/web";
+import { requestJson } from "@apps/core/web";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type CreateTask, type MoveTask, STATUSES, TASKS_API, TaskList, type UpdateTask } from "../../../../contract";
 
