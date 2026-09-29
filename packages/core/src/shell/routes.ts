@@ -9,6 +9,7 @@ import { createWebPushNotifier, type WebPushConfig } from "../push/send";
 import { PushEndpoint, type PushSettings, PushSubscriptionInput, SHELL_API, type ShellApp } from "./contract";
 import { renderIcons } from "./icons" with { type: "macro" };
 import page from "./index.html";
+import settingsPage from "./settings.html";
 import serviceWorker from "./sw.js" with { type: "text" };
 
 /** The installable wrapper around every app: launcher, manifest, service worker and push subscriptions. */
@@ -53,6 +54,7 @@ export const createShellRoutes = (apps: readonly AppModule[], { identity, sql, w
 
   return {
     "/": page,
+    "/shell/settings": settingsPage,
     "/manifest.webmanifest": Response.json(manifest, { headers: { "Content-Type": "application/manifest+json" } }),
     "/sw.js": () =>
       new Response(serviceWorker, {

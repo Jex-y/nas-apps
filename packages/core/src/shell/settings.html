@@ -3,16 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Apps</title>
+    <title>Settings</title>
     <link rel="stylesheet" href="./shell.css" />
   </head>
   <body>
     <main>
       <header class="page-header">
-        <h1>Apps</h1>
-        <a href="/shell/settings" class="button">Settings</a>
+        <a href="/" class="back">‹ Apps</a>
+        <h1>Settings</h1>
       </header>
-      <ul id="apps" class="apps"></ul>
       <section id="push" class="card push" aria-labelledby="push-heading" hidden>
         <h2 id="push-heading">Notifications</h2>
         <p id="push-status" class="muted"></p>
@@ -23,6 +22,6 @@
         </div>
       </section>
     </main>
-    <script type="module" src="./shell.ts"></script>
+    <script type="module" src="./settings.ts"></script>
   </body>
 </html>

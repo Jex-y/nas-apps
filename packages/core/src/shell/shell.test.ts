@@ -89,6 +89,12 @@ describe("shell", () => {
     }
   });
 
+  test("serves the settings page under the shell's reserved prefix", async () => {
+    const response = await request("/shell/settings");
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("<title>Settings</title>");
+  });
+
   test("tells the launcher the key to subscribe with", async () => {
     expect(await (await request("/shell/api/push")).json()).toEqual({
       publicKey: vapid.publicKey,
