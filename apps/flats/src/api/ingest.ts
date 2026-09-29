@@ -14,6 +14,10 @@ export const TOO_SMALL_REASON = `Under ${MIN_SIZE_SQFT} sq ft`;
 const MAX_ANNUAL_SERVICE_CHARGE = 6000;
 export const SERVICE_CHARGE_REASON = `Service charge over £${MAX_ANNUAL_SERVICE_CHARGE.toLocaleString("en-GB")}`;
 
+/** The shortest lease worth viewing; below it, extending costs too much. */
+const MIN_LEASE_YEARS = 90;
+export const SHORT_LEASE_REASON = `Lease under ${MIN_LEASE_YEARS} years`;
+
 /** What a portal now says that differs from what we last recorded. */
 export type ListingChange = {
   readonly propertyId: string;
@@ -154,13 +158,17 @@ const disqualification = (facts: ReturnType<typeof propertyFacts>): string | nul
   if (facts.annualServiceCharge !== null && facts.annualServiceCharge > MAX_ANNUAL_SERVICE_CHARGE) {
     return SERVICE_CHARGE_REASON;
   }
+  if (facts.leaseYearsRemaining !== null && facts.leaseYearsRemaining < MIN_LEASE_YEARS) {
+    return SHORT_LEASE_REASON;
+  }
   return null;
 };
 
 /**
  * Records a freshly parsed listing page (whose raw copy is already stored at `pageKey`) and brings the property's
  * facts up to date; returns what changed since the last observation. A page whose facts disqualify the property
- * (shared ownership, too small, too high a service charge) rejects it unless it has already been triaged.
+ * (shared ownership, too small, too high a service charge, too short a lease) rejects it unless it has already been
+ * triaged.
  */
 export const recordListingPage = (
   db: FlatsDb,
