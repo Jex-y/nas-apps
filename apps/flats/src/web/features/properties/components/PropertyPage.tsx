@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import type { PropertyDetail } from "../../../../contract";
+import { Contributions } from "../../../components/Contributions";
 import { Warnings } from "../../../components/PropertyCard";
 import {
   AVAILABILITY_LABELS,
   formatCommuteTime,
   formatDate,
   formatMoney,
-  formatPoints,
   formatPrice,
   formatTenure,
   pricePerSqft,
@@ -164,19 +164,7 @@ export const PropertyPage = ({ id }: { id: string }) => {
             </section>
           )}
           {detail.ranking.kind === "scored" && detail.ranking.contributions.length > 0 && (
-            <section>
-              <h2>Score {formatPoints(detail.ranking.total)}</h2>
-              <ul className="contributions">
-                {detail.ranking.contributions.map((contribution) => (
-                  <li key={contribution.label}>
-                    <span>
-                      {contribution.label} <span className="muted">{contribution.detail}</span>
-                    </span>
-                    <span className="points">{formatPoints(contribution.points)}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <Contributions total={detail.ranking.total} contributions={detail.ranking.contributions} />
           )}
           <section>
             <h2>History</h2>
