@@ -31,6 +31,8 @@ export type Notification = {
   /** Opened when the notification is tapped; the app's own page when omitted. */
   readonly clickUrl?: string;
   readonly priority?: NotificationPriority;
+  /** Replaces an earlier notification with the same tag on the lock screen; the app's topic when omitted. */
+  readonly tag?: string;
 };
 
 /** Push notifications scoped to one app. */
