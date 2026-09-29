@@ -1,5 +1,5 @@
 import { requestEmpty, requestJson } from "../web";
-import { type ArtworkOptions, artworkSvg } from "./artwork";
+import { artworkSvg, identityAt, markFor, themedPalette } from "./artwork";
 import { PushSettings, SHELL_API, ShellApps } from "./contract";
 import { installShell } from "./register";
 
@@ -11,25 +11,22 @@ const element = <T extends HTMLElement>(id: string): T => {
   return found as T;
 };
 
-/** Theme variables, so the launcher artwork follows light and dark mode. */
-const TILE_ARTWORK: ArtworkOptions = {
-  width: 300,
-  height: 200,
-  margin: 14,
-  colours: ["var(--accent)", "var(--accent-2)", "var(--pink)", "var(--rose)"],
+const tileArtwork = (slug: string, index: number, count: number) => {
+  const mark = markFor(slug, identityAt(index, count));
+  return artworkSvg(mark, { width: 300, height: 200, scale: 0.86, palette: themedPalette(mark.hue) });
 };
 
 const renderApps = async () => {
   const apps = await requestJson(`${SHELL_API}/apps`, ShellApps);
   element("apps").replaceChildren(
-    ...apps.map(({ slug, title }) => {
+    ...apps.map(({ slug, title }, index) => {
       const name = document.createElement("span");
       name.className = "app-title";
       name.textContent = title;
       const link = document.createElement("a");
       link.className = "card";
       link.href = `/${slug}/`;
-      link.innerHTML = artworkSvg(slug, TILE_ARTWORK);
+      link.innerHTML = tileArtwork(slug, index, apps.length);
       link.append(name);
       const item = document.createElement("li");
       item.append(link);
