@@ -7,9 +7,9 @@ import type { FeatureExtractor } from "../src/api/extractor";
 import type { Download, Fetcher, FetchResult } from "../src/api/fetcher";
 import type { ArriveBy, Coordinates, Geocoder, JourneyPlanner } from "../src/api/places";
 import { rightmove } from "../src/api/portals/rightmove";
-import { type Answer, QUESTIONS, type Question } from "../src/api/questions";
 import { destinations, listings, properties, searches } from "../src/api/schema";
 import { createFlatsWork } from "../src/api/work";
+import type { Answer, Question } from "../src/contract";
 
 const fixture = (name: string) => Bun.file(new URL(`./fixtures/rightmove/${name}`, import.meta.url)).text();
 export const [searchPage, listingPage, soldStcPage] = await Promise.all([
@@ -72,8 +72,7 @@ const certainFirst = (question: Question): Answer => {
     case "feature":
       return { kind: "noul", yes: 0.02 };
     case "choice": {
-      const [first = ""] = Object.keys(question.options);
-      return { kind: "choice", probabilities: { [first]: 1 } };
+      return { kind: "choice", probabilities: { [question.options[0]?.key ?? ""]: 1 } };
     }
     case "score":
       return { kind: "score", probabilities: question.levels.map((_, level) => (level === 0 ? 1 : 0)) };
@@ -125,12 +124,10 @@ export const createFlatsTestbed = () => {
       now = NOON,
       planner = fakePlanner().planner,
       extractor = fakeExtractor().extractor,
-      questions = QUESTIONS,
     }: {
       readonly now?: Date;
       readonly planner?: JourneyPlanner | null;
       readonly extractor?: FeatureExtractor | null;
-      readonly questions?: readonly Question[];
     } = {},
   ) => {
     const sent: Notification[] = [];
@@ -144,7 +141,6 @@ export const createFlatsTestbed = () => {
       parsers: { rightmove },
       planner,
       extractor,
-      questions,
       publicUrl: "https://apps.example",
       now: () => now,
     });
@@ -191,7 +187,7 @@ export const createFlatsTestbed = () => {
   };
 
   beforeEach(async () => {
-    await context.sql`truncate flats.searches, flats.properties, flats.destinations cascade`;
+    await context.sql`truncate flats.searches, flats.properties, flats.destinations, flats.requirements cascade`;
     await context.sql`delete from jobs.jobs where name like 'flats.%'`;
   });
 

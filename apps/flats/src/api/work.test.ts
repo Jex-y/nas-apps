@@ -13,9 +13,10 @@ import {
   soldStcPage,
 } from "../../test/support";
 import type { FeatureExtractor } from "./extractor";
-import { SERVICE_CHARGE_REASON, SHARED_OWNERSHIP_REASON, SHORT_LEASE_REASON, TOO_SMALL_REASON } from "./ingest";
+import { SHARED_OWNERSHIP_REASON } from "./ingest";
 import type { JourneyPlanner } from "./places";
 import { fingerprint, QUESTIONS } from "./questions";
+import { DEFAULT_REQUIREMENTS, saveRequirements } from "./requirements";
 import { answers, commutes, listings, photos, properties, searches, snapshots } from "./schema";
 import { isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
 
@@ -70,8 +71,11 @@ describe("ingesting a search", () => {
     expect(sent).toEqual([]);
   });
 
-  const routinePoll = async (pages: Pages = defaultPages) => {
-    const polled = setup(pages);
+  const routinePoll = async (
+    pages: Pages = defaultPages,
+    extractor: FeatureExtractor | null = fakeExtractor().extractor,
+  ) => {
+    const polled = setup(pages, { extractor });
     const search = await addSearch();
     await db.update(searches).set({ lastSucceededAt: NOON }).where(eq(searches.id, search.id));
     await context.jobs.enqueue(polled.work.definitions.pollSearches, {});
@@ -101,6 +105,37 @@ describe("ingesting a search", () => {
     });
 
     expect((await propertyByPortalId("93524796")).property.status).toBe("rejected");
+    expect(sent).toEqual([]);
+  });
+
+  test("does not announce a new listing Jev rules out", async () => {
+    const { sent } = await routinePoll(defaultPages, fakeExtractor({ auction: { kind: "noul", yes: 0.95 } }).extractor);
+
+    expect((await propertyByPortalId("93524796")).property).toMatchObject({
+      status: "rejected",
+      rejectedReason: "Auction",
+    });
+    expect(sent).toEqual([]);
+  });
+
+  test("still announces new listings without TypeSafe", async () => {
+    const { sent } = await routinePoll(defaultPages, null);
+
+    expect(sent.map((notification) => notification.title)).toEqual(["New: Union Lane, Isleworth"]);
+  });
+
+  test("judges a new listing by the saved limits", async () => {
+    await saveRequirements(db, {
+      ...DEFAULT_REQUIREMENTS,
+      limits: { ...DEFAULT_REQUIREMENTS.limits, minSizeSqft: 700 },
+    });
+
+    const { sent } = await routinePoll();
+
+    expect((await propertyByPortalId("93524796")).property).toMatchObject({
+      status: "rejected",
+      rejectedReason: "Under 700 sq ft",
+    });
     expect(sent).toEqual([]);
   });
 
@@ -425,7 +460,7 @@ describe("size and service charge", () => {
   test("rejects an untriaged property under 650 sq ft", async () => {
     expect(await ingestUnionLane(sized(649))).toMatchObject({
       status: "rejected",
-      rejectedReason: TOO_SMALL_REASON,
+      rejectedReason: "Under 650 sq ft",
       sizeSqft: 649,
     });
   });
@@ -440,7 +475,7 @@ describe("size and service charge", () => {
 
     expect((await propertyByPortalId("128855633")).property).toMatchObject({
       status: "rejected",
-      rejectedReason: TOO_SMALL_REASON,
+      rejectedReason: "Under 650 sq ft",
       sizeSqft: 593,
     });
   });
@@ -448,7 +483,7 @@ describe("size and service charge", () => {
   test("rejects an untriaged property whose service charge is over £6,000", async () => {
     expect(await ingestUnionLane(charged(6000.01))).toMatchObject({
       status: "rejected",
-      rejectedReason: SERVICE_CHARGE_REASON,
+      rejectedReason: "Service charge over £6,000",
       annualServiceCharge: 6000.01,
     });
   });
@@ -456,7 +491,7 @@ describe("size and service charge", () => {
   test("rejects an untriaged property with under 90 years left on its lease", async () => {
     expect(await ingestUnionLane(leased(89))).toMatchObject({
       status: "rejected",
-      rejectedReason: SHORT_LEASE_REASON,
+      rejectedReason: "Lease under 90 years",
       leaseYearsRemaining: 89,
     });
   });
@@ -500,7 +535,7 @@ describe("reading listings with Jev", () => {
     expect(await answersFor(removed.property.id)).toEqual([]);
 
     const calls = asked.length;
-    await context.jobs.enqueue(work.definitions.readListing, { propertyId: union.property.id });
+    await context.jobs.enqueue(work.definitions.readListing, { propertyId: union.property.id, announce: false });
     await drain();
     expect(asked).toHaveLength(calls);
   });
@@ -511,9 +546,10 @@ describe("reading listings with Jev", () => {
       question.key === "lift" ? { ...question, instructions: `${question.instructions} Or an elevator?` } : question,
     );
     const again = fakeExtractor();
-    const { work, drain } = setup(defaultPages, { extractor: again.extractor, questions: reworded });
+    const { work, drain } = setup(defaultPages, { extractor: again.extractor });
 
-    await context.jobs.enqueue(work.definitions.sweepReadings, {});
+    await saveRequirements(db, { ...DEFAULT_REQUIREMENTS, questions: reworded });
+    await work.applyRequirements();
     await drain();
 
     expect(again.asked).toEqual([["lift"], ["lift"]]);
@@ -548,5 +584,27 @@ describe("reading listings with Jev", () => {
     await drain();
 
     expect(await answersFor(property.id)).toHaveLength(QUESTIONS.length);
+  });
+});
+
+describe("saving requirements", () => {
+  test("rejects untriaged properties the new limits rule out, leaving those being pursued", async () => {
+    const { work, drain } = setup();
+    await work.backfillSearch((await addSearch()).id, 1);
+    await drain();
+    const soldStc = await propertyByPortalId("128855633");
+    await db.update(properties).set({ status: "shortlisted" }).where(eq(properties.id, soldStc.property.id));
+
+    await saveRequirements(db, {
+      ...DEFAULT_REQUIREMENTS,
+      limits: { ...DEFAULT_REQUIREMENTS.limits, minSizeSqft: 700 },
+    });
+    await work.applyRequirements();
+
+    expect((await propertyByPortalId("93524796")).property).toMatchObject({
+      status: "rejected",
+      rejectedReason: "Under 700 sq ft",
+    });
+    expect((await propertyByPortalId("128855633")).property.status).toBe("shortlisted");
   });
 });

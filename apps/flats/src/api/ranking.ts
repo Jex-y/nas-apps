@@ -1,5 +1,5 @@
-import type { Commute, Contribution, Ranking } from "../contract";
-import { type Answer, exclusion, type Option, type Question } from "./questions";
+import type { Answer, Commute, Contribution, Option, Question, Ranking } from "../contract";
+import { exclusion } from "./questions";
 
 /** A commute up to this long costs nothing; each minute beyond it costs `POINTS_PER_EXTRA_MINUTE`. */
 const COMMUTE_TARGET_MINUTES = 40;
@@ -32,12 +32,11 @@ const fromAnswer = (question: Question, answer: Answer | undefined): Contributio
     return { label: question.label, detail: answer.yes >= 0.5 ? "Yes" : "No", points: question.points * answer.yes };
   }
   if (question.kind === "choice" && answer?.kind === "choice") {
-    const options = Object.entries(question.options);
     return {
       label: question.label,
       ...weigh(
-        options.map(([, option]) => option),
-        options.map(([key]) => answer.probabilities[key] ?? 0),
+        question.options,
+        question.options.map((option) => answer.probabilities[option.key] ?? 0),
       ),
     };
   }

@@ -5,7 +5,6 @@ import { createJevExtractor, type FeatureExtractor } from "./api/extractor";
 import { BROWSER_USER_AGENT, createHttpFetcher } from "./api/fetcher";
 import { createPostcodesIo, createTflPlanner, type Geocoder, type JourneyPlanner } from "./api/places";
 import { rightmove } from "./api/portals/rightmove";
-import { QUESTIONS } from "./api/questions";
 import { createFlatsRoutes } from "./api/routes";
 import { createFlatsWork } from "./api/work";
 import page from "./web/index.html";
@@ -42,7 +41,6 @@ export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = re
     parsers: { rightmove },
     planner: adapters.planner,
     extractor: adapters.extractor,
-    questions: QUESTIONS,
     publicUrl: context.publicUrl,
     now: () => new Date(),
   });
@@ -60,7 +58,7 @@ export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = re
         work,
         parsers,
         geocoder: adapters.geocoder,
-        questions: QUESTIONS,
+        extractor: adapters.extractor,
       }),
     }),
     jobs: work.jobs,

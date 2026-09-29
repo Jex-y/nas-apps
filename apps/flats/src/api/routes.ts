@@ -21,16 +21,23 @@ import {
   type PricePoint,
   type PropertyDetail,
   type PropertySummary,
+  type Question,
+  Requirements,
   type Search,
+  type Trial,
+  TrialRequest,
   UpdateNotes,
   UpdateSearch,
   UpdateStatus,
 } from "../contract";
 import type { FlatsDb } from "./db";
+import type { FeatureExtractor } from "./extractor";
+import { SHARED_OWNERSHIP_REASON } from "./ingest";
 import type { Geocoder } from "./places";
 import type { PortalParser } from "./portals/listing";
-import { currentAnswers, type Question } from "./questions";
+import { currentAnswers, type ListingState, listingState, unanswered } from "./questions";
 import { scoreProperty } from "./ranking";
+import { breach, loadRequirements, saveRequirements } from "./requirements";
 import {
   answers,
   commutes,
@@ -52,7 +59,8 @@ export type FlatsRoutesDeps = {
   readonly work: FlatsWork;
   readonly parsers: readonly PortalParser[];
   readonly geocoder: Geocoder;
-  readonly questions: readonly Question[];
+  /** `null` when no TypeSafe key is configured; drafts of the requirements then cannot be tried. */
+  readonly extractor: FeatureExtractor | null;
 };
 
 const API = "/flats/api";
@@ -72,7 +80,105 @@ export const collapseHistory = (points: readonly PricePoint[]): PricePoint[] =>
       index === 0 || point.price !== points[index - 1]?.price || point.availability !== points[index - 1]?.availability,
   );
 
-export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder, questions }: FlatsRoutesDeps) => {
+const pricePerSqft = (row: Pick<PropertyRow, "price" | "sizeSqft">): number | null =>
+  row.price !== null && row.sizeSqft ? row.price / row.sizeSqft : null;
+
+export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder, extractor }: FlatsRoutesDeps) => {
+  /** Everything a ranking reads besides the questions, for the properties `ids`. */
+  const rankingInputs = async (ids: readonly string[]) => {
+    const timed = await db
+      .select({
+        propertyId: commutes.propertyId,
+        destinationId: commutes.destinationId,
+        name: destinations.name,
+        minutes: commutes.minutes,
+      })
+      .from(commutes)
+      .innerJoin(destinations, eq(destinations.id, commutes.destinationId))
+      .where(inArray(commutes.propertyId, [...ids]))
+      .orderBy(asc(destinations.createdAt));
+    const stored = await db
+      .select({
+        propertyId: answers.propertyId,
+        questionKey: answers.questionKey,
+        fingerprint: answers.fingerprint,
+        answer: answers.answer,
+      })
+      .from(answers)
+      .where(inArray(answers.propertyId, [...ids]));
+    const [inbox] = await db
+      .select({
+        median: sql<
+          number | null
+        >`percentile_cont(0.5) within group (order by ${properties.price}::float8 / ${properties.sizeSqft})`,
+      })
+      .from(properties)
+      .where(
+        and(
+          eq(properties.status, "new"),
+          ne(properties.availability, "removed"),
+          isNotNull(properties.price),
+          gt(properties.sizeSqft, 0),
+        ),
+      );
+    return {
+      commutesOf: (propertyId: string): Commute[] =>
+        timed
+          .filter((commute) => commute.propertyId === propertyId)
+          .map(({ destinationId, name, minutes }) => ({ destinationId, name, minutes })),
+      storedAnswersOf: (propertyId: string) => stored.filter((answer) => answer.propertyId === propertyId),
+      medianPricePerSqft: inbox?.median ?? null,
+    };
+  };
+
+  /** Judges one property by a draft of the requirements; Jev is asked only what it has not answered in the same words. */
+  const trial = async ({ requirements: draft, propertyId }: TrialRequest, signal: AbortSignal): Promise<Trial> => {
+    const row = await requireProperty(propertyId);
+    const [advert] = await db
+      .select({ parsed: listings.parsed })
+      .from(listings)
+      .where(and(eq(listings.propertyId, row.id), isNotNull(listings.parsed)))
+      .orderBy(desc(listings.parsedAt))
+      .limit(1);
+    const parsed = advert?.parsed;
+    if (parsed == null) {
+      throw new HttpError(409, "That property's listing page has not been read yet");
+    }
+    const { commutesOf, storedAnswersOf, medianPricePerSqft } = await rankingInputs([row.id]);
+    const stored = storedAnswersOf(row.id);
+    const asking = unanswered(draft.questions, stored);
+    const fresh = asking.length === 0 ? new Map() : (await ask(listingState(parsed), asking, signal)).answers;
+    const answered = new Map([...currentAnswers(draft.questions, stored), ...fresh]);
+    return {
+      rejectedBy: row.sharedOwnership ? SHARED_OWNERSHIP_REASON : breach(row, draft.limits),
+      ranking: scoreProperty(draft.questions, {
+        answers: answered,
+        commutes: commutesOf(row.id),
+        pricePerSqft: pricePerSqft(row),
+        medianPricePerSqft,
+      }),
+      answers: draft.questions.map((question) => ({ key: question.key, answer: answered.get(question.key) ?? null })),
+      asked: asking.length,
+      listing: {
+        propertyType: parsed.propertyType,
+        keyFeatures: [...parsed.keyFeatures],
+        description: parsed.description,
+      },
+    };
+  };
+
+  /** Jev's answers for a trial, with its refusals shown to whoever is editing the questions. */
+  const ask = async (state: ListingState, questions: readonly Question[], signal: AbortSignal) => {
+    if (extractor === null) {
+      throw new HttpError(409, "Set TYPESAFE_API_KEY to try questions Jev has not answered yet");
+    }
+    try {
+      return await extractor.answer(state, questions, signal);
+    } catch (error) {
+      throw new HttpError(502, error instanceof Error ? error.message : String(error));
+    }
+  };
+
   const summaries = async (rows: readonly PropertyRow[]): Promise<PropertySummary[]> => {
     const ids = rows.map((row) => row.id);
     if (ids.length === 0) {
@@ -96,58 +202,14 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder,
       .where(and(inArray(listings.propertyId, ids), eq(photos.kind, "photo")))
       .orderBy(listings.propertyId, asc(photos.position));
     const coverOf = new Map(covers.map((cover) => [cover.propertyId, photoPath(cover.photoId)]));
-    const timed = await db
-      .select({
-        propertyId: commutes.propertyId,
-        destinationId: commutes.destinationId,
-        name: destinations.name,
-        minutes: commutes.minutes,
-      })
-      .from(commutes)
-      .innerJoin(destinations, eq(destinations.id, commutes.destinationId))
-      .where(inArray(commutes.propertyId, ids))
-      .orderBy(asc(destinations.createdAt));
-    const commutesOf = (propertyId: string): Commute[] =>
-      timed
-        .filter((commute) => commute.propertyId === propertyId)
-        .map(({ destinationId, name, minutes }) => ({
-          destinationId,
-          name,
-          minutes,
-        }));
-    const read = await db
-      .select({
-        propertyId: answers.propertyId,
-        questionKey: answers.questionKey,
-        fingerprint: answers.fingerprint,
-        answer: answers.answer,
-      })
-      .from(answers)
-      .where(inArray(answers.propertyId, ids));
-    const [inbox] = await db
-      .select({
-        median: sql<
-          number | null
-        >`percentile_cont(0.5) within group (order by ${properties.price}::float8 / ${properties.sizeSqft})`,
-      })
-      .from(properties)
-      .where(
-        and(
-          eq(properties.status, "new"),
-          ne(properties.availability, "removed"),
-          isNotNull(properties.price),
-          gt(properties.sizeSqft, 0),
-        ),
-      );
+    const { questions } = await loadRequirements(db);
+    const { commutesOf, storedAnswersOf, medianPricePerSqft } = await rankingInputs(ids);
     const rankingOf = (row: PropertyRow) =>
       scoreProperty(questions, {
-        answers: currentAnswers(
-          questions,
-          read.filter((answer) => answer.propertyId === row.id),
-        ),
+        answers: currentAnswers(questions, storedAnswersOf(row.id)),
         commutes: commutesOf(row.id),
-        pricePerSqft: row.price !== null && row.sizeSqft ? row.price / row.sizeSqft : null,
-        medianPricePerSqft: inbox?.median ?? null,
+        pricePerSqft: pricePerSqft(row),
+        medianPricePerSqft,
       });
 
     return rows.map((row) => ({
@@ -518,6 +580,25 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder,
           }
         }
         throw new HttpError(400, "That is not a listing URL from a supported portal");
+      },
+    },
+    "/flats/api/requirements": {
+      GET: async (request) => {
+        resolveViewer(identity, request);
+        return Response.json(await loadRequirements(db));
+      },
+      PUT: async (request) => {
+        resolveViewer(identity, request);
+        const document = await parseBody(request, Requirements);
+        await saveRequirements(db, document);
+        await work.applyRequirements();
+        return Response.json(document);
+      },
+    },
+    "/flats/api/requirements/trial": {
+      POST: async (request) => {
+        resolveViewer(identity, request);
+        return Response.json(await trial(await parseBody(request, TrialRequest), request.signal));
       },
     },
     "/flats/api/destinations": {

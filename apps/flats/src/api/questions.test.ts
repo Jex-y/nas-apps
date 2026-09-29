@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { currentAnswers, exclusion, fingerprint, QUESTIONS, type Question, unanswered } from "./questions";
+import type { Question } from "../contract";
+import { currentAnswers, exclusion, fingerprint, unanswered } from "./questions";
 
 const retirement: Question = {
   key: "retirement",
@@ -36,16 +37,4 @@ test("an exclusion rules a property out only when Jev is sure", () => {
   expect(exclusion([retirement, lift], saying(0.8))).toBeNull();
   expect(exclusion([retirement, lift], new Map())).toBeNull();
   expect(exclusion([lift], new Map([["lift", { kind: "noul" as const, yes: 1 }]]))).toBeNull();
-});
-
-test("the questions fit what Jev accepts", () => {
-  expect(new Set(QUESTIONS.map((question) => question.key)).size).toBe(QUESTIONS.length);
-  for (const question of QUESTIONS) {
-    if (question.kind === "choice") {
-      expect(Object.keys(question.options).length).toBeWithin(2, 256);
-    }
-    if (question.kind === "score") {
-      expect(question.levels.length).toBeWithin(2, 11);
-    }
-  }
 });

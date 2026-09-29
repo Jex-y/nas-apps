@@ -29,6 +29,13 @@
       "when": 1790713897803,
       "tag": "0003_read_listings_with_jev",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790714848290,
+      "tag": "0004_edit_requirements",
+      "breakpoints": true
     }
   ]
 }

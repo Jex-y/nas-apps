@@ -2,8 +2,18 @@ import { describe, expect, test } from "bun:test";
 import { startTestServer, uniqueLogin } from "@apps/core/testing";
 import { drizzle } from "drizzle-orm/bun-sql";
 import { createFlatsTestbed, fakeExtractor, fakeGeocoder, fakePlanner } from "../../test/support";
-import { Destination, DestinationList, PropertyDetail, PropertyList, Search, SearchList } from "../contract";
+import {
+  Destination,
+  DestinationList,
+  PropertyDetail,
+  PropertyList,
+  Requirements,
+  Search,
+  SearchList,
+  Trial,
+} from "../contract";
 import { createFlatsApp } from "../module";
+import { DEFAULT_REQUIREMENTS } from "./requirements";
 import { collapseHistory } from "./routes";
 
 const { context, setup, addSearch, propertyByPortalId } = createFlatsTestbed();
@@ -313,5 +323,75 @@ describe("destinations", () => {
 
     expect(await context.sql`select 1 from flats.commutes`).toHaveLength(0);
     expect((await request(`/flats/api/destinations/${created.id}`, { as: me, method: "DELETE" })).status).toBe(404);
+  });
+});
+
+describe("requirements", () => {
+  const tightened = { ...DEFAULT_REQUIREMENTS, limits: { ...DEFAULT_REQUIREMENTS.limits, minSizeSqft: 700 } };
+
+  test("start as the defaults, and save as a new document", async () => {
+    expect(Requirements.parse(await (await request("/flats/api/requirements", { as: me })).json())).toEqual(
+      DEFAULT_REQUIREMENTS,
+    );
+
+    const saved = await request("/flats/api/requirements", { as: me, method: "PUT", ...json(tightened) });
+
+    expect(saved.status).toBe(200);
+    expect(Requirements.parse(await (await request("/flats/api/requirements", { as: me })).json())).toEqual(tightened);
+  });
+
+  test("refuse a document with a misspelt field", async () => {
+    const [first, ...rest] = DEFAULT_REQUIREMENTS.questions;
+    const misspelt = { ...DEFAULT_REQUIREMENTS, questions: [{ ...first, pionts: 1 }, ...rest] };
+
+    expect((await request("/flats/api/requirements", { as: me, method: "PUT", ...json(misspelt) })).status).toBe(400);
+  });
+
+  test("saving rejects the untriaged flats the new limits rule out", async () => {
+    await seed();
+
+    await request("/flats/api/requirements", { as: me, method: "PUT", ...json(tightened) });
+
+    expect((await propertyByPortalId("93524796")).property).toMatchObject({
+      status: "rejected",
+      rejectedReason: "Under 700 sq ft",
+    });
+  });
+
+  describe("trying a draft on a flat", () => {
+    const tryOn = async (requirements: Requirements) => {
+      const { property } = await propertyByPortalId("93524796");
+      const response = await request("/flats/api/requirements/trial", {
+        as: me,
+        method: "POST",
+        ...json({ requirements, propertyId: property.id }),
+      });
+      return Trial.parse(await response.json());
+    };
+
+    test("reuses answers to unchanged questions, and asks only the reworded ones", async () => {
+      await seed();
+
+      const unchanged = await tryOn(DEFAULT_REQUIREMENTS);
+      expect(unchanged.asked).toBe(0);
+      expect(unchanged.rejectedBy).toBeNull();
+      expect(unchanged.answers).toHaveLength(DEFAULT_REQUIREMENTS.questions.length);
+      expect(unchanged.listing.keyFeatures).toContain("Private balcony");
+
+      const reworded = await tryOn({
+        ...DEFAULT_REQUIREMENTS,
+        questions: DEFAULT_REQUIREMENTS.questions.map((question, index) =>
+          index === 0 ? { ...question, instructions: `${question.instructions} Really?` } : question,
+        ),
+      });
+      expect(reworded.asked).toBe(1);
+    });
+
+    test("says which limit the draft's facts break, without saving it", async () => {
+      await seed();
+
+      expect((await tryOn(tightened)).rejectedBy).toBe("Under 700 sq ft");
+      expect((await propertyByPortalId("93524796")).property.status).toBe("new");
+    });
   });
 });

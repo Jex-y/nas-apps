@@ -1,22 +1,12 @@
 import { and, eq, sql } from "drizzle-orm";
+import type { Limits } from "../contract";
 import type { FlatsDb } from "./db";
 import type { Availability, ParsedListing, SearchHit } from "./portals/listing";
+import { breach } from "./requirements";
 import { listings, properties, snapshots } from "./schema";
 
 /** Why a property the portal marks as shared ownership was rejected without being triaged. */
 export const SHARED_OWNERSHIP_REASON = "Shared ownership";
-
-/** The smallest floor area worth viewing. */
-const MIN_SIZE_SQFT = 650;
-export const TOO_SMALL_REASON = `Under ${MIN_SIZE_SQFT} sq ft`;
-
-/** The largest annual service charge worth paying. */
-const MAX_ANNUAL_SERVICE_CHARGE = 6000;
-export const SERVICE_CHARGE_REASON = `Service charge over £${MAX_ANNUAL_SERVICE_CHARGE.toLocaleString("en-GB")}`;
-
-/** The shortest lease worth viewing; below it, extending costs too much. */
-const MIN_LEASE_YEARS = 90;
-export const SHORT_LEASE_REASON = `Lease under ${MIN_LEASE_YEARS} years`;
 
 /** What a portal now says that differs from what we last recorded. */
 export type ListingChange = {
@@ -148,33 +138,19 @@ export const propertyFacts = (parsed: ParsedListing) => ({
 });
 
 /** Why a property's facts rule it out before triage, or `null`; a fact the listing doesn't state rules nothing out. */
-const disqualification = (facts: ReturnType<typeof propertyFacts>): string | null => {
-  if (facts.sharedOwnership) {
-    return SHARED_OWNERSHIP_REASON;
-  }
-  if (facts.sizeSqft !== null && facts.sizeSqft < MIN_SIZE_SQFT) {
-    return TOO_SMALL_REASON;
-  }
-  if (facts.annualServiceCharge !== null && facts.annualServiceCharge > MAX_ANNUAL_SERVICE_CHARGE) {
-    return SERVICE_CHARGE_REASON;
-  }
-  if (facts.leaseYearsRemaining !== null && facts.leaseYearsRemaining < MIN_LEASE_YEARS) {
-    return SHORT_LEASE_REASON;
-  }
-  return null;
-};
+const disqualification = (facts: ReturnType<typeof propertyFacts>, limits: Limits): string | null =>
+  facts.sharedOwnership ? SHARED_OWNERSHIP_REASON : breach(facts, limits);
 
 /**
  * Records a freshly parsed listing page (whose raw copy is already stored at `pageKey`) and brings the property's
  * facts up to date; returns what changed since the last observation. A page whose facts disqualify the property
- * (shared ownership, too small, too high a service charge, too short a lease) rejects it unless it has already been
- * triaged.
+ * (shared ownership, or breaking one of `limits`) rejects it unless it has already been triaged.
  */
 export const recordListingPage = (
   db: FlatsDb,
   listingId: string,
   observed:
-    | { readonly kind: "page"; readonly parsed: ParsedListing; readonly pageKey: string }
+    | { readonly kind: "page"; readonly parsed: ParsedListing; readonly pageKey: string; readonly limits: Limits }
     | { readonly kind: "gone" },
 ): Promise<ListingChange | null> =>
   db.transaction(async (tx) => {
@@ -217,7 +193,7 @@ export const recordListingPage = (
       .update(properties)
       .set({ ...(facts ?? { availability: "removed" }), updatedAt: sql`now()` })
       .where(eq(properties.id, known.propertyId));
-    const rejectedReason = facts === null ? null : disqualification(facts);
+    const rejectedReason = observed.kind === "page" && facts !== null ? disqualification(facts, observed.limits) : null;
     if (rejectedReason !== null) {
       await tx
         .update(properties)
