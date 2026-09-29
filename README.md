@@ -95,6 +95,20 @@ in short:
 The Shortcut cannot read Health while the iPhone is locked, so a run then fails and the next one with the phone
 unlocked catches up. The pet only warns about missing data after 36 hours without any.
 
+## Tasks
+
+`apps/tasks` is a to-do list whose tasks form a dependency graph, shared by everyone on the tailnet and grouped into
+projects. Each project has three views of the same tasks:
+
+- **List**: the graph as stages, each task waiting only on tasks in earlier stages, with a checkbox to finish it.
+- **Board**: To do, Doing and Done columns. Cards drag between and within columns; on touch each card has a menu.
+- **Timeline**: a Gantt chart of the critical-path schedule, from each task's duration, its "not before" date and
+  what it waits on, with arrows for dependencies, the critical path in red, due dates and today marked.
+
+The API refuses any dependency that would close a cycle or reach into another project, and only lets a task leave
+To do once everything it waits on is done (and a done task reopen only while nothing that waits on it has started).
+The graph and schedule logic in `src/plan.ts` is pure and shared by the server and the UI.
+
 ## Deploy
 
 Every push to `main` runs lint, typecheck, the migration check and the tests. It then builds
