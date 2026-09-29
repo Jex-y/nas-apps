@@ -614,3 +614,99 @@ main:has(.swipe) {
   color: var(--accent);
   font-weight: 600;
 }
+
+.playground {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 900px) {
+  .playground {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .editor-pane {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+.json-editor {
+  height: 70vh;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.problems {
+  list-style: none;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.sample select {
+  max-width: 100%;
+}
+
+.trial {
+  transition: opacity 0.15s;
+}
+
+.trial.stale {
+  opacity: 0.55;
+}
+
+.verdict {
+  font-weight: 600;
+}
+
+.verdict.rejected {
+  color: var(--error);
+}
+
+.question-results,
+.bars {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.question-result {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.bar {
+  display: grid;
+  grid-template-columns: minmax(6rem, 10rem) 1fr 3rem;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.bar.likeliest {
+  font-weight: 600;
+}
+
+.bar-track {
+  height: 0.5rem;
+  background: var(--surface-2);
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--border-strong);
+}
+
+.bar.likeliest .bar-fill {
+  background: var(--accent);
+}
+
+.bar-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

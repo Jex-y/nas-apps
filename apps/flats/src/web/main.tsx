@@ -10,6 +10,7 @@ import { InboxPage } from "./features/properties/components/InboxPage";
 import { PropertyPage } from "./features/properties/components/PropertyPage";
 import { RejectedPage } from "./features/properties/components/RejectedPage";
 import { SwipePage } from "./features/properties/components/SwipePage";
+import { RequirementsPage } from "./features/requirements/components/RequirementsPage";
 import { SearchesPage } from "./features/searches/components/SearchesPage";
 import { queryClient } from "./lib/query-client";
 
@@ -32,6 +33,7 @@ createRoot(root).render(
             <Route path="/rejected" component={RejectedPage} />
             <Route path="/searches" component={SearchesPage} />
             <Route path="/commutes" component={DestinationsPage} />
+            <Route path="/requirements" component={RequirementsPage} />
             <Route path="/properties/:id">{(params) => <PropertyPage id={params.id} />}</Route>
             <Route>
               <p className="muted">Nothing here.</p>
