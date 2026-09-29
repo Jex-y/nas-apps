@@ -49,7 +49,8 @@ things only once no deployed code reads them.
 
 All the apps are one installable web app scoped to `/`: open `https://apps.tail12605.ts.net/` in Safari, Share →
 Add to Home Screen, then open it from the Home Screen and turn notifications on. iOS only offers Web Push to an
-installed app. An app sends with `context.notifier("<slug>").send(...)`, which reaches every subscribed device.
+installed app. An app sends with `context.notifier("<slug>").send(...)`, which reaches every subscribed device, or
+`context.notifier("<slug>", login)` to reach only that person's.
 
 ## Store files
 
@@ -69,6 +70,20 @@ before its blob, so a failure leaves at worst an unreferenced blob, never a row 
    `server/src/apps.ts`, then `bun install`.
 
 The server refuses to start if two apps share a slug or an app declares a route outside `/<slug>/`.
+
+## Tasks
+
+`apps/tasks` is a to-do list whose tasks form a dependency graph, shared by everyone on the tailnet and grouped into
+projects. Each project has three views of the same tasks:
+
+- **List**: the graph as stages, each task waiting only on tasks in earlier stages, with a checkbox to finish it.
+- **Board**: To do, Doing and Done columns. Cards drag between and within columns; on touch each card has a menu.
+- **Timeline**: a Gantt chart of the critical-path schedule, from each task's duration, its "not before" date and
+  what it waits on, with arrows for dependencies, the critical path in red, due dates and today marked.
+
+The API refuses any dependency that would close a cycle or reach into another project, and only lets a task leave
+To do once everything it waits on is done (and a done task reopen only while nothing that waits on it has started).
+The graph and schedule logic in `src/plan.ts` is pure and shared by the server and the UI.
 
 ## Deploy
 
