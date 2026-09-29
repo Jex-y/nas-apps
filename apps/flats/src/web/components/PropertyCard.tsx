@@ -1,15 +1,18 @@
 import type { ReactNode } from "react";
 import { Link } from "wouter";
 import type { PropertySummary } from "../../contract";
-import { AVAILABILITY_LABELS, formatCommutes, formatDate, formatPrice, keyFacts } from "../utils/format";
+import { AVAILABILITY_LABELS, formatCommutes, formatDate, formatPoints, formatPrice, keyFacts } from "../utils/format";
 
 export const Warnings = ({ property }: { property: PropertySummary }) => {
-  const warnings = [
+  const flagged = [
     AVAILABILITY_LABELS[property.availability],
     property.sharedOwnership ? "Shared ownership" : null,
     property.auction ? "Auction" : null,
     property.leaseYearsRemaining !== null && property.leaseYearsRemaining < 90 ? "Short lease" : null,
+    property.ranking.kind === "excluded" ? property.ranking.reason : null,
   ].filter((warning): warning is string => warning !== null);
+  // Jev and the portal can both flag an auction.
+  const warnings = [...new Set(flagged)];
   return warnings.length === 0 ? null : (
     <ul className="badges">
       {warnings.map((warning) => (
@@ -39,7 +42,14 @@ export const PropertyCard = ({
         <Link href={`/properties/${property.id}`}>
           <h2>{formatPrice(property.price, property.priceQualifier)}</h2>
         </Link>
-        <span className="muted">{formatDate(property.firstSeenAt)}</span>
+        <span className="muted">
+          {property.ranking.kind === "scored" && (
+            <span className="score" title="Score">
+              {formatPoints(property.ranking.total)}
+            </span>
+          )}{" "}
+          {formatDate(property.firstSeenAt)}
+        </span>
       </div>
       <p className="address">
         {property.address}

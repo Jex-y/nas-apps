@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { PropertyCard } from "../../../components/PropertyCard";
-import { useProperties, useUpdateStatus } from "../api/properties";
+import { useInbox, useUpdateStatus } from "../api/properties";
 import { isTyping } from "../utils/keyboard";
 import { RejectForm } from "./RejectForm";
 
 /** New listings to triage: j/k to move, s to shortlist, x to reject, r to reject with a reason, o to open. */
 export const InboxPage = () => {
-  const properties = useProperties("new");
+  const properties = useInbox();
   const updateStatus = useUpdateStatus();
   const [, navigate] = useLocation();
   const [cursor, setCursor] = useState(0);

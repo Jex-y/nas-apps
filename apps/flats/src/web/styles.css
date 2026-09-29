@@ -246,6 +246,7 @@ main {
 .history,
 .stations,
 .commutes,
+.contributions,
 .searches,
 .destinations,
 .viewings {
@@ -595,4 +596,21 @@ main:has(.swipe) {
     color: var(--accent);
     font-weight: 600;
   }
+}
+
+.contributions li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.points,
+.score {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.score {
+  color: var(--accent);
+  font-weight: 600;
 }

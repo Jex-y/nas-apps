@@ -23,6 +23,18 @@ export const Commute = z.object({
 });
 export type Commute = z.infer<typeof Commute>;
 
+/** One reason a property scores as it does, e.g. `{ label: "Outdoor space", detail: "Balcony", points: 1.8 }`. */
+export const Contribution = z.object({ label: z.string(), detail: z.string(), points: z.number() });
+export type Contribution = z.infer<typeof Contribution>;
+
+export const Ranking = z.discriminatedUnion("kind", [
+  /** Jev is sure the listing rules the property out, e.g. a retirement flat. */
+  z.object({ kind: z.literal("excluded"), reason: z.string() }),
+  /** Higher is better; contributions run from the largest effect to the smallest. */
+  z.object({ kind: z.literal("scored"), total: z.number(), contributions: z.array(Contribution) }),
+]);
+export type Ranking = z.infer<typeof Ranking>;
+
 export const PropertySummary = z.object({
   id: z.uuid(),
   status: z.enum(PROPERTY_STATUSES),
@@ -48,6 +60,7 @@ export const PropertySummary = z.object({
   listings: z.array(z.object({ portal: z.enum(PORTALS), url: z.url() })),
   /** Only the places already timed; the rest are still being computed. */
   commutes: z.array(Commute),
+  ranking: Ranking,
 });
 export type PropertySummary = z.infer<typeof PropertySummary>;
 

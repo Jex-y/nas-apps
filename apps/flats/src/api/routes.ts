@@ -7,7 +7,7 @@ import {
   parseParam,
   resolveViewer,
 } from "@apps/core";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   AddListing,
@@ -29,7 +29,10 @@ import {
 import type { FlatsDb } from "./db";
 import type { Geocoder } from "./places";
 import type { PortalParser } from "./portals/listing";
+import { currentAnswers, type Question } from "./questions";
+import { scoreProperty } from "./ranking";
 import {
+  answers,
   commutes,
   destinations,
   listings,
@@ -49,6 +52,7 @@ export type FlatsRoutesDeps = {
   readonly work: FlatsWork;
   readonly parsers: readonly PortalParser[];
   readonly geocoder: Geocoder;
+  readonly questions: readonly Question[];
 };
 
 const API = "/flats/api";
@@ -68,7 +72,7 @@ export const collapseHistory = (points: readonly PricePoint[]): PricePoint[] =>
       index === 0 || point.price !== points[index - 1]?.price || point.availability !== points[index - 1]?.availability,
   );
 
-export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder }: FlatsRoutesDeps) => {
+export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder, questions }: FlatsRoutesDeps) => {
   const summaries = async (rows: readonly PropertyRow[]): Promise<PropertySummary[]> => {
     const ids = rows.map((row) => row.id);
     if (ids.length === 0) {
@@ -111,6 +115,40 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder 
           name,
           minutes,
         }));
+    const read = await db
+      .select({
+        propertyId: answers.propertyId,
+        questionKey: answers.questionKey,
+        fingerprint: answers.fingerprint,
+        answer: answers.answer,
+      })
+      .from(answers)
+      .where(inArray(answers.propertyId, ids));
+    const [inbox] = await db
+      .select({
+        median: sql<
+          number | null
+        >`percentile_cont(0.5) within group (order by ${properties.price}::float8 / ${properties.sizeSqft})`,
+      })
+      .from(properties)
+      .where(
+        and(
+          eq(properties.status, "new"),
+          ne(properties.availability, "removed"),
+          isNotNull(properties.price),
+          gt(properties.sizeSqft, 0),
+        ),
+      );
+    const rankingOf = (row: PropertyRow) =>
+      scoreProperty(questions, {
+        answers: currentAnswers(
+          questions,
+          read.filter((answer) => answer.propertyId === row.id),
+        ),
+        commutes: commutesOf(row.id),
+        pricePerSqft: row.price !== null && row.sizeSqft ? row.price / row.sizeSqft : null,
+        medianPricePerSqft: inbox?.median ?? null,
+      });
 
     return rows.map((row) => ({
       id: row.id,
@@ -135,6 +173,7 @@ export const createFlatsRoutes = ({ db, blob, identity, work, parsers, geocoder 
       firstSeenAt: row.firstSeenAt.toISOString(),
       listings: adverts.filter((advert) => advert.propertyId === row.id).map(({ portal, url }) => ({ portal, url })),
       commutes: commutesOf(row.id),
+      ranking: rankingOf(row),
     }));
   };
 

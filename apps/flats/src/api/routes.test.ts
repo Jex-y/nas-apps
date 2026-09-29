@@ -61,6 +61,21 @@ describe("properties", () => {
     expect(photo.headers.get("Location")).toContain("X-Amz-Signature");
   });
 
+  test("ranks each property by what Jev read and its price per sq ft against the inbox", async () => {
+    await seed();
+
+    const list = PropertyList.parse(await (await request("/flats/api/properties?status=new", { as: me })).json());
+
+    const union = list.find((property) => property.address === "Union Lane, Isleworth");
+    expect(union?.ranking).toMatchObject({
+      kind: "scored",
+      contributions: expect.arrayContaining([
+        { label: "Outdoor space", detail: "Private garden", points: 3 },
+        expect.objectContaining({ label: "Price per sq ft", detail: expect.stringContaining("the inbox median") }),
+      ]),
+    });
+  });
+
   test("rejects an unknown status filter", async () => {
     expect((await request("/flats/api/properties?status=maybe", { as: me })).status).toBe(404);
   });
