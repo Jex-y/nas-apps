@@ -1,6 +1,9 @@
 @import "./fonts.css";
 @import "./themes/glass.css";
 @import "./themes/drafting.css";
+@import "./themes/blueprint.css";
+@import "./themes/tracing.css";
+@import "./themes/dot-grid.css";
 @import "./themes/command.css";
 
 /*

@@ -1,0 +1,88 @@
+/*
+ * Blueprint: ink rules on gridded drafting film, square corners, IBM Plex Sans Condensed with Plex Mono labels set
+ * small, upper case and tracked. Dark is a blueprint: the same drawing in pale ink on navy.
+ */
+[data-theme="blueprint"] {
+  color-scheme: light dark;
+  --bg: #f2f5f9;
+  --ground:
+    linear-gradient(oklch(0.5 0.1 250 / 0.12) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, oklch(0.5 0.1 250 / 0.12) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(oklch(0.5 0.1 250 / 0.055) 1px, transparent 1px) 0 0 / 8px 8px,
+    linear-gradient(90deg, oklch(0.5 0.1 250 / 0.055) 1px, transparent 1px) 0 0 / 8px 8px;
+  --surface: #ffffff;
+  --surface-2: #f6f8fb;
+  --surface-raised: var(--surface);
+  --chrome: var(--surface);
+  --chrome-blur: none;
+  --fg: #0f2747;
+  --on-fg: #ffffff;
+  --muted: #5a6f8c;
+  --border: #d5deea;
+  --edge: var(--fg);
+  --border-strong: var(--fg);
+  --accent: oklch(0.5 0.13 var(--hue));
+  --on-accent: #ffffff;
+  --accent-2: #0d8a5a;
+  --pink: #c2418f;
+  --warning-bg: #fbeebf;
+  --warning-fg: #6f5200;
+  --error: #c8323f;
+  --success: #0d8a5a;
+  --shadow: none;
+  --shadow-raised: 6px 6px 0 rgb(15 39 71 / 0.12);
+  --radius: 0;
+  --radius-small: 0;
+  --radius-control: 0;
+  --font-body: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --figure-font: var(--font-mono);
+  --heading-tracking: -0.015em;
+  --label-font: var(--font-mono);
+  --label-case: uppercase;
+  --label-tracking: 0.08em;
+  --label-size: 0.6875rem;
+  --label-size-small: 0.625rem;
+  --label-weight: 500;
+  --control-font: var(--font-mono);
+  --control-case: uppercase;
+  --control-tracking: 0.08em;
+  --control-size: 0.6875rem;
+  --control-weight: 500;
+  --control-bg: var(--surface);
+  --control-edge: var(--edge);
+  --control-hover-bg: var(--fg);
+  --control-hover-fg: var(--on-fg);
+  --primary-bg: var(--fg);
+  --primary-fg: var(--on-fg);
+  --primary-hover-bg: var(--accent);
+  --primary-hover-fg: var(--on-accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="blueprint"] {
+    --bg: #0a2240;
+    --ground:
+      linear-gradient(rgb(190 215 245 / 0.09) 1px, transparent 1px) 0 0 / 64px 64px,
+      linear-gradient(90deg, rgb(190 215 245 / 0.09) 1px, transparent 1px) 0 0 / 64px 64px,
+      linear-gradient(rgb(190 215 245 / 0.04) 1px, transparent 1px) 0 0 / 8px 8px,
+      linear-gradient(90deg, rgb(190 215 245 / 0.04) 1px, transparent 1px) 0 0 / 8px 8px;
+    --surface: #0d2a4d;
+    --surface-2: #0b2546;
+    --fg: #e6effa;
+    --on-fg: #0a2240;
+    --muted: #8fa8c8;
+    --border: rgb(230 239 250 / 0.14);
+    --edge: rgb(230 239 250 / 0.6);
+    --border-strong: var(--fg);
+    --accent: oklch(0.82 0.1 var(--hue));
+    --on-accent: #0a2240;
+    --accent-2: #4fd49a;
+    --pink: #f08cc8;
+    --warning-bg: rgb(250 204 21 / 0.14);
+    --warning-fg: #f5cf4a;
+    --error: #ff8190;
+    --success: #4fd49a;
+    --shadow-raised: 6px 6px 0 rgb(0 0 0 / 0.3);
+  }
+}

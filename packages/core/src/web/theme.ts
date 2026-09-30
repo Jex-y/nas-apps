@@ -1,6 +1,9 @@
 export const THEMES = [
   { id: "glass", name: "Glass", description: "Frosted panes over soft colour, rounded and light." },
-  { id: "drafting", name: "Drafting", description: "Ink rules on grid paper, square corners, a blueprint at night." },
+  { id: "drafting", name: "Drafting", description: "Graphite ink rules on plain grey, square corners, one accent." },
+  { id: "blueprint", name: "Blueprint", description: "Ink rules on grid paper, square corners, a blueprint at night." },
+  { id: "tracing", name: "Tracing", description: "Graphite on warm tracing paper, square corners, charcoal at night." },
+  { id: "dot-grid", name: "Dot grid", description: "Warm tracing paper with a faint dot grid." },
   { id: "command", name: "Command", description: "Dark and dense, whatever your device is set to." },
 ] as const;
 

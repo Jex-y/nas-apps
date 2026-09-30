@@ -1,8 +1,7 @@
 /*
- * Drafting: ink rules in neutral graphite on a plain grey ground, square corners, IBM Plex Sans Condensed with Plex
- * Mono labels set small, upper case and tracked. The accent is the only hue.
+ * Dot grid: Tracing with a faint dot grid on the ground, like a bullet-journal page.
  */
-[data-theme="drafting"] {
+[data-theme="dot-grid"] {
   color-scheme: light dark;
   --surface-raised: var(--surface);
   --chrome: var(--surface);
@@ -35,45 +34,45 @@
   --primary-fg: var(--on-fg);
   --primary-hover-bg: var(--accent);
   --primary-hover-fg: var(--on-accent);
-  --bg: #ececec;
-  --surface: #ffffff;
-  --surface-2: #f5f5f5;
-  --fg: #141414;
-  --on-fg: #ffffff;
-  --muted: #676767;
-  --border: #d8d8d8;
+  --bg: #f3f0e8;
+  --surface: #fdfcf8;
+  --surface-2: #f1ede4;
+  --fg: #1f1d1a;
+  --on-fg: #fdfcf8;
+  --muted: #6d675d;
+  --border: #ddd6c8;
   --edge: var(--fg);
   --accent: oklch(0.5 0.12 var(--hue));
   --on-accent: #ffffff;
-  --accent-2: #1f8a55;
-  --pink: #c2418f;
-  --warning-bg: #fbeebf;
-  --warning-fg: #6f5200;
-  --error: #c8323f;
-  --success: #1f8a55;
-  --shadow-raised: 6px 6px 0 rgb(0 0 0 / 0.1);
-  --ground: none;
+  --accent-2: #2f7d4f;
+  --pink: #b84a86;
+  --warning-bg: #f6e7b8;
+  --warning-fg: #6a4e00;
+  --error: #b8392f;
+  --success: #2f7d4f;
+  --shadow-raised: 6px 6px 0 rgb(31 29 26 / 0.12);
+  --ground: radial-gradient(circle, rgb(31 29 26 / 0.16) 1px, transparent 1.3px) 0 0 / 18px 18px;
 }
 
 @media (prefers-color-scheme: dark) {
-  [data-theme="drafting"] {
-    --bg: #121212;
-    --surface: #1b1b1b;
-    --surface-2: #171717;
-    --fg: #ececec;
-    --on-fg: #121212;
-    --muted: #999999;
-    --border: rgb(255 255 255 / 0.12);
-    --edge: rgb(255 255 255 / 0.55);
+  [data-theme="dot-grid"] {
+    --bg: #1b1a17;
+    --surface: #23221e;
+    --surface-2: #1f1e1b;
+    --fg: #eee8dd;
+    --on-fg: #1b1a17;
+    --muted: #a39b8d;
+    --border: rgb(238 232 221 / 0.13);
+    --edge: rgb(238 232 221 / 0.6);
     --accent: oklch(0.8 0.1 var(--hue));
-    --on-accent: #121212;
-    --accent-2: #4fd49a;
-    --pink: #f08cc8;
-    --warning-bg: rgb(250 204 21 / 0.14);
-    --warning-fg: #f5cf4a;
-    --error: #ff8190;
-    --success: #4fd49a;
-    --shadow-raised: 6px 6px 0 rgb(0 0 0 / 0.4);
-    --ground: none;
+    --on-accent: #1b1a17;
+    --accent-2: #7cc79a;
+    --pink: #e38cbd;
+    --warning-bg: rgb(245 200 80 / 0.13);
+    --warning-fg: #edc96a;
+    --error: #f08a7e;
+    --success: #7cc79a;
+    --shadow-raised: 6px 6px 0 rgb(0 0 0 / 0.35);
+    --ground: radial-gradient(circle, rgb(238 232 221 / 0.1) 1px, transparent 1.3px) 0 0 / 18px 18px;
   }
 }
