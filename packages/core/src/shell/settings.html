@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Settings</title>
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem("theme")??"glass"}catch{}</script>
     <link rel="stylesheet" href="./shell.css" />
   </head>
   <body>
@@ -12,6 +13,11 @@
         <a href="/" class="back">‹ Apps</a>
         <h1>Settings</h1>
       </header>
+      <section class="card theme-settings" aria-labelledby="theme-heading">
+        <h2 id="theme-heading">Theme</h2>
+        <p class="muted">Every app follows it. It is saved on this device.</p>
+        <div id="themes" class="themes" role="radiogroup" aria-labelledby="theme-heading"></div>
+      </section>
       <section id="push" class="card push" aria-labelledby="push-heading" hidden>
         <h2 id="push-heading">Notifications</h2>
         <p id="push-status" class="muted"></p>
@@ -22,6 +28,30 @@
         </div>
       </section>
     </main>
+    <template id="theme-option">
+      <label class="theme-option">
+        <input type="radio" name="theme" class="visually-hidden" />
+        <span class="theme-preview" aria-hidden="true">
+          <span class="preview-chrome">
+            <span class="preview-label current">Inbox</span>
+            <span class="preview-label">Board</span>
+            <span class="preview-label">Status</span>
+          </span>
+          <span class="preview-card">
+            <span class="preview-price">£525,000</span>
+            <span class="preview-meta">Chatsworth Road · 2 bed</span>
+            <span class="preview-actions">
+              <span class="preview-button">Reject</span>
+              <span class="preview-button primary">Shortlist</span>
+            </span>
+          </span>
+        </span>
+        <span class="theme-text">
+          <span class="theme-name"></span>
+          <span class="theme-description muted"></span>
+        </span>
+      </label>
+    </template>
     <script type="module" src="./settings.ts"></script>
   </body>
 </html>

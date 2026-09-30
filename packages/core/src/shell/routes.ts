@@ -22,7 +22,8 @@ export type ShellOptions = {
 /** Reserved so no app's routes can collide with the shell's. */
 export const SHELL_SLUG = "shell";
 
-const THEME_COLOR = "#e3e9e8";
+/** The default theme's light ground; the manifest is fixed, so the pages set their own colour once they load. */
+const THEME_COLOR = "#e4e8ee";
 
 const manifest = {
   name: "Apps",

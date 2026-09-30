@@ -124,7 +124,7 @@ main {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  border-radius: var(--radius-small);
+  border-radius: max(0px, calc(var(--radius) - 0.75rem));
   background: var(--border);
   display: block;
 }
@@ -135,12 +135,24 @@ main {
   align-items: baseline;
 }
 
+.card-heading h2 {
+  margin: 0;
+}
+
+.card-heading .muted {
+  white-space: nowrap;
+}
+
 .card-heading a {
   text-decoration: none;
 }
 
 .address {
   margin: 0.25rem 0;
+}
+
+.address .muted {
+  white-space: nowrap;
 }
 
 .facts {
@@ -150,7 +162,7 @@ main {
 
 .facts,
 .facts-table dd {
-  font-family: var(--font-mono);
+  font-family: var(--figure-font);
 }
 
 .facts,
@@ -332,7 +344,7 @@ main:has(.swipe) {
 
 .swipe-card {
   position: relative;
-  background: var(--surface);
+  background: var(--surface-raised);
   border: 1px solid var(--edge);
   border-radius: calc(var(--radius) * 1.5);
   overflow: hidden;
@@ -614,7 +626,7 @@ main:has(.swipe) {
 
 .points,
 .score {
-  font-family: var(--font-mono);
+  font-family: var(--figure-font);
   font-variant-numeric: tabular-nums;
 }
 
@@ -701,12 +713,15 @@ main:has(.swipe) {
 
 .bar-track {
   height: 0.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-control);
   background: var(--surface-2);
 }
 
 .bar-fill {
   display: block;
   height: 100%;
+  border-radius: var(--radius-control);
   background: var(--border-strong);
 }
 
@@ -715,7 +730,7 @@ main:has(.swipe) {
 }
 
 .bar-value {
-  font-family: var(--font-mono);
+  font-family: var(--figure-font);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }

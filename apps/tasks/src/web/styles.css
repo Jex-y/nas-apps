@@ -430,7 +430,7 @@ h2 > .muted {
 
 .gantt-chart {
   display: block;
-  font-family: var(--font-mono);
+  font-family: var(--figure-font);
   font-size: 0.625rem;
 }
 

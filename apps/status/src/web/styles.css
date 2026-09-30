@@ -35,9 +35,17 @@ p {
 }
 
 code,
+pre {
+  font-family: var(--font-mono);
+}
+
+.figure {
+  font-family: var(--figure-font);
+}
+
+code,
 pre,
 .figure {
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
