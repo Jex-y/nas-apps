@@ -20,6 +20,15 @@ export const parseBody = async <S extends z.ZodType>(request: Request, schema: S
   return result.data;
 };
 
+/** The query string, as `schema` reads it; a bad one is the client's mistake, so a 400. */
+export const parseQuery = <S extends z.ZodType>(request: Request, schema: S): z.infer<S> => {
+  const result = schema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if (!result.success) {
+    throw new HttpError(400, z.prettifyError(result.error));
+  }
+  return result.data;
+};
+
 export const parseParam = <S extends z.ZodType>(value: string, schema: S): z.infer<S> => {
   const result = schema.safeParse(value);
   if (!result.success) {
