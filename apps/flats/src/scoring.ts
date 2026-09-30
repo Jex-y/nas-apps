@@ -174,12 +174,15 @@ export const fingerprintInBrowser = async (question: Question): Promise<string> 
 export const matchingAnswers = (
   fingerprints: ReadonlyMap<string, string>,
   stored: readonly StoredAnswer[],
-): ReadonlyMap<string, Answer> =>
-  new Map(
-    stored
-      .filter((row) => fingerprints.get(row.questionKey) === row.fingerprint)
-      .map((row) => [row.questionKey, row.answer]),
+): ReadonlyMap<string, Answer> => {
+  const byWording = new Map(stored.map((row) => [row.fingerprint, row.answer]));
+  return new Map(
+    [...fingerprints].flatMap(([key, fingerprint]) => {
+      const answer = byWording.get(fingerprint);
+      return answer === undefined ? [] : [[key, answer] as const];
+    }),
   );
+};
 
 /** Why the answers rule the property out, or `null`; an unanswered exclusion rules nothing out. */
 export const exclusion = (questions: readonly Question[], answers: ReadonlyMap<string, Answer>): string | null => {

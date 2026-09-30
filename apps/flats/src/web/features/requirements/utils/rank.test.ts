@@ -24,7 +24,6 @@ const version = (document: Requirements): Version => ({
 });
 
 const said = (question: Question, yes: number): StoredAnswer => ({
-  questionKey: question.key,
   fingerprint: fingerprint(question),
   answer: { kind: "noul", yes },
 });

@@ -19,6 +19,7 @@ import {
   type Question,
   type Requirements,
   type Search,
+  type StoredAnswer,
   type Trial,
   type TrialRequest,
   type UpdateStatus,
@@ -32,9 +33,9 @@ import { SHARED_OWNERSHIP_REASON } from "./ingest";
 import type { Geocoder } from "./places";
 import type { Portal, PortalParser } from "./portals/listing";
 import { currentAnswers, type ListingState, listingState, unanswered } from "./questions";
+import { latestTexts, readingsOf, recordReadings } from "./readings";
 import { loadRequirements, saveRequirements } from "./requirements";
 import {
-  answers,
   commutes,
   crime,
   crimeReports,
@@ -102,15 +103,11 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       .innerJoin(destinations, eq(destinations.id, commutes.destinationId))
       .where(inArray(commutes.propertyId, [...ids]))
       .orderBy(asc(destinations.createdAt));
-    const stored = await db
-      .select({
-        propertyId: answers.propertyId,
-        questionKey: answers.questionKey,
-        fingerprint: answers.fingerprint,
-        answer: answers.answer,
-      })
-      .from(answers)
-      .where(inArray(answers.propertyId, [...ids]));
+    const texts = await latestTexts(db, ids);
+    const read = await readingsOf(
+      db,
+      [...texts.values()].map((text) => text.fingerprint),
+    );
     const counted = await db
       .select()
       .from(crime)
@@ -135,7 +132,12 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
         timed
           .filter((commute) => commute.propertyId === propertyId)
           .map(({ destinationId, name, minutes }) => ({ destinationId, name, minutes })),
-      storedAnswersOf: (propertyId: string) => stored.filter((answer) => answer.propertyId === propertyId),
+      /** The listing text Jev reads for the property; `undefined` until one of its pages has been read. */
+      textOf: (propertyId: string) => texts.get(propertyId),
+      storedAnswersOf: (propertyId: string): readonly StoredAnswer[] => {
+        const text = texts.get(propertyId);
+        return text === undefined ? [] : (read.get(text.fingerprint) ?? []);
+      },
       crimeOf: (propertyId: string): CrimeSummary | null => {
         const row = counted.find((candidate) => candidate.propertyId === propertyId);
         if (row === undefined) {
@@ -149,24 +151,25 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
     };
   };
 
-  /** Judges one property by a draft of the requirements; Jev is asked only what it has not answered in the same words. */
+  /**
+   * Judges one property by a draft of the requirements. Jev is asked only what it has not answered in the same words
+   * about the same text, and its answers are kept, so saving the draft or trying it again asks nothing.
+   */
   const trial = async ({ requirements: draft, propertyId }: TrialRequest, signal: AbortSignal): Promise<Trial> => {
     const row = await requireProperty(propertyId);
-    const [advert] = await db
-      .select({ parsed: listings.parsed })
-      .from(listings)
-      .where(and(eq(listings.propertyId, row.id), isNotNull(listings.parsed)))
-      .orderBy(desc(listings.parsedAt))
-      .limit(1);
-    const parsed = advert?.parsed;
-    if (parsed == null) {
+    const { textOf, commutesOf, storedAnswersOf, crimeOf, medianPricePerSqft } = await rankingInputs([row.id]);
+    const text = textOf(row.id);
+    if (text === undefined) {
       throw new HttpError(409, "That property's listing page has not been read yet");
     }
-    const { commutesOf, storedAnswersOf, crimeOf, medianPricePerSqft } = await rankingInputs([row.id]);
+    const { parsed } = text;
     const stored = storedAnswersOf(row.id);
     const asking = unanswered(draft.questions, stored);
-    const fresh = asking.length === 0 ? new Map() : (await ask(listingState(parsed), asking, signal)).answers;
-    const answered = new Map([...currentAnswers(draft.questions, stored), ...fresh]);
+    const fresh =
+      asking.length === 0
+        ? []
+        : await recordReadings(db, text, asking, await ask(listingState(parsed), asking, signal));
+    const answered = currentAnswers(draft.questions, [...stored, ...fresh]);
     return {
       rejectedBy: row.sharedOwnership ? SHARED_OWNERSHIP_REASON : breach(row, draft.limits),
       ranking: scoreProperty(draft, {
@@ -269,24 +272,14 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       .orderBy(desc(properties.firstSeenAt));
     const ids = rows.map((row) => row.id);
     const inputs = await rankingInputs(ids);
-    const read =
-      ids.length === 0
-        ? []
-        : await db
-            .selectDistinct({ propertyId: listings.propertyId })
-            .from(listings)
-            .where(and(inArray(listings.propertyId, ids), isNotNull(listings.parsed)));
-    const readable = new Set(read.map(({ propertyId }) => propertyId));
     const summarised = await summaries(rows, inputs);
     return {
       medianPricePerSqft: inputs.medianPricePerSqft,
       properties: summarised.map((summary, index) => ({
         ...summary,
         rejectedReason: rows[index]?.rejectedReason ?? null,
-        answers: inputs
-          .storedAnswersOf(summary.id)
-          .map(({ questionKey, fingerprint, answer }) => ({ questionKey, fingerprint, answer })),
-        readable: readable.has(summary.id),
+        answers: [...inputs.storedAnswersOf(summary.id)],
+        readable: inputs.textOf(summary.id) !== undefined,
       })),
     };
   };

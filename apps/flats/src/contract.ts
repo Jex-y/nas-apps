@@ -192,7 +192,8 @@ export const Answer = z.discriminatedUnion("kind", [
 export type Answer = z.infer<typeof Answer>;
 
 /** Jev's answer to a question as it was worded when asked, identified by `fingerprint` (see questions.ts). */
-export const StoredAnswer = z.object({ questionKey: z.string(), fingerprint: z.string(), answer: Answer });
+/** Jev's answer to a question worded as `fingerprint` says, about a property's current listing text. */
+export const StoredAnswer = z.object({ fingerprint: z.string(), answer: Answer });
 export type StoredAnswer = z.infer<typeof StoredAnswer>;
 
 /**

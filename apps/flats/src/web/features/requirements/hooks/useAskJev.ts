@@ -11,8 +11,8 @@ export type Asking =
   | { readonly kind: "failed"; readonly message: string };
 
 /**
- * Asks Jev about a draft's new wordings, flat by flat, keeping its answers for this session by property id. Nothing is
- * saved: saving the requirements asks Jev again for the flats still in play.
+ * Asks Jev about a draft's new wordings, flat by flat, holding its answers by property id until the workbench is next
+ * fetched. The server keeps every answer too, so nothing asked here is asked again.
  */
 export const useAskJev = () => {
   const [asked, setAsked] = useState<ReadonlyMap<string, readonly StoredAnswer[]>>(new Map());
@@ -43,7 +43,7 @@ export const useAskJev = () => {
         const trial = await tryOn(requirements, propertyId, current.signal);
         const answers = trial.answers.flatMap(({ key, answer }) => {
           const fingerprint = fingerprints.get(key);
-          return answer === null || fingerprint === undefined ? [] : [{ questionKey: key, fingerprint, answer }];
+          return answer === null || fingerprint === undefined ? [] : [{ fingerprint, answer }];
         });
         setAsked((previous) => new Map(previous).set(propertyId, [...(previous.get(propertyId) ?? []), ...answers]));
         done += 1;

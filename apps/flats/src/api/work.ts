@@ -20,10 +20,10 @@ import type { Fetcher } from "./fetcher";
 import { hitFromListing, type ListingChange, recordListingPage, recordSearchHit } from "./ingest";
 import { type Coordinates, type JourneyPlanner, nextTuesday } from "./places";
 import { type ParsedListing, ParseError, PORTALS, type Portal, type PortalParser } from "./portals/listing";
-import { currentAnswers, fingerprint, listingState, unanswered } from "./questions";
+import { currentAnswers, listingState, unanswered } from "./questions";
+import { latestTexts, readingsOf, recordReadings } from "./readings";
 import { loadRequirements } from "./requirements";
 import {
-  answers,
   commutes,
   crime,
   crimeReports,
@@ -326,58 +326,31 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
   });
 
-  /** Asks Jev whatever the current questions have no answer for, and rejects the property if it is now excluded. */
+  /**
+   * Asks Jev whatever the current questions have no answer for in the listing's current text, and rejects the property
+   * if it is now excluded. A page whose text changed is a new text, so it is read afresh.
+   */
   const read = async (propertyId: string, signal: AbortSignal) => {
     const extractor = deps.extractor;
     if (extractor === null) {
       return;
     }
-    const { questions } = await loadRequirements(db);
-    const [advert] = await db
-      .select({ parsed: listings.parsed })
-      .from(listings)
-      .innerJoin(properties, eq(properties.id, listings.propertyId))
-      .where(and(eq(listings.propertyId, propertyId), isNotNull(listings.parsed), inPlay))
-      .orderBy(desc(listings.parsedAt))
-      .limit(1);
-    if (advert?.parsed == null) {
+    const [playing] = await db
+      .select({ id: properties.id })
+      .from(properties)
+      .where(and(eq(properties.id, propertyId), inPlay));
+    const text = playing === undefined ? undefined : (await latestTexts(db, [propertyId])).get(propertyId);
+    if (text === undefined) {
       return;
     }
-    const stored = await db
-      .select({ questionKey: answers.questionKey, fingerprint: answers.fingerprint, answer: answers.answer })
-      .from(answers)
-      .where(eq(answers.propertyId, propertyId));
+    const { questions } = await loadRequirements(db);
+    const stored = (await readingsOf(db, [text.fingerprint])).get(text.fingerprint) ?? [];
     const asking = unanswered(questions, stored);
     if (asking.length === 0) {
       return;
     }
-    const extraction = await extractor.answer(listingState(advert.parsed), asking, signal);
-    const fresh = asking.flatMap((question) => {
-      const answer = extraction.answers.get(question.key);
-      return answer === undefined
-        ? []
-        : [
-            {
-              propertyId,
-              questionKey: question.key,
-              fingerprint: fingerprint(question),
-              answer,
-              model: extraction.model,
-            },
-          ];
-    });
-    await db
-      .insert(answers)
-      .values(fresh)
-      .onConflictDoUpdate({
-        target: [answers.propertyId, answers.questionKey],
-        set: {
-          fingerprint: sql`excluded.fingerprint`,
-          answer: sql`excluded.answer`,
-          model: sql`excluded.model`,
-          extractedAt: sql`now()`,
-        },
-      });
+    const extraction = await extractor.answer(listingState(text.parsed), asking, signal);
+    const fresh = await recordReadings(db, text, asking, extraction);
     const rejectedReason = exclusion(questions, currentAnswers(questions, [...stored, ...fresh]));
     if (rejectedReason !== null) {
       await db

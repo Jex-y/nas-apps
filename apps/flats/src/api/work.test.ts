@@ -19,8 +19,9 @@ import type { FeatureExtractor } from "./extractor";
 import { SHARED_OWNERSHIP_REASON } from "./ingest";
 import type { JourneyPlanner } from "./places";
 import { fingerprint, QUESTIONS } from "./questions";
+import { latestTexts } from "./readings";
 import { DEFAULT_REQUIREMENTS, saveRequirements } from "./requirements";
-import { answers, commutes, crime, crimeReports, listings, photos, properties, searches, snapshots } from "./schema";
+import { commutes, crime, crimeReports, listings, photos, properties, readings, searches, snapshots } from "./schema";
 import { isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
 
 const { context, db, blob, setup, addSearch, addDestination, propertyByPortalId } = createFlatsTestbed();
@@ -563,11 +564,16 @@ describe("reading listings with Jev", () => {
     return seeded;
   };
 
-  const answersFor = (propertyId: string) =>
-    db
-      .select({ questionKey: answers.questionKey, fingerprint: answers.fingerprint, model: answers.model })
-      .from(answers)
-      .where(eq(answers.propertyId, propertyId));
+  /** What Jev has answered about the property's current listing text. */
+  const answersFor = async (propertyId: string) => {
+    const text = (await latestTexts(db, [propertyId])).get(propertyId);
+    return text === undefined
+      ? []
+      : db
+          .select({ fingerprint: readings.questionFingerprint, model: readings.model })
+          .from(readings)
+          .where(eq(readings.textFingerprint, text.fingerprint));
+  };
 
   test("asks every question about each property still in play, once", async () => {
     const { extractor, asked } = fakeExtractor();
@@ -575,13 +581,7 @@ describe("reading listings with Jev", () => {
 
     const union = await propertyByPortalId("93524796");
     expect(await answersFor(union.property.id)).toEqual(
-      expect.arrayContaining(
-        QUESTIONS.map((question) => ({
-          questionKey: question.key,
-          fingerprint: fingerprint(question),
-          model: "jev-fake",
-        })),
-      ),
+      expect.arrayContaining(QUESTIONS.map((question) => ({ fingerprint: fingerprint(question), model: "jev-fake" }))),
     );
     expect(await answersFor(union.property.id)).toHaveLength(QUESTIONS.length);
     const removed = await propertyByPortalId("93631518");
@@ -591,6 +591,30 @@ describe("reading listings with Jev", () => {
     await context.jobs.enqueue(work.definitions.readListing, { propertyId: union.property.id, announce: false });
     await drain();
     expect(asked).toHaveLength(calls);
+  });
+
+  test("reads a listing again, in full, once its text changes", async () => {
+    await seed(fakeExtractor().extractor);
+    const union = await propertyByPortalId("93524796");
+    const [page] = await db
+      .select({ id: listings.id, parsed: listings.parsed })
+      .from(listings)
+      .where(eq(listings.propertyId, union.property.id));
+    if (page?.parsed == null) {
+      throw new Error("Union Lane was never parsed");
+    }
+    await db
+      .update(listings)
+      .set({ parsed: { ...page.parsed, description: `${page.parsed.description} Now with a roof terrace.` } })
+      .where(eq(listings.id, page.id));
+
+    const again = fakeExtractor();
+    const rerun = setup(defaultPages, { extractor: again.extractor });
+    await context.jobs.enqueue(rerun.work.definitions.readListing, { propertyId: union.property.id, announce: false });
+    await rerun.drain();
+
+    expect(again.asked).toEqual([QUESTIONS.map((question) => question.key)]);
+    expect(await answersFor(union.property.id)).toHaveLength(QUESTIONS.length);
   });
 
   test("asks a reworded question again, and only that one", async () => {
@@ -612,7 +636,7 @@ describe("reading listings with Jev", () => {
     await seed(fakeExtractor().extractor);
     const soldStc = await propertyByPortalId("128855633");
     await db.update(properties).set({ status: "shortlisted" }).where(eq(properties.id, soldStc.property.id));
-    await db.delete(answers);
+    await db.delete(readings);
 
     const retirement = fakeExtractor({ retirement: { kind: "noul", yes: 0.97 } });
     const { work, drain } = setup(defaultPages, { extractor: retirement.extractor });

@@ -107,6 +107,13 @@ export const listings = flatsSchema.table(
     /** The last parsed listing page; `null` until the page has been fetched once. */
     parsed: jsonb<ParsedListing>("parsed"),
     parsedAt: timestamp("parsed_at", { withTimezone: true }),
+    /**
+     * Identifies the text Jev reads, `listingState` in questions.ts: a page that changes it gets read again. `null`
+     * until the page has been fetched once.
+     */
+    textFingerprint: text("text_fingerprint").generatedAlwaysAs(
+      sql`md5((parsed -> 'propertyType')::text || (parsed -> 'keyFeatures')::text || (parsed -> 'description')::text)`,
+    ),
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -248,21 +255,22 @@ export const commutes = flatsSchema.table(
   (table) => [primaryKey({ columns: [table.propertyId, table.destinationId] })],
 );
 
-/** What Jev read from a property's listing text, one row per question. */
-export const answers = flatsSchema.table(
-  "answers",
+/**
+ * Jev's answer to one wording of a question about one listing text, whichever property or draft asked it: rewording a
+ * question or changing a listing's text asks again, and anything asked before is never asked twice.
+ */
+export const readings = flatsSchema.table(
+  "readings",
   {
-    propertyId: uuid("property_id")
-      .notNull()
-      .references(() => properties.id, { onDelete: "cascade" }),
-    questionKey: text("question_key").notNull(),
-    /** The wording answered; an answer to an older wording is stale and gets asked again. */
-    fingerprint: text("fingerprint").notNull(),
+    /** `listings.textFingerprint` of the text read. */
+    textFingerprint: text("text_fingerprint").notNull(),
+    /** `fingerprint` in questions.ts of the wording answered. */
+    questionFingerprint: text("question_fingerprint").notNull(),
     answer: jsonb<Answer>("answer").notNull(),
     model: text("model").notNull(),
-    extractedAt: timestamp("extracted_at", { withTimezone: true }).notNull().defaultNow(),
+    readAt: timestamp("read_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.propertyId, table.questionKey] })],
+  (table) => [primaryKey({ columns: [table.textFingerprint, table.questionFingerprint] })],
 );
 
 /** The one saved `Requirements` document; until it is first saved, the defaults in code apply. */

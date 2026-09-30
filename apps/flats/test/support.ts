@@ -222,7 +222,7 @@ export const createFlatsTestbed = () => {
   };
 
   beforeEach(async () => {
-    await context.sql`truncate flats.searches, flats.properties, flats.destinations, flats.requirements, flats.crime_reports, flats.crime_tiles cascade`;
+    await context.sql`truncate flats.searches, flats.properties, flats.destinations, flats.requirements, flats.crime_reports, flats.crime_tiles, flats.readings cascade`;
     await context.sql`delete from jobs.jobs where name like 'flats.%'`;
   });
 

@@ -17,6 +17,7 @@ import {
   Workbench,
 } from "../contract";
 import { createFlatsApp } from "../module";
+import { fingerprint } from "./questions";
 import { DEFAULT_REQUIREMENTS } from "./requirements";
 import { collapseHistory } from "./service";
 
@@ -425,8 +426,8 @@ describe("requirements", () => {
     expect(workbench.medianPricePerSqft).toBeGreaterThan(0);
     const union = workbench.properties.find((property) => property.address === "Union Lane, Isleworth");
     expect(union).toMatchObject({ readable: true, rejectedReason: null, sizeSqft: expect.any(Number) });
-    expect(union?.answers.map((answer) => answer.questionKey).sort()).toEqual(
-      DEFAULT_REQUIREMENTS.questions.map((question) => question.key).sort(),
+    expect(union?.answers.map((answer) => answer.fingerprint).sort()).toEqual(
+      DEFAULT_REQUIREMENTS.questions.map(fingerprint).sort(),
     );
   });
 
@@ -441,7 +442,7 @@ describe("requirements", () => {
       return Trial.parse(await response.json());
     };
 
-    test("reuses answers to unchanged questions, and asks only the reworded ones", async () => {
+    test("reuses answers to unchanged questions, and asks only the reworded ones, once", async () => {
       await seed();
 
       const unchanged = await tryOn(DEFAULT_REQUIREMENTS);
@@ -450,13 +451,15 @@ describe("requirements", () => {
       expect(unchanged.answers).toHaveLength(DEFAULT_REQUIREMENTS.questions.length);
       expect(unchanged.listing.keyFeatures).toContain("Private balcony");
 
-      const reworded = await tryOn({
+      const rewording = {
         ...DEFAULT_REQUIREMENTS,
         questions: DEFAULT_REQUIREMENTS.questions.map((question, index) =>
           index === 0 ? { ...question, instructions: `${question.instructions} Really?` } : question,
         ),
-      });
+      };
+      const reworded = await tryOn(rewording);
       expect(reworded.asked).toBe(1);
+      expect((await tryOn(rewording)).asked).toBe(0);
     });
 
     test("says which limit the draft's facts break, without saving it", async () => {
