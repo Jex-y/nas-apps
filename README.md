@@ -41,6 +41,11 @@ bun run typecheck
 bun test             # against the real test database and Garage
 ```
 
+To see a UI change everywhere at once, `bun scripts/ui-harness/shoot.ts` screenshots every page in each theme,
+colour scheme and viewport into a contact sheet; its options are in the file's header. It serves this checkout's UI
+with data read from the deployed stack over the tailnet, forwarding only GET and HEAD, and needs Playwright's Chromium
+once: `bunx playwright-core install chromium`.
+
 Adding an app, changing a schema, sending notifications and storing files: see
 [`packages/core/README.md`](packages/core/README.md).
 
