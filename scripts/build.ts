@@ -14,8 +14,6 @@ const result = await Bun.build({
   outdir,
   target: "bun",
   minify: true,
-  // Lets a page load a heavy library, such as the map, only when it is opened.
-  splitting: true,
   sourcemap: "linked",
   publicPath: "/",
   define: { "process.env.NODE_ENV": JSON.stringify("production") },
