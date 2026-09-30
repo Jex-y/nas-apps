@@ -11,6 +11,7 @@ import {
   Search,
   SearchList,
   Trial,
+  Workbench,
 } from "../contract";
 import { createFlatsApp } from "../module";
 import { DEFAULT_REQUIREMENTS } from "./requirements";
@@ -360,6 +361,19 @@ describe("requirements", () => {
       status: "rejected",
       rejectedReason: "Under 700 sq ft",
     });
+  });
+
+  test("hand the editor every listed property with the answers Jev gave, to rank drafts in the browser", async () => {
+    await seed();
+
+    const workbench = Workbench.parse(await (await request("/flats/api/requirements/workbench", { as: me })).json());
+
+    expect(workbench.medianPricePerSqft).toBeGreaterThan(0);
+    const union = workbench.properties.find((property) => property.address === "Union Lane, Isleworth");
+    expect(union).toMatchObject({ readable: true, rejectedReason: null, sizeSqft: expect.any(Number) });
+    expect(union?.answers.map((answer) => answer.questionKey).sort()).toEqual(
+      DEFAULT_REQUIREMENTS.questions.map((question) => question.key).sort(),
+    );
   });
 
   describe("trying a draft on a flat", () => {

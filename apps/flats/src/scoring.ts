@@ -9,6 +9,7 @@ import {
   type Option,
   type Question,
   type Ranking,
+  type StoredAnswer,
 } from "./contract";
 
 /** The structured facts a property may state; `null` where its listing does not. */
@@ -146,6 +147,31 @@ export const prompt = (question: Question): Prompt => {
       };
   }
 };
+
+/** The exact text a question's wording is fingerprinted by, so the server and the browser agree. */
+export const promptText = (question: Question): string => JSON.stringify(prompt(question));
+
+export const FINGERPRINT_LENGTH = 16;
+
+/** `fingerprint` in questions.ts, for the browser, where Web Crypto hashes only asynchronously. */
+export const fingerprintInBrowser = async (question: Question): Promise<string> => {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(promptText(question)));
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, FINGERPRINT_LENGTH);
+};
+
+/** The stored answers to questions worded as `fingerprints` says, by question key. */
+export const matchingAnswers = (
+  fingerprints: ReadonlyMap<string, string>,
+  stored: readonly StoredAnswer[],
+): ReadonlyMap<string, Answer> =>
+  new Map(
+    stored
+      .filter((row) => fingerprints.get(row.questionKey) === row.fingerprint)
+      .map((row) => [row.questionKey, row.answer]),
+  );
 
 /** Why the answers rule the property out, or `null`; an unanswered exclusion rules nothing out. */
 export const exclusion = (questions: readonly Question[], answers: ReadonlyMap<string, Answer>): string | null => {

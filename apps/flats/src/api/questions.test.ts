@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Question } from "../contract";
+import { fingerprintInBrowser } from "../scoring";
 import { currentAnswers, fingerprint, unanswered } from "./questions";
 
 const retirement: Question = {
@@ -12,6 +13,12 @@ const retirement: Question = {
 const lift: Question = { key: "lift", kind: "feature", label: "Lift", points: 1, instructions: "Is there a lift?" };
 
 describe("fingerprints", () => {
+  test("are the same when the browser takes them, so it can match a draft's wording to stored answers", async () => {
+    for (const question of [retirement, lift, { ...lift, criteria: { yes: "A lift", no: "No lift" } }]) {
+      expect(await fingerprintInBrowser(question)).toBe(fingerprint(question));
+    }
+  });
+
   test("change when the wording does, not the labels or points", () => {
     expect(fingerprint({ ...lift, label: "Has a lift", points: 3 })).toBe(fingerprint(lift));
     expect(fingerprint({ ...lift, instructions: "Does the building have a lift?" })).not.toBe(fingerprint(lift));

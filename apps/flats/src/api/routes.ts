@@ -112,6 +112,9 @@ export const createFlatsRoutes = ({ service, identity }: FlatsRoutesDeps) => {
         Response.json(await service.addListing((await parseBody(request, AddListing)).url), { status: 202 }),
       ),
     },
+    "/flats/api/requirements/workbench": {
+      GET: viewer(async () => Response.json(await service.workbench())),
+    },
     "/flats/api/requirements": {
       GET: viewer(async () => Response.json(await service.requirements())),
       PUT: viewer(async (request) =>

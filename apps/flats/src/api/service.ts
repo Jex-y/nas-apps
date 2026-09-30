@@ -18,6 +18,7 @@ import {
   type Trial,
   type TrialRequest,
   type UpdateStatus,
+  type Workbench,
 } from "../contract";
 import { breach, scoreProperty } from "../scoring";
 import type { FlatsDb } from "./db";
@@ -172,7 +173,9 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
     }
   };
 
-  const summaries = async (rows: readonly PropertyRow[]): Promise<PropertySummary[]> => {
+  type RankingInputs = Awaited<ReturnType<typeof rankingInputs>>;
+
+  const summaries = async (rows: readonly PropertyRow[], inputs?: RankingInputs): Promise<PropertySummary[]> => {
     const ids = rows.map((row) => row.id);
     if (ids.length === 0) {
       return [];
@@ -196,7 +199,7 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       .orderBy(listings.propertyId, asc(photos.position));
     const coverOf = new Map(covers.map((cover) => [cover.propertyId, photoPath(cover.photoId)]));
     const saved = await loadRequirements(db);
-    const { commutesOf, storedAnswersOf, medianPricePerSqft } = await rankingInputs(ids);
+    const { commutesOf, storedAnswersOf, medianPricePerSqft } = inputs ?? (await rankingInputs(ids));
     const rankingOf = (row: PropertyRow) =>
       scoreProperty(saved, {
         answers: currentAnswers(saved.questions, storedAnswersOf(row.id)),
@@ -230,6 +233,37 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       commutes: commutesOf(row.id),
       ranking: rankingOf(row),
     }));
+  };
+
+  /** Every property still listed, with Jev's stored answers, for the editor to rank by a draft in the browser. */
+  const workbench = async (): Promise<Workbench> => {
+    const rows = await db
+      .select()
+      .from(properties)
+      .where(ne(properties.availability, "removed"))
+      .orderBy(desc(properties.firstSeenAt));
+    const ids = rows.map((row) => row.id);
+    const inputs = await rankingInputs(ids);
+    const read =
+      ids.length === 0
+        ? []
+        : await db
+            .selectDistinct({ propertyId: listings.propertyId })
+            .from(listings)
+            .where(and(inArray(listings.propertyId, ids), isNotNull(listings.parsed)));
+    const readable = new Set(read.map(({ propertyId }) => propertyId));
+    const summarised = await summaries(rows, inputs);
+    return {
+      medianPricePerSqft: inputs.medianPricePerSqft,
+      properties: summarised.map((summary, index) => ({
+        ...summary,
+        rejectedReason: rows[index]?.rejectedReason ?? null,
+        answers: inputs
+          .storedAnswersOf(summary.id)
+          .map(({ questionKey, fingerprint, answer }) => ({ questionKey, fingerprint, answer })),
+        readable: readable.has(summary.id),
+      })),
+    };
   };
 
   const requireProperty = async (id: string): Promise<PropertyRow> => {
@@ -552,6 +586,8 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
     },
 
     trial,
+
+    workbench,
 
     destinations: async (): Promise<Destination[]> =>
       (await db.select().from(destinations).orderBy(asc(destinations.createdAt))).map(toDestination),

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { Answer, Question } from "../contract";
-import { prompt } from "../scoring";
+import type { Answer, Question, StoredAnswer } from "../contract";
+import { FINGERPRINT_LENGTH, matchingAnswers, promptText } from "../scoring";
 import type { ParsedListing } from "./portals/listing";
 
 /** The listing text a question is answered from; instructions name its fields in backticks. */
@@ -21,25 +21,14 @@ export const listingState = (parsed: ParsedListing): ListingState => ({
  * re-asks it everywhere, while changing its labels or points does not.
  */
 export const fingerprint = (question: Question): string =>
-  createHash("sha256")
-    .update(JSON.stringify(prompt(question)))
-    .digest("hex")
-    .slice(0, 16);
-
-export type StoredAnswer = { readonly questionKey: string; readonly fingerprint: string; readonly answer: Answer };
+  createHash("sha256").update(promptText(question)).digest("hex").slice(0, FINGERPRINT_LENGTH);
 
 /** The stored answers to the questions as currently worded, by question key. */
 export const currentAnswers = (
   questions: readonly Question[],
   stored: readonly StoredAnswer[],
-): ReadonlyMap<string, Answer> => {
-  const current = new Map(questions.map((question) => [question.key, fingerprint(question)]));
-  return new Map(
-    stored
-      .filter((row) => current.get(row.questionKey) === row.fingerprint)
-      .map((row) => [row.questionKey, row.answer]),
-  );
-};
+): ReadonlyMap<string, Answer> =>
+  matchingAnswers(new Map(questions.map((question) => [question.key, fingerprint(question)])), stored);
 
 export const unanswered = (questions: readonly Question[], stored: readonly StoredAnswer[]): Question[] => {
   const answered = currentAnswers(questions, stored);

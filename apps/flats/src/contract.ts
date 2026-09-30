@@ -27,27 +27,46 @@ export type Commute = z.infer<typeof Commute>;
 const Key = z.string().regex(/^[a-z][a-z0-9_]*$/, "Use lower_snake_case");
 const Text = z.string().trim().min(1);
 
-export const Option = z.strictObject({ label: Text, description: Text, points: z.number() });
+export const Option = z.strictObject({
+  label: Text.describe("The answer's name in the app"),
+  description: Text.describe("What this answer means, as Jev reads it; rewording it asks Jev again"),
+  points: z.number().describe("Points this answer adds to a score, in proportion to how sure Jev is"),
+});
 export type Option = z.infer<typeof Option>;
 
-export const ChoiceOption = z.strictObject({ key: Key, ...Option.shape });
+export const ChoiceOption = z.strictObject({
+  key: Key.describe("The option's stable id, sent to Jev; changing it asks Jev again"),
+  ...Option.shape,
+});
 export type ChoiceOption = z.infer<typeof ChoiceOption>;
 
-const questionBase = { key: Key, label: Text, instructions: Text };
+const questionBase = {
+  key: Key.describe("The question's stable id; changing it discards Jev's answers"),
+  label: Text.describe("The question's name in the app"),
+  instructions: Text.describe(
+    "What Jev is asked. Name the listing fields it reads in backticks: `description`, `key_features`, `property_type`",
+  ),
+};
 
 /** How a question is asked and what its answer is worth to the ranking. Strict, so a misspelt field is an error. */
 export const Question = z.discriminatedUnion("kind", [
-  /** Rules the property out when Jev is sure the answer is yes. */
-  z.strictObject({ ...questionBase, kind: z.literal("exclusion"), reason: Text }),
   z.strictObject({
     ...questionBase,
-    kind: z.literal("feature"),
-    points: z.number(),
-    criteria: z.strictObject({ yes: Text, no: Text }).optional(),
+    kind: z.literal("exclusion").describe("Rules a flat out when Jev is more than 80% sure the answer is yes"),
+    reason: Text.describe("Why the flat was ruled out, as shown in the app"),
   }),
   z.strictObject({
     ...questionBase,
-    kind: z.literal("choice"),
+    kind: z.literal("feature").describe("A yes or no question that adds points when the answer is yes"),
+    points: z.number().describe("Points a yes adds, in proportion to how sure Jev is"),
+    criteria: z
+      .strictObject({ yes: Text, no: Text })
+      .optional()
+      .describe("What counts as yes and as no, when the question alone is ambiguous"),
+  }),
+  z.strictObject({
+    ...questionBase,
+    kind: z.literal("choice").describe("Jev picks the one option that fits best"),
     /** A list, not a map: Postgres reorders a jsonb object's keys, which would change the question's wording. */
     options: z
       .array(ChoiceOption)
@@ -55,10 +74,14 @@ export const Question = z.discriminatedUnion("kind", [
       .max(255)
       .refine((options) => new Set(options.map((option) => option.key)).size === options.length, {
         message: "Option keys must be unique",
-      }),
+      })
+      .describe("The answers Jev chooses between"),
   }),
-  /** Levels run from worst to best. */
-  z.strictObject({ ...questionBase, kind: z.literal("score"), levels: z.array(Option).min(2).max(10) }),
+  z.strictObject({
+    ...questionBase,
+    kind: z.literal("score").describe("Jev places the flat on a scale of levels"),
+    levels: z.array(Option).min(2).max(10).describe("The scale, from worst to best"),
+  }),
 ]);
 export type Question = z.infer<typeof Question>;
 
@@ -67,9 +90,23 @@ export const EXCLUSION_THRESHOLD = 0.8;
 
 /** Facts a listing states that rule a property out; `null` turns a limit off. */
 export const Limits = z.strictObject({
-  minSizeSqft: z.number().int().positive().nullable(),
-  maxAnnualServiceCharge: z.number().nonnegative().nullable(),
-  minLeaseYears: z.number().int().positive().nullable(),
+  minSizeSqft: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .describe("Rule out flats smaller than this, in sq ft; null for no limit"),
+  maxAnnualServiceCharge: z
+    .number()
+    .nonnegative()
+    .nullable()
+    .describe("Rule out flats with a yearly service charge above this, in £; null for no limit"),
+  minLeaseYears: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .describe("Rule out leases with fewer years left than this; null for no limit"),
 });
 export type Limits = z.infer<typeof Limits>;
 
@@ -91,11 +128,11 @@ export type FactKey = (typeof FACT_KEYS)[number];
  */
 export const FactRule = z
   .strictObject({
-    fact: z.enum(FACT_KEYS),
-    from: z.number(),
-    perUnit: z.number(),
-    min: z.number().nullable(),
-    max: z.number().nullable(),
+    fact: z.enum(FACT_KEYS).describe("The fact to score; a commute scores each destination separately"),
+    from: z.number().describe("The value that scores nothing"),
+    perUnit: z.number().describe("Points for each unit above `from`; negative to take points away"),
+    min: z.number().nullable().describe("The fewest points the fact can give; null for no floor"),
+    max: z.number().nullable().describe("The most points the fact can give; null for no cap"),
   })
   .refine((rule) => rule.min === null || rule.max === null || rule.min <= rule.max, {
     message: "min must not exceed max",
@@ -111,20 +148,22 @@ export const DEFAULT_FACT_RULES: readonly FactRule[] = [
 
 /** What a flat must be to stay in the hunt, and what makes one better than another. */
 export const Requirements = z.strictObject({
-  limits: Limits,
+  limits: Limits.describe("Facts that rule a flat out as it arrives"),
   questions: z
     .array(Question)
     .max(50)
     .refine((questions) => new Set(questions.map((question) => question.key)).size === questions.length, {
       message: "Question keys must be unique",
-    }),
+    })
+    .describe("What Jev reads from each listing: exclusions rule flats out, the rest score them"),
   /** Absent from documents saved before facts were scored, which keep scoring by the defaults. */
   facts: z
     .array(FactRule)
     .refine((rules) => new Set(rules.map((rule) => rule.fact)).size === rules.length, {
       message: "Score each fact once",
     })
-    .default(() => [...DEFAULT_FACT_RULES]),
+    .default(() => [...DEFAULT_FACT_RULES])
+    .describe("How facts the listings state, or TfL times, add to a score"),
 });
 export type Requirements = z.infer<typeof Requirements>;
 
@@ -137,6 +176,10 @@ export const Answer = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("score"), probabilities: z.array(z.number()) }),
 ]);
 export type Answer = z.infer<typeof Answer>;
+
+/** Jev's answer to a question as it was worded when asked, identified by `fingerprint` (see questions.ts). */
+export const StoredAnswer = z.object({ questionKey: z.string(), fingerprint: z.string(), answer: Answer });
+export type StoredAnswer = z.infer<typeof StoredAnswer>;
 
 /**
  * One reason a property scores as it does, e.g. `{ label: "Outdoor space", detail: "Balcony", points: 1.8 }`. `key`
@@ -189,6 +232,22 @@ export const PropertySummary = z.object({
 export type PropertySummary = z.infer<typeof PropertySummary>;
 
 export const PropertyList = z.array(PropertySummary);
+
+/** A property with what the requirements editor needs to rank it by a draft in the browser. */
+export const WorkbenchProperty = PropertySummary.extend({
+  rejectedReason: z.string().nullable(),
+  answers: z.array(StoredAnswer),
+  /** Whether its listing page has been read, so Jev can be asked about it. */
+  readable: z.boolean(),
+});
+export type WorkbenchProperty = z.infer<typeof WorkbenchProperty>;
+
+export const Workbench = z.object({
+  /** Of the properties still to triage, as scoring reads it. */
+  medianPricePerSqft: z.number().nullable(),
+  properties: z.array(WorkbenchProperty),
+});
+export type Workbench = z.infer<typeof Workbench>;
 
 export const Photo = z.object({ id: z.uuid(), kind: z.enum(["photo", "floorplan"]), url: z.string() });
 export type Photo = z.infer<typeof Photo>;
