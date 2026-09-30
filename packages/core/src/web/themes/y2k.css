@@ -1,0 +1,93 @@
+/*
+ * Y2K: digital nostalgia. A periwinkle-to-peach sky, glossy rounded panes with a white top highlight, pixel-font
+ * labels and controls over a clean Geist body. Dark is a CRT-violet night with the same gloss dimmed.
+ */
+[data-theme="y2k"] {
+  color-scheme: light dark;
+  --bg: #e6e4ff;
+  --ground:
+    radial-gradient(50rem 36rem at 10% 0%, oklch(0.86 0.09 285 / 0.9), transparent 70%),
+    radial-gradient(44rem 32rem at 95% 100%, oklch(0.9 0.08 40 / 0.85), transparent 70%),
+    radial-gradient(1px 1px at 50% 50%, rgb(255 255 255 / 0.9), transparent) 0 0 / 22px 22px;
+  --surface: rgb(255 255 255 / 0.78);
+  --surface-2: rgb(255 255 255 / 0.5);
+  --surface-raised: #fbfaff;
+  --chrome: rgb(255 255 255 / 0.7);
+  --chrome-blur: blur(14px) saturate(1.6);
+  --fg: #1d1740;
+  --on-fg: #ffffff;
+  --muted: #5d5689;
+  --border: rgb(60 50 140 / 0.12);
+  --edge: rgb(90 80 190 / 0.35);
+  --border-strong: #3b30a0;
+  --accent: oklch(0.58 0.2 var(--hue));
+  --on-accent: #ffffff;
+  --accent-2: #19a96a;
+  --pink: #ff4fb8;
+  --warning-bg: #fff0a8;
+  --warning-fg: #5c4700;
+  --error: #e0306a;
+  --success: #19a96a;
+  --shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), 0 6px 18px -8px rgb(60 40 160 / 0.35);
+  --shadow-raised: inset 0 1px 0 #ffffff, 0 24px 48px -18px rgb(60 40 160 / 0.5);
+  --radius: 16px;
+  --radius-small: 10px;
+  --radius-control: 999px;
+  --font-body: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, Menlo, monospace;
+  --figure-font: var(--font-mono);
+  --heading-tracking: -0.03em;
+  --label-font: "Pixelify Sans", var(--font-mono);
+  --label-case: none;
+  --label-tracking: 0.02em;
+  --label-size: 0.875rem;
+  --label-size-small: 0.75rem;
+  --label-weight: 400;
+  --control-font: "Pixelify Sans", var(--font-mono);
+  --control-case: none;
+  --control-tracking: 0.02em;
+  --control-size: 0.9rem;
+  --control-weight: 400;
+  --control-bg: linear-gradient(#ffffff, #e9e6ff);
+  --control-edge: rgb(90 80 190 / 0.45);
+  --control-hover-bg: linear-gradient(#ffffff, #d9d3ff);
+  --control-hover-fg: var(--fg);
+  --primary-bg: var(--accent);
+  --primary-fg: var(--on-accent);
+  --primary-hover-bg: #ff4fb8;
+  --primary-hover-fg: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="y2k"] {
+    --bg: #120e2a;
+    --ground:
+      radial-gradient(50rem 36rem at 10% 0%, oklch(0.32 0.12 290 / 0.8), transparent 70%),
+      radial-gradient(44rem 32rem at 95% 100%, oklch(0.3 0.1 340 / 0.6), transparent 70%),
+      radial-gradient(1px 1px at 50% 50%, rgb(255 255 255 / 0.35), transparent) 0 0 / 22px 22px;
+    --surface: rgb(255 255 255 / 0.07);
+    --surface-2: rgb(255 255 255 / 0.04);
+    --surface-raised: #1f1946;
+    --chrome: rgb(18 14 42 / 0.7);
+    --fg: #f0edff;
+    --on-fg: #120e2a;
+    --muted: #a59fd6;
+    --border: rgb(200 190 255 / 0.12);
+    --edge: rgb(200 190 255 / 0.28);
+    --border-strong: #c8beff;
+    --accent: oklch(0.78 0.15 var(--hue));
+    --on-accent: #120e2a;
+    --accent-2: #4fe0a0;
+    --pink: #ff7cd0;
+    --warning-bg: rgb(255 230 110 / 0.14);
+    --warning-fg: #ffe27a;
+    --error: #ff7aa2;
+    --success: #4fe0a0;
+    --shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 10px 24px -12px rgb(0 0 0 / 0.7);
+    --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 28px 56px -18px rgb(0 0 0 / 0.8);
+    --control-bg: linear-gradient(rgb(255 255 255 / 0.14), rgb(255 255 255 / 0.05));
+    --control-edge: rgb(200 190 255 / 0.35);
+    --control-hover-bg: linear-gradient(rgb(255 255 255 / 0.22), rgb(255 255 255 / 0.08));
+    --primary-hover-fg: #120e2a;
+  }
+}

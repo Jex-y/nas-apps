@@ -5,6 +5,10 @@ export const THEMES = [
   { id: "tracing", name: "Tracing", description: "Graphite on warm tracing paper, square corners, charcoal at night." },
   { id: "dot-grid", name: "Dot grid", description: "Warm tracing paper with a faint dot grid." },
   { id: "command", name: "Command", description: "Dark and dense, whatever your device is set to." },
+  { id: "brutal", name: "Brutal", description: "Black ink edges, hard shadows and a loud accent on butter yellow." },
+  { id: "editorial", name: "Editorial", description: "A printed page: newsprint, a serif throughout, hairline rules." },
+  { id: "y2k", name: "Y2K", description: "Glossy pills and pixel labels under a periwinkle sky." },
+  { id: "clay", name: "Clay", description: "Soft pastel putty, pillowy rounded cards you want to press." },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];
