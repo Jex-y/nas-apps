@@ -74,6 +74,7 @@ export const DEFAULT_RULES: Readonly<Record<FactKey, FactRule>> = {
   bathrooms: { fact: "bathrooms", from: 1, perUnit: 1, min: 0, max: 1 },
   lease_years: { fact: "lease_years", from: 125, perUnit: 0.02, min: -2, max: 0 },
   annual_service_charge: { fact: "annual_service_charge", from: 2000, perUnit: -0.0005, min: -2, max: 0 },
+  crime_per_month: { fact: "crime_per_month", from: 100, perUnit: -0.015, min: -2, max: 1.5 },
 };
 
 export const replaceQuestion = (requirements: Requirements, key: string, next: Question): Requirements => ({

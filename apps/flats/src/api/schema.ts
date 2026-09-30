@@ -191,6 +191,47 @@ export const destinations = flatsSchema.table("destinations", {
   createdAt: createdAt(),
 });
 
+/** A street crime police.uk recorded, stored once however many properties it is near. */
+export const crimeReports = flatsSchema.table(
+  "crime_reports",
+  {
+    /** police.uk's own id for the crime. */
+    id: bigint("id", { mode: "number" }).primaryKey(),
+    /** `YYYY-MM`. */
+    month: text("month").notNull(),
+    category: text("category").notNull(),
+    /** Where police.uk placed it: the nearest of its anonymising map points, not the exact spot. */
+    latitude: doublePrecision("latitude").notNull(),
+    longitude: doublePrecision("longitude").notNull(),
+  },
+  (table) => [index("crime_reports_month_latitude_idx").on(table.month, table.latitude)],
+);
+
+/** Which tile of the crime grid (see crime.ts) has been fetched for which month, so each is fetched once. */
+export const crimeTiles = flatsSchema.table(
+  "crime_tiles",
+  {
+    tile: text("tile").notNull(),
+    month: text("month").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.tile, table.month] })],
+);
+
+/** Street crime near a property, counted from police.uk over the months to `throughMonth`. */
+export const crime = flatsSchema.table("crime", {
+  propertyId: uuid("property_id")
+    .primaryKey()
+    .references(() => properties.id, { onDelete: "cascade" }),
+  /** The latest month counted, `YYYY-MM`. */
+  throughMonth: text("through_month").notNull(),
+  months: smallint("months").notNull(),
+  radiusMetres: smallint("radius_metres").notNull(),
+  /** Crimes over those months by police.uk category. */
+  byCategory: jsonb<Record<string, number>>("by_category").notNull(),
+  countedAt: timestamp("counted_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const commutes = flatsSchema.table(
   "commutes",
   {

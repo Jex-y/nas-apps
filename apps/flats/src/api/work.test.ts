@@ -3,7 +3,9 @@ import { asc, eq } from "drizzle-orm";
 import { rightmoveListingPage } from "../../test/rightmove-page";
 import {
   createFlatsTestbed,
+  crimesEachMonth,
   defaultPages,
+  fakeCrime,
   fakeExtractor,
   fakePlanner,
   NOON,
@@ -12,12 +14,13 @@ import {
   searchPage,
   soldStcPage,
 } from "../../test/support";
+import { monthsTo } from "./crime";
 import type { FeatureExtractor } from "./extractor";
 import { SHARED_OWNERSHIP_REASON } from "./ingest";
 import type { JourneyPlanner } from "./places";
 import { fingerprint, QUESTIONS } from "./questions";
 import { DEFAULT_REQUIREMENTS, saveRequirements } from "./requirements";
-import { answers, commutes, listings, photos, properties, searches, snapshots } from "./schema";
+import { answers, commutes, crime, crimeReports, listings, photos, properties, searches, snapshots } from "./schema";
 import { isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
 
 const { context, db, blob, setup, addSearch, addDestination, propertyByPortalId } = createFlatsTestbed();
@@ -279,6 +282,56 @@ describe("adding a listing by URL", () => {
     const { work, drain } = setup();
     await work.addListing("rightmove", "1");
     expect(await drain()).toMatchObject({ dead: 1 });
+  });
+});
+
+describe("crime", () => {
+  const countedFor = async (portalId: string) => {
+    const { property } = await propertyByPortalId(portalId);
+    const [counted] = await db.select().from(crime).where(eq(crime.propertyId, property.id));
+    return counted;
+  };
+  const pairs = (asked: readonly { bounds: { south: number; west: number }; month: string }[]) =>
+    asked.map(({ bounds, month }) => `${bounds.south},${bounds.west} ${month}`);
+
+  test("counts a year of street crime near each property, fetching each area and month once", async () => {
+    const police = fakeCrime("2026-07");
+    const { work, drain } = setup(defaultPages, { crime: police.crime });
+    await work.backfillSearch((await addSearch()).id, 1);
+    await drain();
+
+    expect(await countedFor("93524796")).toMatchObject({
+      throughMonth: "2026-07",
+      months: 12,
+      radiusMetres: 400,
+      byCategory: { burglary: 24, "violent-crime": 60 },
+    });
+    expect(new Set(pairs(police.asked)).size).toBe(police.asked.length);
+    expect(new Set(police.asked.map(({ month }) => month))).toEqual(new Set(monthsTo("2026-07", 12)));
+    expect(await db.select().from(crimeReports)).toHaveLength(12 * 7);
+  });
+
+  test("once a newer month is out, fetches only that month", async () => {
+    const before = fakeCrime("2026-07", crimesEachMonth("2026-08"));
+    const first = setup(defaultPages, { crime: before.crime });
+    await first.work.backfillSearch((await addSearch()).id, 1);
+    await first.drain();
+
+    const areas = before.asked.length;
+    await context.jobs.enqueue(first.work.definitions.sweepCrime, {});
+    await first.drain();
+    expect(before.asked).toHaveLength(areas);
+
+    const after = fakeCrime("2026-08");
+    const later = setup(defaultPages, { crime: after.crime });
+    await context.jobs.enqueue(later.work.definitions.sweepCrime, {});
+    await later.drain();
+
+    expect(new Set(after.asked.map(({ month }) => month))).toEqual(new Set(["2026-08"]));
+    expect(await countedFor("93524796")).toMatchObject({
+      throughMonth: "2026-08",
+      byCategory: { burglary: 24, "violent-crime": 60 },
+    });
   });
 });
 

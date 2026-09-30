@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { startTestServer, uniqueLogin } from "@apps/core/testing";
 import { drizzle } from "drizzle-orm/bun-sql";
-import { createFlatsTestbed, fakeExtractor, fakeGeocoder, fakePlanner } from "../../test/support";
+import { createFlatsTestbed, fakeCrime, fakeExtractor, fakeGeocoder, fakePlanner } from "../../test/support";
 import {
   Destination,
   DestinationList,
@@ -23,6 +23,7 @@ const request = startTestServer(
     createFlatsApp(ctx, {
       geocoder: fakeGeocoder,
       planner: fakePlanner().planner,
+      crime: fakeCrime().crime,
       extractor: fakeExtractor().extractor,
     }),
   ],
@@ -66,6 +67,7 @@ describe("properties", () => {
       listings: [{ portal: "rightmove", url: "https://www.rightmove.co.uk/properties/93524796" }],
     });
     expect(union?.thumbnailUrl).toStartWith("/flats/api/photos/");
+    expect(union?.crime).toMatchObject({ perMonth: 7, months: 12, throughMonth: "2026-07", radiusMetres: 400 });
 
     const photo = await request(union?.thumbnailUrl ?? "", { as: me });
     expect(photo.status).toBe(302);

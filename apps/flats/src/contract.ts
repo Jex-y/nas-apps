@@ -15,6 +15,19 @@ export const TRACKED_STATUSES = [
   "offer_made",
 ] as const satisfies readonly PropertyStatus[];
 
+/** Street crime the police recorded near a property; see crime.ts for how near. */
+export const CrimeSummary = z.object({
+  /** Crimes a month on average, over `months` months to `throughMonth`. */
+  perMonth: z.number(),
+  months: z.number(),
+  /** The latest month counted, `YYYY-MM`; the police publish a month or two behind. */
+  throughMonth: z.string(),
+  radiusMetres: z.number(),
+  /** Crimes over the whole period by police.uk category, e.g. `violent-crime`. */
+  byCategory: z.record(z.string(), z.number()),
+});
+export type CrimeSummary = z.infer<typeof CrimeSummary>;
+
 export const Commute = z.object({
   destinationId: z.uuid(),
   name: z.string(),
@@ -119,6 +132,7 @@ export const FACT_KEYS = [
   "bathrooms",
   "lease_years",
   "annual_service_charge",
+  "crime_per_month",
 ] as const;
 export type FactKey = (typeof FACT_KEYS)[number];
 
@@ -227,6 +241,8 @@ export const PropertySummary = z.object({
   listings: z.array(z.object({ portal: z.enum(PORTALS), url: z.url() })),
   /** Only the places already timed; the rest are still being computed. */
   commutes: z.array(Commute),
+  /** `null` until counted, or for a property with no known location. */
+  crime: CrimeSummary.nullable(),
   ranking: Ranking,
 });
 export type PropertySummary = z.infer<typeof PropertySummary>;

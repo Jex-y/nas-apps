@@ -2,6 +2,7 @@ import { beforeEach } from "bun:test";
 import { type AppContext, createBlobStore, drainJobs, type Notification } from "@apps/core";
 import { createTestContext } from "@apps/core/testing";
 import { eq } from "drizzle-orm";
+import { type Bounds, type CrimeRecords, type CrimeReport, monthsTo } from "../src/api/crime";
 import { flatsDb } from "../src/api/db";
 import type { FeatureExtractor } from "../src/api/extractor";
 import type { Download, Fetcher, FetchResult } from "../src/api/fetcher";
@@ -65,6 +66,37 @@ export const fakePlanner = (minutes: number | null = 43) => {
   return { planner, asked };
 };
 
+/** Where the Union Lane fixture listing is. */
+const UNION_LANE = { latitude: 51.476311, longitude: -0.324446 };
+
+/** Two burglaries and five violent crimes at `at` each month for two years to `latest`. */
+export const crimesEachMonth = (latest: string, at: Coordinates = UNION_LANE): CrimeReport[] =>
+  monthsTo(latest, 24).flatMap((month) =>
+    ["burglary", "burglary", "violent-crime", "violent-crime", "violent-crime", "violent-crime", "violent-crime"].map(
+      (category, offset) => ({ id: Number(month.replace("-", "")) * 100 + offset, month, category, ...at }),
+    ),
+  );
+
+/** The police have published to `latest` and recorded `reports`; `asked` lists each area and month requested. */
+export const fakeCrime = (latest = "2026-07", reports: readonly CrimeReport[] = crimesEachMonth(latest)) => {
+  const asked: { bounds: Bounds; month: string }[] = [];
+  const crime: CrimeRecords = {
+    latestMonth: async () => latest,
+    inArea: async (bounds, month) => {
+      asked.push({ bounds, month });
+      return reports.filter(
+        (report) =>
+          report.month === month &&
+          report.latitude >= bounds.south &&
+          report.latitude < bounds.north &&
+          report.longitude >= bounds.west &&
+          report.longitude < bounds.east,
+      );
+    },
+  };
+  return { crime, asked };
+};
+
 /** A certain answer at a question's first option or level, or a confident no. */
 const certainFirst = (question: Question): Answer => {
   switch (question.kind) {
@@ -123,10 +155,12 @@ export const createFlatsTestbed = () => {
     {
       now = NOON,
       planner = fakePlanner().planner,
+      crime = fakeCrime().crime,
       extractor = fakeExtractor().extractor,
     }: {
       readonly now?: Date;
       readonly planner?: JourneyPlanner | null;
+      readonly crime?: CrimeRecords;
       readonly extractor?: FeatureExtractor | null;
     } = {},
   ) => {
@@ -140,6 +174,7 @@ export const createFlatsTestbed = () => {
       fetcher,
       parsers: { rightmove },
       planner,
+      crime,
       extractor,
       publicUrl: "https://apps.example",
       now: () => now,
@@ -187,7 +222,7 @@ export const createFlatsTestbed = () => {
   };
 
   beforeEach(async () => {
-    await context.sql`truncate flats.searches, flats.properties, flats.destinations, flats.requirements cascade`;
+    await context.sql`truncate flats.searches, flats.properties, flats.destinations, flats.requirements, flats.crime_reports, flats.crime_tiles cascade`;
     await context.sql`delete from jobs.jobs where name like 'flats.%'`;
   });
 

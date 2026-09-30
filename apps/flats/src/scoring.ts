@@ -2,6 +2,7 @@ import {
   type Answer,
   type Commute,
   type Contribution,
+  type CrimeSummary,
   EXCLUSION_THRESHOLD,
   type FactKey,
   type FactRule,
@@ -20,6 +21,7 @@ export type PropertyFacts = {
   readonly bathrooms: number | null;
   readonly leaseYearsRemaining: number | null;
   readonly annualServiceCharge: number | null;
+  readonly crime: Pick<CrimeSummary, "perMonth"> | null;
 };
 
 export type RankingInput = {
@@ -79,6 +81,12 @@ export const FACTS: Readonly<Record<FactKey, FactDefinition>> = {
     unit: "£ a year",
     read: (facts) => facts.annualServiceCharge,
     describe: (pounds) => `£${count(Math.round(pounds))} a year`,
+  },
+  crime_per_month: {
+    label: "Crime nearby",
+    unit: "a month",
+    read: (facts) => facts.crime?.perMonth ?? null,
+    describe: (crimes) => `${count(Math.round(crimes))} a month nearby`,
   },
 };
 

@@ -40,9 +40,16 @@ const range = (fact: FactKey, values: readonly number[]) => {
     return "None stated";
   }
   const { describe } = FACTS[fact];
-  const low = Math.min(...values);
-  const high = Math.max(...values);
-  return low === high ? describe(low) : `${describe(low)} to ${describe(high)}`;
+  const low = describe(Math.min(...values));
+  const high = describe(Math.max(...values));
+  if (low === high) {
+    return low;
+  }
+  // "650 sq ft to 1,315 sq ft" reads as "650 to 1,315 sq ft" when both ends share their words.
+  const words = (text: string) => text.replace(/^[£−-]?[\d.,]+/, "");
+  return words(low) === words(high)
+    ? `${low.slice(0, low.length - words(low).length)} to ${high}`
+    : `${low} to ${high}`;
 };
 
 export const FactsSection = ({

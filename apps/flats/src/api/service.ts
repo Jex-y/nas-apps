@@ -5,6 +5,7 @@ import {
   type CreateDestination,
   type CreateSearch,
   type CreateViewing,
+  type CrimeSummary,
   type Destination,
   FLATS_API,
   MAX_VIEWING_PHOTO_BYTES,
@@ -31,6 +32,7 @@ import { loadRequirements, saveRequirements } from "./requirements";
 import {
   answers,
   commutes,
+  crime,
   destinations,
   listings,
   photos,
@@ -100,6 +102,10 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       })
       .from(answers)
       .where(inArray(answers.propertyId, [...ids]));
+    const counted = await db
+      .select()
+      .from(crime)
+      .where(inArray(crime.propertyId, [...ids]));
     const [inbox] = await db
       .select({
         median: sql<
@@ -121,6 +127,15 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
           .filter((commute) => commute.propertyId === propertyId)
           .map(({ destinationId, name, minutes }) => ({ destinationId, name, minutes })),
       storedAnswersOf: (propertyId: string) => stored.filter((answer) => answer.propertyId === propertyId),
+      crimeOf: (propertyId: string): CrimeSummary | null => {
+        const row = counted.find((candidate) => candidate.propertyId === propertyId);
+        if (row === undefined) {
+          return null;
+        }
+        const { throughMonth, months, radiusMetres, byCategory } = row;
+        const total = Object.values(byCategory).reduce((sum, count) => sum + count, 0);
+        return { perMonth: total / months, months, throughMonth, radiusMetres, byCategory };
+      },
       medianPricePerSqft: inbox?.median ?? null,
     };
   };
@@ -138,7 +153,7 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
     if (parsed == null) {
       throw new HttpError(409, "That property's listing page has not been read yet");
     }
-    const { commutesOf, storedAnswersOf, medianPricePerSqft } = await rankingInputs([row.id]);
+    const { commutesOf, storedAnswersOf, crimeOf, medianPricePerSqft } = await rankingInputs([row.id]);
     const stored = storedAnswersOf(row.id);
     const asking = unanswered(draft.questions, stored);
     const fresh = asking.length === 0 ? new Map() : (await ask(listingState(parsed), asking, signal)).answers;
@@ -147,7 +162,7 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       rejectedBy: row.sharedOwnership ? SHARED_OWNERSHIP_REASON : breach(row, draft.limits),
       ranking: scoreProperty(draft, {
         answers: answered,
-        facts: row,
+        facts: { ...row, crime: crimeOf(row.id) },
         commutes: commutesOf(row.id),
         medianPricePerSqft,
       }),
@@ -199,11 +214,11 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       .orderBy(listings.propertyId, asc(photos.position));
     const coverOf = new Map(covers.map((cover) => [cover.propertyId, photoPath(cover.photoId)]));
     const saved = await loadRequirements(db);
-    const { commutesOf, storedAnswersOf, medianPricePerSqft } = inputs ?? (await rankingInputs(ids));
+    const { commutesOf, storedAnswersOf, crimeOf, medianPricePerSqft } = inputs ?? (await rankingInputs(ids));
     const rankingOf = (row: PropertyRow) =>
       scoreProperty(saved, {
         answers: currentAnswers(saved.questions, storedAnswersOf(row.id)),
-        facts: row,
+        facts: { ...row, crime: crimeOf(row.id) },
         commutes: commutesOf(row.id),
         medianPricePerSqft,
       });
@@ -231,6 +246,7 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       firstSeenAt: row.firstSeenAt.toISOString(),
       listings: adverts.filter((advert) => advert.propertyId === row.id).map(({ portal, url }) => ({ portal, url })),
       commutes: commutesOf(row.id),
+      crime: crimeOf(row.id),
       ranking: rankingOf(row),
     }));
   };

@@ -1,18 +1,39 @@
 import type { BlobStore, JobQueue, Notifier, RegisteredJob, Schedule } from "@apps/core";
 import { defineJob, defineSchedule, PermanentJobError } from "@apps/core";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, between, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { TRACKED_STATUSES } from "../contract";
 import { breach, exclusion } from "../scoring";
+import {
+  CRIME_MONTHS,
+  CRIME_RADIUS_METRES,
+  type CrimeRecords,
+  type CrimeReport,
+  degreesAcross,
+  METRES_PER_DEGREE,
+  monthsTo,
+  tilesAround,
+} from "./crime";
 import type { FlatsDb } from "./db";
 import type { FeatureExtractor } from "./extractor";
 import type { Fetcher } from "./fetcher";
 import { hitFromListing, type ListingChange, recordListingPage, recordSearchHit } from "./ingest";
-import { type JourneyPlanner, nextTuesday } from "./places";
+import { type Coordinates, type JourneyPlanner, nextTuesday } from "./places";
 import { type ParsedListing, ParseError, PORTALS, type Portal, type PortalParser } from "./portals/listing";
 import { currentAnswers, fingerprint, listingState, unanswered } from "./questions";
 import { loadRequirements } from "./requirements";
-import { answers, commutes, destinations, listings, photos, properties, searches } from "./schema";
+import {
+  answers,
+  commutes,
+  crime,
+  crimeReports,
+  crimeTiles,
+  destinations,
+  listings,
+  photos,
+  properties,
+  searches,
+} from "./schema";
 
 export type FlatsWorkDeps = {
   readonly db: FlatsDb;
@@ -22,6 +43,7 @@ export type FlatsWorkDeps = {
   readonly fetcher: Fetcher;
   /** `null` when no TfL key is configured; commutes are then left uncomputed. */
   readonly planner: JourneyPlanner | null;
+  readonly crime: CrimeRecords;
   /** `null` when no TypeSafe key is configured; listings are then left unread. */
   readonly extractor: FeatureExtractor | null;
   readonly parsers: Readonly<Partial<Record<Portal, PortalParser>>>;
@@ -212,6 +234,98 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
   });
 
+  /** Crimes by category recorded in `months` within `radiusMetres` of `at`, from the reports stored. */
+  const crimeNear = async (at: Coordinates, radiusMetres: number, months: readonly string[]) => {
+    const span = degreesAcross(at.latitude, radiusMetres);
+    const east = METRES_PER_DEGREE * Math.cos((at.latitude * Math.PI) / 180);
+    const counts = await db
+      .select({ category: crimeReports.category, count: sql<number>`count(*)::int` })
+      .from(crimeReports)
+      .where(
+        and(
+          inArray(crimeReports.month, [...months]),
+          between(crimeReports.latitude, at.latitude - span.latitude, at.latitude + span.latitude),
+          between(crimeReports.longitude, at.longitude - span.longitude, at.longitude + span.longitude),
+          sql`power((${crimeReports.latitude} - ${at.latitude}) * ${METRES_PER_DEGREE}, 2)
+            + power((${crimeReports.longitude} - ${at.longitude}) * ${east}, 2) <= ${radiusMetres ** 2}`,
+        ),
+      )
+      .groupBy(crimeReports.category);
+    return Object.fromEntries(counts.map(({ category, count }) => [category, count]));
+  };
+
+  /**
+   * Counts street crime around the property over the latest months the police have published. Each tile of the
+   * crime grid is fetched once a month and its reports kept, so neighbours share them; a property already counted to
+   * the latest month is left alone, so a sweep costs nothing until a new month is out.
+   */
+  const countCrime = defineJob({
+    name: "flats.count-crime",
+    payload: z.object({ propertyId: z.uuid() }),
+    // Each area and month is saved as it arrives, so a job that times out waiting its turn resumes where it stopped.
+    timeoutMs: 4 * MINUTE,
+    handle: async ({ propertyId }, { signal }) => {
+      const [property] = await db
+        .select({ latitude: properties.latitude, longitude: properties.longitude, counted: crime.throughMonth })
+        .from(properties)
+        .leftJoin(crime, eq(crime.propertyId, properties.id))
+        .where(and(eq(properties.id, propertyId), inPlay));
+      if (property?.latitude == null || property.longitude == null) {
+        return;
+      }
+      const latest = await deps.crime.latestMonth(signal);
+      if (property.counted === latest) {
+        return;
+      }
+      const at = { latitude: property.latitude, longitude: property.longitude };
+      const months = monthsTo(latest, CRIME_MONTHS);
+      const tiles = tilesAround(at, CRIME_RADIUS_METRES);
+      const fetched = await db
+        .select({ tile: crimeTiles.tile, month: crimeTiles.month })
+        .from(crimeTiles)
+        .where(
+          and(
+            inArray(
+              crimeTiles.tile,
+              tiles.map((tile) => tile.key),
+            ),
+            inArray(crimeTiles.month, months),
+          ),
+        );
+      const done = new Set(fetched.map(({ tile, month }) => `${tile} ${month}`));
+      // A tile's missing months are saved together, so a job that times out resumes at the next tile.
+      for (const tile of tiles) {
+        const missing = months.filter((month) => !done.has(`${tile.key} ${month}`));
+        if (missing.length === 0) {
+          continue;
+        }
+        const reports: CrimeReport[] = [];
+        for (const month of missing) {
+          reports.push(...(await deps.crime.inArea(tile.bounds, month, signal)));
+        }
+        await db.transaction(async (tx) => {
+          if (reports.length > 0) {
+            await tx.insert(crimeReports).values(reports).onConflictDoNothing();
+          }
+          await tx
+            .insert(crimeTiles)
+            .values(missing.map((month) => ({ tile: tile.key, month })))
+            .onConflictDoNothing();
+        });
+      }
+      const counted = {
+        throughMonth: latest,
+        months: CRIME_MONTHS,
+        radiusMetres: CRIME_RADIUS_METRES,
+        byCategory: await crimeNear(at, CRIME_RADIUS_METRES, months),
+      };
+      await db
+        .insert(crime)
+        .values({ propertyId, ...counted })
+        .onConflictDoUpdate({ target: crime.propertyId, set: { ...counted, countedAt: sql`now()` } });
+    },
+  });
+
   /** Asks Jev whatever the current questions have no answer for, and rejects the property if it is now excluded. */
   const read = async (propertyId: string, signal: AbortSignal) => {
     const extractor = deps.extractor;
@@ -314,6 +428,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       .where(eq(listings.id, listingId));
     if (listing !== undefined) {
       await queue.enqueue(computeCommutes, { propertyId: listing.propertyId }, { dedupeKey: listing.propertyId });
+      await queue.enqueue(countCrime, { propertyId: listing.propertyId }, { dedupeKey: listing.propertyId });
       // A distinct key, so a sweep's pending read of the same property cannot swallow the announcement.
       await queue.enqueue(
         readListing,
@@ -492,6 +607,17 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     handle: enqueueCommutes,
   });
 
+  const sweepCrime = defineJob({
+    name: "flats.sweep-crime",
+    payload: z.object({}),
+    handle: async () => {
+      const countable = await db.select({ id: properties.id }).from(properties).where(inPlay);
+      for (const { id } of countable) {
+        await queue.enqueue(countCrime, { propertyId: id }, { dedupeKey: id });
+      }
+    },
+  });
+
   /** Reads every property still in play, e.g. after a question is reworded or TypeSafe is configured. */
   /** Queues a read of every property still in play; each only asks Jev what the current questions lack. */
   const enqueueReadings = async () => {
@@ -515,6 +641,8 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     mirrorPhotos,
     computeCommutes,
     sweepCommutes,
+    countCrime,
+    sweepCrime,
     readListing,
     sweepReadings,
     refreshTracked,
@@ -543,6 +671,13 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       payload: {},
     }),
     defineSchedule({
+      name: "flats.sweep-crime",
+      everyMs: 24 * HOUR,
+      jitterMs: 2 * HOUR,
+      job: sweepCrime,
+      payload: {},
+    }),
+    defineSchedule({
       name: "flats.sweep-readings",
       everyMs: 24 * HOUR,
       jitterMs: 2 * HOUR,
@@ -562,6 +697,8 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       mirrorPhotos,
       computeCommutes,
       sweepCommutes,
+      countCrime,
+      sweepCrime,
       readListing,
       sweepReadings,
       refreshTracked,

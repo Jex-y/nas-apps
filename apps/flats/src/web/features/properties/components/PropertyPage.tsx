@@ -13,6 +13,7 @@ import {
   pricePerSqft,
 } from "../../../utils/format";
 import { useProperty, useUpdateNotes } from "../api/properties";
+import { CrimeSection } from "./CrimeSection";
 import { PhotoViewer } from "./PhotoViewer";
 import { StatusControl } from "./StatusControl";
 import type { GalleryPhoto } from "./SwipeCard";
@@ -184,6 +185,7 @@ export const PropertyPage = ({ id }: { id: string }) => {
               </ul>
             </section>
           )}
+          {detail.crime !== null && <CrimeSection crime={detail.crime} />}
           {detail.ranking.kind === "scored" && detail.ranking.contributions.length > 0 && (
             <Contributions total={detail.ranking.total} contributions={detail.ranking.contributions} />
           )}

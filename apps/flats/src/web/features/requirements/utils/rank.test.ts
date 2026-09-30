@@ -52,6 +52,7 @@ const property = (id: string, sizeSqft: number, answers: StoredAnswer[] = []): W
   firstSeenAt: new Date(0).toISOString(),
   listings: [],
   commutes: [],
+  crime: null,
   ranking: { kind: "scored", total: 0, contributions: [] },
   rejectedReason: null,
   answers,

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createBlobStore } from "@apps/core";
 import { callTool, connectMcp, startTestServer, uniqueLogin } from "@apps/core/testing";
-import { createFlatsTestbed, fakeExtractor, fakeGeocoder, fakePlanner } from "../../test/support";
+import { createFlatsTestbed, fakeCrime, fakeExtractor, fakeGeocoder, fakePlanner } from "../../test/support";
 import { createFlatsApp } from "../module";
 import { DEFAULT_REQUIREMENTS } from "./requirements";
 
@@ -11,6 +11,7 @@ const request = startTestServer(
     createFlatsApp(ctx, {
       geocoder: fakeGeocoder,
       planner: fakePlanner().planner,
+      crime: fakeCrime().crime,
       extractor: fakeExtractor().extractor,
     }),
   ],

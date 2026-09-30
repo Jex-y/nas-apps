@@ -36,6 +36,7 @@ const unknown: PropertyFacts = {
   bathrooms: null,
   leaseYearsRemaining: null,
   annualServiceCharge: null,
+  crime: null,
 };
 const nothing: RankingInput = { answers: new Map(), facts: unknown, commutes: [], medianPricePerSqft: null };
 const answering = (answers: Record<string, Answer>): RankingInput => ({

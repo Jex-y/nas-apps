@@ -1,5 +1,6 @@
 import { type AppContext, type AppModule, appRoutes, createBlobStore, trailingSlashRedirect } from "@apps/core";
 import { parseFlatsConfig } from "./api/config";
+import { type CrimeRecords, createPoliceUk } from "./api/crime";
 import { flatsDb } from "./api/db";
 import { createJevExtractor, type FeatureExtractor } from "./api/extractor";
 import { BROWSER_USER_AGENT, createHttpFetcher } from "./api/fetcher";
@@ -18,6 +19,7 @@ const intervalMs = (host: string): number => (host.startsWith("www.") ? 5_000 : 
 export type FlatsAdapters = {
   readonly geocoder: Geocoder;
   readonly planner: JourneyPlanner | null;
+  readonly crime: CrimeRecords;
   readonly extractor: FeatureExtractor | null;
 };
 
@@ -26,6 +28,7 @@ const realAdapters = (context: AppContext): FlatsAdapters => {
   return {
     geocoder: createPostcodesIo(),
     planner: tflApiKey === null ? null : createTflPlanner(tflApiKey),
+    crime: createPoliceUk(),
     extractor: typesafeApiKey === null ? null : createJevExtractor(typesafeApiKey),
   };
 };
@@ -42,6 +45,7 @@ export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = re
     fetcher: createHttpFetcher({ userAgent: BROWSER_USER_AGENT, intervalMs }),
     parsers: { rightmove },
     planner: adapters.planner,
+    crime: adapters.crime,
     extractor: adapters.extractor,
     publicUrl: context.publicUrl,
     now: () => new Date(),
