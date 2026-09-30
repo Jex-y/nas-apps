@@ -99,6 +99,7 @@ button,
   gap: 0.4rem;
   padding: 0.5rem 0.85rem;
   background: var(--control-bg);
+  color: inherit;
   border: 1px solid var(--control-edge);
   border-radius: var(--radius-control);
   font-family: var(--control-font);
