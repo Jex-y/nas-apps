@@ -39,8 +39,10 @@ textarea {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  border-bottom: 1px solid var(--edge);
+  background: var(--chrome);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -55,11 +57,11 @@ textarea {
 .nav-link {
   text-decoration: none;
   color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
 }
 
 .nav-link.active {
@@ -108,8 +110,9 @@ main {
   gap: 1rem;
   padding: 0.75rem;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .card.selected {
@@ -121,7 +124,7 @@ main {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  border-radius: var(--radius);
+  border-radius: var(--radius-small);
   background: var(--border);
   display: block;
 }
@@ -263,8 +266,9 @@ main {
   gap: 0.375rem;
   padding: 0.75rem;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .viewing-form {
@@ -329,8 +333,8 @@ main:has(.swipe) {
 .swipe-card {
   position: relative;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) * 2);
+  border: 1px solid var(--edge);
+  border-radius: calc(var(--radius) * 1.5);
   overflow: hidden;
   transform: translateY(0.5rem) scale(0.96);
   transition: transform 200ms ease-out;
@@ -342,7 +346,7 @@ main:has(.swipe) {
   transform: none;
   touch-action: pan-y;
   cursor: grab;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  box-shadow: var(--shadow-raised);
 }
 
 .swipe-card.dragging {
@@ -547,8 +551,10 @@ main:has(.swipe) {
     grid-template-columns: repeat(5, 1fr);
     padding: 0.25rem max(0.25rem, env(safe-area-inset-right)) env(safe-area-inset-bottom)
       max(0.25rem, env(safe-area-inset-left));
-    background: var(--surface);
-    border-top: 1px solid var(--border);
+    background: var(--chrome);
+    -webkit-backdrop-filter: var(--chrome-blur);
+    backdrop-filter: var(--chrome-blur);
+    border-top: 1px solid var(--edge);
   }
 
   .tab {
@@ -560,10 +566,10 @@ main:has(.swipe) {
     border: none;
     background: none;
     color: var(--muted);
-    font-family: var(--font-mono);
-    font-size: 0.625rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-family: var(--label-font);
+    font-size: var(--label-size-small);
+    letter-spacing: var(--label-tracking);
+    text-transform: var(--label-case);
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
   }
@@ -578,11 +584,13 @@ main:has(.swipe) {
     margin: 0;
     padding: 0.25rem;
     min-width: 10rem;
-    background: var(--surface);
+    background: var(--chrome);
+    -webkit-backdrop-filter: var(--chrome-blur);
+    backdrop-filter: var(--chrome-blur);
     color: var(--fg);
-    border: 1px solid var(--border);
+    border: 1px solid var(--edge);
     border-radius: var(--radius);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+    box-shadow: var(--shadow-raised);
   }
 
   .more-link {
@@ -635,7 +643,8 @@ main:has(.swipe) {
 
 .json-editor {
   height: 70vh;
-  border: 1px solid var(--border);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-small);
   overflow: hidden;
 }
 

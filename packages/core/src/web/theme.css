@@ -21,6 +21,9 @@
 /*
  * Paper and ink: white cards with ink rules on a sage ground, one teal accent, square corners. Headings are tightly
  * tracked Inter; labels, controls and figures are JetBrains Mono, labels set small, upper case and widely tracked.
+ *
+ * Apps read only these tokens. `--edge` outlines a surface and `--border` separates rows within one; `--chrome` is
+ * the sticky header and tab bar, which content scrolls beneath; a label is small navigational or status text.
  */
 :root {
   color-scheme: light dark;
@@ -35,15 +38,42 @@
   --on-accent: #fefefe;
   --accent-2: #03aa5c;
   --pink: #d45bb6;
-  --rose: #f386a1;
   --warning-bg: #fbeebf;
   --warning-fg: #6f5200;
   --error: #d6364f;
   --success: #03955a;
+  --ground: none;
+  --chrome: var(--surface);
+  --chrome-blur: none;
+  --on-fg: var(--surface);
+  --edge: var(--border);
+  --shadow: none;
+  --shadow-raised: 0 8px 24px rgb(0 0 0 / 0.18);
   --radius: 0;
   --radius-small: 0;
+  --radius-control: 0;
   --font-body: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, Menlo, monospace;
+  --heading-tracking: -0.035em;
+  --label-font: var(--font-mono);
+  --label-case: uppercase;
+  --label-tracking: 0.06em;
+  --label-size: 0.6875rem;
+  --label-size-small: 0.625rem;
+  --label-weight: 500;
+  --control-font: var(--font-mono);
+  --control-case: uppercase;
+  --control-tracking: 0.06em;
+  --control-size: 0.6875rem;
+  --control-weight: 500;
+  --control-bg: var(--surface);
+  --control-edge: var(--border-strong);
+  --control-hover-bg: var(--fg);
+  --control-hover-fg: var(--on-fg);
+  --primary-bg: var(--fg);
+  --primary-fg: var(--on-fg);
+  --primary-hover-bg: var(--accent);
+  --primary-hover-fg: var(--on-accent);
   font-family: var(--font-body);
   font-feature-settings: "cv11", "ss03";
   background: var(--bg);
@@ -63,7 +93,6 @@
     --on-accent: #0b1211;
     --accent-2: #2fd083;
     --pink: #ea7fd0;
-    --rose: #f7a1b7;
     --warning-bg: rgb(250 204 21 / 0.12);
     --warning-fg: #f5cf4a;
     --error: #ff7589;
@@ -79,23 +108,32 @@
 
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--fg);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Fixed, so the ground stays put under scrolling content; `background-attachment: fixed` scrolls on iOS. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--ground);
+  pointer-events: none;
+}
+
 h1,
 h2,
 h3 {
   font-weight: 600;
-  letter-spacing: -0.035em;
+  letter-spacing: var(--heading-tracking);
   line-height: 1.15;
 }
 
 h1 {
-  letter-spacing: -0.045em;
+  letter-spacing: calc(var(--heading-tracking) - 0.01em);
 }
 
 ::selection {
@@ -119,9 +157,9 @@ button {
 input,
 select,
 textarea {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--control-bg);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-small);
   padding: 0.45rem 0.7rem;
   transition: border-color 120ms ease-out;
 }
@@ -138,22 +176,21 @@ textarea:focus {
   display: inline-flex;
 }
 
-/* Controls read as labels: small upper-case mono, widely tracked. */
 button,
 .button {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
   padding: 0.5rem 0.85rem;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
+  background: var(--control-bg);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius-control);
+  font-family: var(--control-font);
+  font-size: var(--control-size);
+  font-weight: var(--control-weight);
+  letter-spacing: var(--control-tracking);
   line-height: 1.2;
-  text-transform: uppercase;
+  text-transform: var(--control-case);
   text-decoration: none;
   cursor: pointer;
   transition:
@@ -163,30 +200,29 @@ button,
 
 button:hover,
 .button:hover {
-  background: var(--fg);
-  color: var(--surface);
+  background: var(--control-hover-bg);
+  color: var(--control-hover-fg);
 }
 
 button:disabled {
   opacity: 0.4;
   cursor: default;
-  background: var(--surface);
+  background: var(--control-bg);
   color: inherit;
 }
 
-/* Primary actions are solid ink blocks. */
 button[type="submit"],
 button.primary {
-  background: var(--fg);
-  border-color: var(--fg);
-  color: var(--surface);
+  background: var(--primary-bg);
+  border-color: var(--primary-bg);
+  color: var(--primary-fg);
 }
 
 button[type="submit"]:hover,
 button.primary:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
+  background: var(--primary-hover-bg);
+  border-color: var(--primary-hover-bg);
+  color: var(--primary-hover-fg);
 }
 
 kbd {

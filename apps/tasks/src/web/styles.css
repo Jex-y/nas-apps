@@ -37,8 +37,10 @@ textarea {
   align-items: center;
   padding: 0.75rem 1rem;
   padding-top: calc(0.75rem + env(safe-area-inset-top));
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  border-bottom: 1px solid var(--edge);
+  background: var(--chrome);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
   position: sticky;
   top: 0;
   z-index: 2;
@@ -53,11 +55,11 @@ textarea {
 .label {
   text-decoration: none;
   color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
 }
 
 .nav-link.active {
@@ -134,12 +136,13 @@ h2 > .muted {
 
 .badge {
   padding: 0.05rem 0.4rem;
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-family: var(--label-font);
+  font-size: var(--label-size-small);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
   border: 1px solid currentColor;
+  border-radius: var(--radius-small);
 }
 
 .badge.ready {
@@ -176,7 +179,9 @@ h2 > .muted {
   padding: 0;
   margin: 0;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .task-row {
@@ -279,7 +284,8 @@ h2 > .muted {
   min-height: 12rem;
   padding: 0.75rem;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
   scroll-snap-align: start;
 }
 
@@ -296,7 +302,9 @@ h2 > .muted {
   gap: 0.4rem;
   padding: 0.7rem;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow);
   cursor: grab;
 }
 
@@ -383,7 +391,9 @@ h2 > .muted {
   grid-template-columns: minmax(7rem, 14rem) auto;
   overflow-x: auto;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .gantt-labels {
@@ -393,7 +403,9 @@ h2 > .muted {
   list-style: none;
   margin: 0;
   padding: 0;
-  background: var(--surface);
+  background: var(--chrome);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
   border-right: 1px solid var(--border);
 }
 
@@ -433,8 +445,8 @@ h2 > .muted {
 .gantt-chart .month {
   fill: var(--fg);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
 }
 
 .gantt-chart .day {
@@ -532,8 +544,10 @@ h2 > .muted {
     grid-template-columns: repeat(3, 1fr);
     padding: 0.25rem max(0.25rem, env(safe-area-inset-right)) env(safe-area-inset-bottom)
       max(0.25rem, env(safe-area-inset-left));
-    background: var(--surface);
-    border-top: 1px solid var(--border);
+    background: var(--chrome);
+    -webkit-backdrop-filter: var(--chrome-blur);
+    backdrop-filter: var(--chrome-blur);
+    border-top: 1px solid var(--edge);
   }
 
   .tab {
@@ -543,10 +557,10 @@ h2 > .muted {
     gap: 0.15rem;
     padding: 0.4rem 0 0.5rem;
     color: var(--muted);
-    font-family: var(--font-mono);
-    font-size: 0.625rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-family: var(--label-font);
+    font-size: var(--label-size-small);
+    letter-spacing: var(--label-tracking);
+    text-transform: var(--label-case);
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
   }
