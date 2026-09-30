@@ -2472,3 +2472,311 @@ main:has(.workbench) {
     transition: none;
   }
 }
+
+/* The map: full bleed under the header, with the layer panel and a chosen listing floating over it. */
+
+main:has(.map-page) {
+  max-width: none;
+  padding: 0;
+}
+
+.map-page {
+  position: relative;
+  height: calc(100dvh - 4.05rem);
+}
+
+.map-canvas {
+  height: 100%;
+  background: var(--surface-2);
+}
+
+.layer-panel,
+.map-card {
+  position: absolute;
+  z-index: 1;
+  background: var(--chrome);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-raised);
+}
+
+.layer-panel {
+  top: 0.75rem;
+  left: 0.75rem;
+  width: min(19rem, calc(100% - 1.5rem));
+  max-height: calc(100% - 1.5rem);
+  overflow-y: auto;
+}
+
+.layer-panel-toggle {
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--fg);
+}
+
+.layer-panel-toggle:hover {
+  background: transparent;
+  color: var(--fg);
+}
+
+.layer-panel.open .layer-panel-toggle {
+  border-bottom: 1px solid var(--border);
+}
+
+.layer-list {
+  display: grid;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+}
+
+.layer {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+}
+
+.layer + .layer {
+  border-top: 1px solid var(--border);
+}
+
+.layer-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+}
+
+.layer-name {
+  display: grid;
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
+.layer-name .muted {
+  font-size: 0.75rem;
+}
+
+.layer:not(.on) .layer-name > span:first-child {
+  color: var(--muted);
+}
+
+.layer-option {
+  margin-left: 2.65rem;
+}
+
+.legend {
+  display: grid;
+  gap: 0.25rem;
+  margin-left: 2.65rem;
+}
+
+.legend-ramp {
+  display: block;
+  block-size: 0.4rem;
+  border-radius: var(--radius-control);
+}
+
+.legend-ends {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-family: var(--figure-font);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.legend-note {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1.35;
+}
+
+.legend-dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.map-card {
+  bottom: 0.75rem;
+  left: 0.75rem;
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  width: min(26rem, calc(100% - 1.5rem));
+  overflow: hidden;
+}
+
+.map-card-photo {
+  width: 100%;
+  height: 100%;
+  min-height: 6.5rem;
+  object-fit: cover;
+}
+
+.map-card-body {
+  display: grid;
+  gap: 0.2rem;
+  align-content: start;
+  padding: 0.65rem 2.25rem 0.7rem 0.8rem;
+  min-width: 0;
+}
+
+.map-card-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.map-card-price {
+  display: grid;
+}
+
+.map-card-price small {
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+
+.map-card-price strong {
+  font-family: var(--figure-font);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.map-card-score {
+  font-family: var(--figure-font);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.map-card-out {
+  color: var(--error);
+  font-size: 0.75rem;
+}
+
+.map-card-address {
+  margin: 0;
+  overflow: hidden;
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-card-facts {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--figure-font);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.map-card-link {
+  margin-top: 0.25rem;
+  color: var(--accent);
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.map-card-link:hover {
+  text-decoration: underline;
+}
+
+.map-card-close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+}
+
+.map-place {
+  padding: 0.2rem 0.55rem;
+  background: var(--fg);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-raised);
+  color: var(--on-fg);
+  font-family: var(--label-font);
+  font-size: var(--label-size-small);
+  font-weight: 600;
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
+  white-space: nowrap;
+}
+
+.map-place::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  background: var(--fg);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+/* MapLibre's own controls, in the theme's chrome. */
+.map-page .maplibregl-ctrl-group {
+  background: var(--chrome);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow-raised);
+}
+
+.map-page .maplibregl-ctrl-group button {
+  padding: 0;
+  background-color: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.map-page .maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--border);
+}
+
+.map-page .maplibregl-ctrl-group button:hover {
+  background-color: var(--surface-2);
+}
+
+.map-page .maplibregl-ctrl-attrib.maplibregl-compact {
+  background: var(--chrome);
+  color: var(--muted);
+  font-family: var(--font-body);
+}
+
+/* MapLibre draws its icons in #333, for a light map. */
+.map-canvas[data-scheme="dark"] .maplibregl-ctrl-icon,
+.map-canvas[data-scheme="dark"] .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+
+.map-page .maplibregl-ctrl-attrib a {
+  color: var(--muted);
+}
+
+@media (max-width: 40rem) {
+  .map-page {
+    height: calc(100dvh - 3.6rem - env(safe-area-inset-top) - 4.25rem - env(safe-area-inset-bottom));
+  }
+
+  .layer-panel:not(.open) {
+    width: auto;
+  }
+
+  .map-card {
+    bottom: 0.5rem;
+    left: 0.5rem;
+    width: calc(100% - 1rem);
+  }
+}
