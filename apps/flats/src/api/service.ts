@@ -19,14 +19,14 @@ import {
   type TrialRequest,
   type UpdateStatus,
 } from "../contract";
+import { breach, scoreProperty } from "../scoring";
 import type { FlatsDb } from "./db";
 import type { FeatureExtractor } from "./extractor";
 import { SHARED_OWNERSHIP_REASON } from "./ingest";
 import type { Geocoder } from "./places";
 import type { Portal, PortalParser } from "./portals/listing";
 import { currentAnswers, type ListingState, listingState, unanswered } from "./questions";
-import { scoreProperty } from "./ranking";
-import { breach, loadRequirements, saveRequirements } from "./requirements";
+import { loadRequirements, saveRequirements } from "./requirements";
 import {
   answers,
   commutes,
@@ -71,9 +71,6 @@ export const collapseHistory = (points: readonly PricePoint[]): PricePoint[] =>
     (point, index) =>
       index === 0 || point.price !== points[index - 1]?.price || point.availability !== points[index - 1]?.availability,
   );
-
-const pricePerSqft = (row: Pick<PropertyRow, "price" | "sizeSqft">): number | null =>
-  row.price !== null && row.sizeSqft ? row.price / row.sizeSqft : null;
 
 /**
  * The flat hunt, shared by the HTTP API and the MCP server. Fails with an {@link HttpError} saying why a change was
@@ -147,10 +144,10 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
     const answered = new Map([...currentAnswers(draft.questions, stored), ...fresh]);
     return {
       rejectedBy: row.sharedOwnership ? SHARED_OWNERSHIP_REASON : breach(row, draft.limits),
-      ranking: scoreProperty(draft.questions, {
+      ranking: scoreProperty(draft, {
         answers: answered,
+        facts: row,
         commutes: commutesOf(row.id),
-        pricePerSqft: pricePerSqft(row),
         medianPricePerSqft,
       }),
       answers: draft.questions.map((question) => ({ key: question.key, answer: answered.get(question.key) ?? null })),
@@ -198,13 +195,13 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       .where(and(inArray(listings.propertyId, ids), eq(photos.kind, "photo")))
       .orderBy(listings.propertyId, asc(photos.position));
     const coverOf = new Map(covers.map((cover) => [cover.propertyId, photoPath(cover.photoId)]));
-    const { questions } = await loadRequirements(db);
+    const saved = await loadRequirements(db);
     const { commutesOf, storedAnswersOf, medianPricePerSqft } = await rankingInputs(ids);
     const rankingOf = (row: PropertyRow) =>
-      scoreProperty(questions, {
-        answers: currentAnswers(questions, storedAnswersOf(row.id)),
+      scoreProperty(saved, {
+        answers: currentAnswers(saved.questions, storedAnswersOf(row.id)),
+        facts: row,
         commutes: commutesOf(row.id),
-        pricePerSqft: pricePerSqft(row),
         medianPricePerSqft,
       });
 

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { type Answer, EXCLUSION_THRESHOLD, type Question } from "../contract";
+import type { Answer, Question } from "../contract";
+import { prompt } from "../scoring";
 import type { ParsedListing } from "./portals/listing";
 
 /** The listing text a question is answered from; instructions name its fields in backticks. */
@@ -14,41 +15,6 @@ export const listingState = (parsed: ParsedListing): ListingState => ({
   key_features: parsed.keyFeatures,
   description: parsed.description,
 });
-
-/** A Jev System One question, as sent. */
-export type Prompt =
-  | {
-      readonly type: "noul";
-      readonly instructions: string;
-      readonly criteria?: { readonly true: string; readonly false: string };
-    }
-  | { readonly type: "choice"; readonly instructions: string; readonly criteria: Readonly<Record<string, string>> }
-  | { readonly type: "score"; readonly instructions: string; readonly criteria: readonly string[] };
-
-export const prompt = (question: Question): Prompt => {
-  switch (question.kind) {
-    case "exclusion":
-      return { type: "noul", instructions: question.instructions };
-    case "feature":
-      return {
-        type: "noul",
-        instructions: question.instructions,
-        ...(question.criteria && { criteria: { true: question.criteria.yes, false: question.criteria.no } }),
-      };
-    case "choice":
-      return {
-        type: "choice",
-        instructions: question.instructions,
-        criteria: Object.fromEntries(question.options.map((option) => [option.key, option.description])),
-      };
-    case "score":
-      return {
-        type: "score",
-        instructions: question.instructions,
-        criteria: question.levels.map((level) => level.description),
-      };
-  }
-};
 
 /**
  * Identifies a question's wording. A stored answer counts only while its fingerprint matches, so rewording a question
@@ -78,17 +44,6 @@ export const currentAnswers = (
 export const unanswered = (questions: readonly Question[], stored: readonly StoredAnswer[]): Question[] => {
   const answered = currentAnswers(questions, stored);
   return questions.filter((question) => !answered.has(question.key));
-};
-
-/** Why the answers rule the property out, or `null`; an unanswered exclusion rules nothing out. */
-export const exclusion = (questions: readonly Question[], answers: ReadonlyMap<string, Answer>): string | null => {
-  for (const question of questions) {
-    const answer = answers.get(question.key);
-    if (question.kind === "exclusion" && answer?.kind === "noul" && answer.yes > EXCLUSION_THRESHOLD) {
-      return question.reason;
-    }
-  }
-  return null;
 };
 
 const IN_TEXT = "Do `description` or `key_features` say";

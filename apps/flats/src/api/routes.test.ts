@@ -80,8 +80,12 @@ describe("properties", () => {
     expect(union?.ranking).toMatchObject({
       kind: "scored",
       contributions: expect.arrayContaining([
-        { label: "Outdoor space", detail: "Private garden", points: 3 },
-        expect.objectContaining({ label: "Price per sq ft", detail: expect.stringContaining("the inbox median") }),
+        { key: "outdoor_space", source: "jev", label: "Outdoor space", detail: "Private garden", points: 3 },
+        expect.objectContaining({
+          key: "percent_below_median_price",
+          source: "fact",
+          detail: expect.stringContaining("the inbox median"),
+        }),
       ]),
     });
   });

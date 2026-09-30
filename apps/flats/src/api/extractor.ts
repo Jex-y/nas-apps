@@ -1,7 +1,8 @@
 import { PermanentJobError } from "@apps/core";
 import { z } from "zod";
 import type { Answer, Question } from "../contract";
-import { type ListingState, prompt } from "./questions";
+import { prompt } from "../scoring";
+import type { ListingState } from "./questions";
 
 export type Extraction = {
   /** The versioned model that answered, e.g. `jev-1.13.0`. */

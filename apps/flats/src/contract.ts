@@ -73,6 +73,42 @@ export const Limits = z.strictObject({
 });
 export type Limits = z.infer<typeof Limits>;
 
+/** Structured facts a rule can score, each read from the listing or computed; see `FACTS` in scoring.ts. */
+export const FACT_KEYS = [
+  "commute_minutes",
+  "percent_below_median_price",
+  "size_sqft",
+  "bedrooms",
+  "bathrooms",
+  "lease_years",
+  "annual_service_charge",
+] as const;
+export type FactKey = (typeof FACT_KEYS)[number];
+
+/**
+ * Scores a structured fact on a line, `perUnit × (value − from)`, held between `min` and `max`; `null` leaves that
+ * side open. A commute rule scores each destination separately.
+ */
+export const FactRule = z
+  .strictObject({
+    fact: z.enum(FACT_KEYS),
+    from: z.number(),
+    perUnit: z.number(),
+    min: z.number().nullable(),
+    max: z.number().nullable(),
+  })
+  .refine((rule) => rule.min === null || rule.max === null || rule.min <= rule.max, {
+    message: "min must not exceed max",
+    path: ["min"],
+  });
+export type FactRule = z.infer<typeof FactRule>;
+
+/** Each 10 minutes' commute over 40 costs a point; each 5% cheaper per sq ft than the inbox is worth one, up to 4. */
+export const DEFAULT_FACT_RULES: readonly FactRule[] = [
+  { fact: "commute_minutes", from: 40, perUnit: -0.1, min: null, max: 0 },
+  { fact: "percent_below_median_price", from: 0, perUnit: 0.2, min: -4, max: 4 },
+];
+
 /** What a flat must be to stay in the hunt, and what makes one better than another. */
 export const Requirements = z.strictObject({
   limits: Limits,
@@ -82,6 +118,13 @@ export const Requirements = z.strictObject({
     .refine((questions) => new Set(questions.map((question) => question.key)).size === questions.length, {
       message: "Question keys must be unique",
     }),
+  /** Absent from documents saved before facts were scored, which keep scoring by the defaults. */
+  facts: z
+    .array(FactRule)
+    .refine((rules) => new Set(rules.map((rule) => rule.fact)).size === rules.length, {
+      message: "Score each fact once",
+    })
+    .default(() => [...DEFAULT_FACT_RULES]),
 });
 export type Requirements = z.infer<typeof Requirements>;
 
@@ -95,8 +138,17 @@ export const Answer = z.discriminatedUnion("kind", [
 ]);
 export type Answer = z.infer<typeof Answer>;
 
-/** One reason a property scores as it does, e.g. `{ label: "Outdoor space", detail: "Balcony", points: 1.8 }`. */
-export const Contribution = z.object({ label: z.string(), detail: z.string(), points: z.number() });
+/**
+ * One reason a property scores as it does, e.g. `{ label: "Outdoor space", detail: "Balcony", points: 1.8 }`. `key`
+ * names the same reason on every property: the question's key, the fact's, or `commute_minutes:<destination id>`.
+ */
+export const Contribution = z.object({
+  key: z.string(),
+  source: z.enum(["jev", "fact"]),
+  label: z.string(),
+  detail: z.string(),
+  points: z.number(),
+});
 export type Contribution = z.infer<typeof Contribution>;
 
 export const Ranking = z.discriminatedUnion("kind", [

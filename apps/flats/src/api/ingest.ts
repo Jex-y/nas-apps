@@ -1,8 +1,8 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Limits } from "../contract";
+import { breach } from "../scoring";
 import type { FlatsDb } from "./db";
 import type { Availability, ParsedListing, SearchHit } from "./portals/listing";
-import { breach } from "./requirements";
 import { listings, properties, snapshots } from "./schema";
 
 /** Why a property the portal marks as shared ownership was rejected without being triaged. */

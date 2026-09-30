@@ -79,6 +79,8 @@ describe("flats mcp", () => {
     const detail = await json("get_property", { propertyId: property.id });
     expect(detail.keyFeatures).toContain("Private balcony");
     expect(detail.ranking.contributions).toContainEqual({
+      key: "outdoor_space",
+      source: "jev",
       label: "Outdoor space",
       detail: "Private garden",
       points: 3,

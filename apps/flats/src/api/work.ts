@@ -3,14 +3,15 @@ import { defineJob, defineSchedule, PermanentJobError } from "@apps/core";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { TRACKED_STATUSES } from "../contract";
+import { breach, exclusion } from "../scoring";
 import type { FlatsDb } from "./db";
 import type { FeatureExtractor } from "./extractor";
 import type { Fetcher } from "./fetcher";
 import { hitFromListing, type ListingChange, recordListingPage, recordSearchHit } from "./ingest";
 import { type JourneyPlanner, nextTuesday } from "./places";
 import { type ParsedListing, ParseError, PORTALS, type Portal, type PortalParser } from "./portals/listing";
-import { currentAnswers, exclusion, fingerprint, listingState, unanswered } from "./questions";
-import { breach, loadRequirements } from "./requirements";
+import { currentAnswers, fingerprint, listingState, unanswered } from "./questions";
+import { loadRequirements } from "./requirements";
 import { answers, commutes, destinations, listings, photos, properties, searches } from "./schema";
 
 export type FlatsWorkDeps = {
