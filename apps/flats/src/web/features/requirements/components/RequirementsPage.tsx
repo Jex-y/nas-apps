@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Requirements, Workbench } from "../../../../contract";
 import { matchingAnswers } from "../../../../scoring";
-import { useRequirements, useSaveRequirements, useWorkbench } from "../api/requirements";
+import { useRequirements, useWorkbench } from "../api/requirements";
 import { type Asking, useAskJev } from "../hooks/useAskJev";
+import { useAutosave } from "../hooks/useAutosave";
 import { useFingerprints } from "../hooks/useFingerprints";
 import { formatDocument, parseDraft } from "../utils/draft";
 import { drivers, type Row, rankProperties } from "../utils/rank";
@@ -11,7 +12,7 @@ import { JsonEditor } from "./JsonEditor";
 import { Leaderboard } from "./Leaderboard";
 import { VisualEditor } from "./VisualEditor";
 
-/** The requirements, edited visually or as JSON, with every flat re-ranked live as they change. */
+/** The requirements, edited visually or as JSON, with every flat re-ranked live as they change and saved as they settle. */
 export const RequirementsPage = () => {
   const saved = useRequirements();
   const workbench = useWorkbench();
@@ -22,7 +23,7 @@ export const RequirementsPage = () => {
   if (saved.data === undefined || workbench.data === undefined) {
     return <p className="muted">Loading…</p>;
   }
-  return <Editor key={formatDocument(saved.data)} saved={saved.data} workbench={workbench.data} />;
+  return <Editor saved={saved.data} workbench={workbench.data} />;
 };
 
 type Mode = "visual" | "json";
@@ -112,8 +113,8 @@ const Editor = ({ saved, workbench }: { saved: Requirements; workbench: Workbenc
   const [pane, setPane] = useState<Pane>("edit");
   const [showRejected, setShowRejected] = useState(false);
 
-  const save = useSaveRequirements();
   const dirty = text !== formatDocument(saved);
+  const save = useAutosave(draft.kind === "valid" && dirty ? draft.requirements : null);
   const moved = rows?.filter((row) => row.rank !== row.savedRank).length ?? 0;
   const inPlay = rows?.filter((row) => row.property.status !== "rejected") ?? [];
   const unread = inPlay.filter((row) => row.property.readable && row.unanswered.length > 0);
@@ -139,28 +140,20 @@ const Editor = ({ saved, workbench }: { saved: Requirements; workbench: Workbenc
           </p>
         </div>
         <div className="workbench-actions">
-          <span className={`workbench-status ${draft.kind === "invalid" ? "invalid" : dirty ? "dirty" : ""}`}>
-            {draft.kind === "invalid"
-              ? `${draft.problems.length === 1 ? "1 problem" : `${draft.problems.length} problems`} in the JSON`
-              : dirty
-                ? moved === 0
-                  ? "Unsaved changes"
-                  : `Unsaved · ${moved === 1 ? "1 flat moves" : `${moved} flats move`}`
-                : "Saved"}
-          </span>
-          <button type="button" disabled={!dirty} onClick={() => setText(formatDocument(saved))}>
-            Revert
-          </button>
-          <button
-            type="button"
-            className="primary"
-            disabled={!dirty || draft.kind === "invalid" || save.isPending}
-            onClick={() => draft.kind === "valid" && save.mutate(draft.requirements)}
+          <span
+            className={`workbench-status ${draft.kind === "invalid" || save.isError ? "invalid" : dirty ? "dirty" : ""}`}
+            role="status"
           >
-            {save.isPending ? "Saving…" : "Save"}
-          </button>
+            {draft.kind === "invalid"
+              ? `${draft.problems.length === 1 ? "1 problem" : `${draft.problems.length} problems`} in the JSON, not saved`
+              : save.isError && !save.isPending
+                ? "Not saved"
+                : dirty || save.isPending
+                  ? "Saving…"
+                  : "Saved"}
+          </span>
         </div>
-        {save.error && <p className="error">{save.error.message}</p>}
+        {save.error && !save.isPending && <p className="error">{save.error.message}</p>}
       </header>
 
       <nav className="segmented pane-switch" aria-label="Panes">

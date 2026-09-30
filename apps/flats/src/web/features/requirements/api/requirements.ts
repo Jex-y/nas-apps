@@ -13,11 +13,23 @@ export const useRequirements = () =>
 export const useWorkbench = () =>
   useQuery({ queryKey: workbenchKey, queryFn: () => requestJson(`${FLATS_API}/requirements/workbench`, Workbench) });
 
+/**
+ * Replaces the saved requirements. `keepalive` lets the request finish after the page is gone, so an edit made just
+ * before closing the tab still lands.
+ */
+export const putRequirements = (requirements: Requirements): Promise<Requirements> =>
+  requestJson(`${FLATS_API}/requirements`, Requirements, {
+    method: "PUT",
+    body: JSON.stringify(requirements),
+    keepalive: true,
+  });
+
 export const useSaveRequirements = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (requirements: Requirements) =>
-      requestJson(`${FLATS_API}/requirements`, Requirements, { method: "PUT", body: JSON.stringify(requirements) }),
+    // One at a time, in order: each save replaces the whole document.
+    scope: { id: "requirements" },
+    mutationFn: putRequirements,
     onSuccess: (saved) => {
       queryClient.setQueryData(requirementsKey, saved);
       return Promise.all([
