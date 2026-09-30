@@ -2,6 +2,8 @@ import { type FormEvent, useState } from "react";
 import { MAX_VIEWING_PHOTO_BYTES, type Viewing } from "../../../../contract";
 import { formatDateTime } from "../../../utils/format";
 import { useAddViewing, useDeleteViewing, useUploadViewingPhoto } from "../api/properties";
+import { PhotoViewer } from "./PhotoViewer";
+import type { GalleryPhoto } from "./SwipeCard";
 
 const localNow = () => {
   const now = new Date();
@@ -54,6 +56,8 @@ const ViewingForm = ({ propertyId }: { propertyId: string }) => {
 const ViewingItem = ({ viewing }: { viewing: Viewing }) => {
   const deleteViewing = useDeleteViewing();
   const upload = useUploadViewingPhoto();
+  const [shown, setShown] = useState<number | null>(null);
+  const photos: readonly GalleryPhoto[] = viewing.photos.map(({ url }) => ({ kind: "photo", url }));
 
   return (
     <li className="viewing">
@@ -67,12 +71,13 @@ const ViewingItem = ({ viewing }: { viewing: Viewing }) => {
       </div>
       {viewing.notes && <p className="prose">{viewing.notes}</p>}
       <div className="thumbs">
-        {viewing.photos.map((photo) => (
-          <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer">
+        {viewing.photos.map((photo, i) => (
+          <button key={photo.id} type="button" onClick={() => setShown(i)}>
             <img src={photo.url} alt={photo.filename} loading="lazy" />
-          </a>
+          </button>
         ))}
       </div>
+      {shown !== null && <PhotoViewer photos={photos} index={shown} onStep={setShown} onClose={() => setShown(null)} />}
       <label className="upload">
         {upload.isPending ? "Uploading…" : "Add photos"}
         <input

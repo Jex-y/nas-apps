@@ -13,7 +13,9 @@ import {
   pricePerSqft,
 } from "../../../utils/format";
 import { useProperty, useUpdateNotes } from "../api/properties";
+import { PhotoViewer } from "./PhotoViewer";
 import { StatusControl } from "./StatusControl";
+import type { GalleryPhoto } from "./SwipeCard";
 import { ViewingsSection } from "./ViewingsSection";
 
 /**
@@ -63,6 +65,40 @@ const Facts = ({ property }: { property: PropertyDetail }) => {
   );
 };
 
+const PhotoGallery = ({ property }: { property: PropertyDetail }) => {
+  const [viewing, setViewing] = useState<number | null>(null);
+  const photos: readonly GalleryPhoto[] =
+    property.photos.length > 0
+      ? [
+          ...property.photos.filter((photo) => photo.kind === "photo"),
+          ...property.photos.filter((photo) => photo.kind === "floorplan"),
+        ]
+      : property.thumbnailUrl
+        ? [{ kind: "photo", url: property.thumbnailUrl }]
+        : [];
+  const [cover, ...rest] = photos;
+
+  return (
+    <div className="gallery">
+      {cover && (
+        <button type="button" onClick={() => setViewing(0)}>
+          <img className="cover" src={cover.url} alt="" />
+        </button>
+      )}
+      <div className="thumbs">
+        {rest.map((photo, i) => (
+          <button key={photo.url} type="button" onClick={() => setViewing(i + 1)}>
+            <img src={photo.url} alt={photo.kind} loading="lazy" />
+          </button>
+        ))}
+      </div>
+      {viewing !== null && (
+        <PhotoViewer photos={photos} index={viewing} onStep={setViewing} onClose={() => setViewing(null)} />
+      )}
+    </div>
+  );
+};
+
 const Notes = ({ property }: { property: PropertyDetail }) => {
   const updateNotes = useUpdateNotes();
   const [notes, setNotes] = useState(property.notes);
@@ -94,8 +130,6 @@ export const PropertyPage = ({ id }: { id: string }) => {
     return <p className="error">{property.error.message}</p>;
   }
   const detail = property.data;
-  const [cover, ...rest] = detail.photos.filter((photo) => photo.kind === "photo");
-  const floorplans = detail.photos.filter((photo) => photo.kind === "floorplan");
 
   return (
     <article className="property">
@@ -122,20 +156,7 @@ export const PropertyPage = ({ id }: { id: string }) => {
         </div>
       </div>
 
-      <div className="gallery">
-        {cover ? (
-          <img className="cover" src={cover.url} alt="" />
-        ) : (
-          detail.thumbnailUrl && <img className="cover" src={detail.thumbnailUrl} alt="" />
-        )}
-        <div className="thumbs">
-          {[...rest, ...floorplans].map((photo) => (
-            <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer">
-              <img src={photo.url} alt={photo.kind} loading="lazy" />
-            </a>
-          ))}
-        </div>
-      </div>
+      <PhotoGallery property={detail} />
 
       <div className="columns">
         <div>
