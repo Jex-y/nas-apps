@@ -16,11 +16,13 @@
       "name": "@apps/flats",
       "dependencies": {
         "@apps/core": "workspace:*",
+        "@codemirror/autocomplete": "^6.20.3",
         "@codemirror/lang-json": "^6.0.2",
         "@codemirror/language": "^6.12.4",
         "@codemirror/lint": "^6.9.7",
         "@codemirror/state": "^6.7.6",
         "@codemirror/view": "^6.43.13",
+        "@lezer/common": "^1.5.3",
         "@lezer/highlight": "^1.2.5",
         "@modelcontextprotocol/sdk": "^1.31.0",
         "@tanstack/react-query": "^5.104.0",
