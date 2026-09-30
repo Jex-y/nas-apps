@@ -14,7 +14,7 @@ import {
 } from "../contract";
 import { createFlatsApp } from "../module";
 import { DEFAULT_REQUIREMENTS } from "./requirements";
-import { collapseHistory } from "./routes";
+import { collapseHistory } from "./service";
 
 const { context, setup, addSearch, propertyByPortalId } = createFlatsTestbed();
 const request = startTestServer(

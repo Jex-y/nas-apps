@@ -6,6 +6,7 @@ import { BROWSER_USER_AGENT, createHttpFetcher } from "./api/fetcher";
 import { createPostcodesIo, createTflPlanner, type Geocoder, type JourneyPlanner } from "./api/places";
 import { rightmove } from "./api/portals/rightmove";
 import { createFlatsRoutes } from "./api/routes";
+import { createFlatsService } from "./api/service";
 import { createFlatsWork } from "./api/work";
 import page from "./web/index.html";
 
@@ -44,6 +45,14 @@ export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = re
     publicUrl: context.publicUrl,
     now: () => new Date(),
   });
+  const service = createFlatsService({
+    db,
+    blob,
+    work,
+    parsers,
+    geocoder: adapters.geocoder,
+    extractor: adapters.extractor,
+  });
 
   return {
     slug: "flats",
@@ -51,15 +60,7 @@ export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = re
     routes: appRoutes({
       "/flats": trailingSlashRedirect("flats"),
       "/flats/*": page,
-      ...createFlatsRoutes({
-        db,
-        blob,
-        identity: context.identity,
-        work,
-        parsers,
-        geocoder: adapters.geocoder,
-        extractor: adapters.extractor,
-      }),
+      ...createFlatsRoutes({ service, identity: context.identity }),
     }),
     jobs: work.jobs,
     schedules: work.schedules,
