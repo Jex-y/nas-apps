@@ -3,8 +3,11 @@ import { startTestServer, uniqueLogin } from "@apps/core/testing";
 import { drizzle } from "drizzle-orm/bun-sql";
 import { createFlatsTestbed, fakeCrime, fakeExtractor, fakeGeocoder, fakePlanner } from "../../test/support";
 import {
+  CrimeCells,
   Destination,
   DestinationList,
+  MAP_WORKER_PATH,
+  MapData,
   PropertyDetail,
   PropertyList,
   Requirements,
@@ -272,6 +275,55 @@ test("history keeps only the changes", () => {
       point("2026-09-04T00:00:00Z", 390000, "sold_stc"),
     ]).map((kept) => kept.observedAt),
   ).toEqual(["2026-09-01T00:00:00Z", "2026-09-03T00:00:00Z", "2026-09-04T00:00:00Z"]);
+});
+
+describe("the map", () => {
+  test("places each listed property and each commute place", async () => {
+    await seed();
+    await request("/flats/api/destinations", {
+      as: me,
+      method: "POST",
+      ...json({ name: "Office", postcode: "WC2A 1QS", arriveBy: "09:00" }),
+    });
+
+    const map = MapData.parse(await (await request("/flats/api/map", { as: me })).json());
+
+    expect(map.properties.find((property) => property.address === "Union Lane, Isleworth")).toMatchObject({
+      latitude: 51.476311,
+      longitude: -0.324446,
+      ranking: { kind: "scored" },
+      crime: { perMonth: 7 },
+    });
+    expect(map.places).toEqual([{ id: expect.any(String), name: "Office", latitude: 51.5162, longitude: -0.1117 }]);
+  });
+
+  test("counts crime in view in cells, never finer than 120 m", async () => {
+    await seed();
+    const around = "south=51.47&west=-0.33&north=51.48&east=-0.32";
+
+    const crime = CrimeCells.parse(await (await request(`/flats/api/map/crime?${around}`, { as: me })).json());
+
+    expect(crime).toMatchObject({ throughMonth: "2026-07", months: 12, cellMetres: 120 });
+    expect(crime.cells).toEqual([
+      { latitude: expect.closeTo(51.4763, 3), longitude: expect.closeTo(-0.3244, 3), count: 84 },
+    ]);
+  });
+
+  test("serves MapLibre's worker as one script", async () => {
+    const response = await request(MAP_WORKER_PATH, { as: me });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toStartWith("text/javascript");
+    const script = await response.text();
+    expect(script.length).toBeGreaterThan(100_000);
+    expect(script).not.toContain("maplibre-gl-shared.mjs");
+  });
+
+  test("refuses a view that is inside out", async () => {
+    const response = await request("/flats/api/map/crime?south=51.48&west=-0.33&north=51.47&east=-0.32", { as: me });
+
+    expect(response.status).toBe(400);
+  });
 });
 
 describe("destinations", () => {

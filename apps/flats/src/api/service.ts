@@ -1,14 +1,17 @@
 import { type BlobStore, HttpError } from "@apps/core";
-import { and, asc, desc, eq, gt, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import { and, asc, between, desc, eq, gt, inArray, isNotNull, max, ne, sql } from "drizzle-orm";
 import {
   type Commute,
   type CreateDestination,
   type CreateSearch,
   type CreateViewing,
+  type CrimeCells,
   type CrimeSummary,
   type Destination,
   FLATS_API,
   MAX_VIEWING_PHOTO_BYTES,
+  type MapBounds,
+  type MapData,
   type PricePoint,
   type PropertyDetail,
   type PropertyStatus,
@@ -22,6 +25,7 @@ import {
   type Workbench,
 } from "../contract";
 import { breach, scoreProperty } from "../scoring";
+import { CRIME_MONTHS, METRES_PER_DEGREE, monthsTo } from "./crime";
 import type { FlatsDb } from "./db";
 import type { FeatureExtractor } from "./extractor";
 import { SHARED_OWNERSHIP_REASON } from "./ingest";
@@ -33,6 +37,8 @@ import {
   answers,
   commutes,
   crime,
+  crimeReports,
+  crimeTiles,
   destinations,
   listings,
   photos,
@@ -61,6 +67,9 @@ export type AddedListing = { readonly portal: Portal; readonly portalId: string 
 
 /** Pages polled when a search is added, so it starts with what is on the market now. */
 const BACKFILL_PAGES = 3;
+/** Crime cells are never finer than this, so a close zoom does not pinpoint one street's reports. */
+const MIN_CELL_METRES = 120;
+const CELLS_ACROSS = 120;
 
 const photoPath = (id: string) => `${FLATS_API}/photos/${id}`;
 const viewingPhotoPath = (id: string) => `${FLATS_API}/viewing-photos/${id}`;
@@ -278,6 +287,84 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
           .storedAnswersOf(summary.id)
           .map(({ questionKey, fingerprint, answer }) => ({ questionKey, fingerprint, answer })),
         readable: readable.has(summary.id),
+      })),
+    };
+  };
+
+  /** Every listed property that has a location, and every commute place, for the map. */
+  const mapData = async (): Promise<MapData> => {
+    const rows = await db
+      .select()
+      .from(properties)
+      .where(
+        and(ne(properties.availability, "removed"), isNotNull(properties.latitude), isNotNull(properties.longitude)),
+      )
+      .orderBy(desc(properties.firstSeenAt));
+    const summarised = await summaries(rows);
+    const places = await db.select().from(destinations).orderBy(asc(destinations.createdAt));
+    return {
+      properties: summarised.flatMap((summary, index) => {
+        const row = rows[index];
+        return row?.latitude == null || row.longitude == null
+          ? []
+          : [
+              {
+                id: summary.id,
+                status: summary.status,
+                address: summary.address,
+                postcode: summary.postcode,
+                price: summary.price,
+                priceQualifier: summary.priceQualifier,
+                bedrooms: summary.bedrooms,
+                sizeSqft: summary.sizeSqft,
+                thumbnailUrl: summary.thumbnailUrl,
+                crime: summary.crime,
+                ranking: summary.ranking,
+                latitude: row.latitude,
+                longitude: row.longitude,
+              },
+            ];
+      }),
+      places: places.map(({ id, name, latitude, longitude }) => ({ id, name, latitude, longitude })),
+    };
+  };
+
+  /**
+   * Street crime in `bounds` over the latest months stored, in square cells: about `CELLS_ACROSS` across the view,
+   * but never finer than `MIN_CELL_METRES`, so the answer stays small at any zoom.
+   */
+  const crimeCells = async (bounds: MapBounds): Promise<CrimeCells> => {
+    const spanMetres = (bounds.north - bounds.south) * METRES_PER_DEGREE;
+    const cellMetres = Math.max(MIN_CELL_METRES, Math.round(spanMetres / CELLS_ACROSS));
+    const [latest] = await db.select({ month: max(crimeTiles.month) }).from(crimeTiles);
+    if (latest?.month == null) {
+      return { throughMonth: null, months: CRIME_MONTHS, cellMetres, cells: [] };
+    }
+    const middle = (bounds.south + bounds.north) / 2;
+    const tall = cellMetres / METRES_PER_DEGREE;
+    const wide = cellMetres / (METRES_PER_DEGREE * Math.cos((middle * Math.PI) / 180));
+    const row = sql<number>`floor(${crimeReports.latitude} / ${tall})`;
+    const column = sql<number>`floor(${crimeReports.longitude} / ${wide})`;
+    const cells = await db
+      .select({ row, column, count: sql<number>`count(*)::int` })
+      .from(crimeReports)
+      .where(
+        and(
+          inArray(crimeReports.month, monthsTo(latest.month, CRIME_MONTHS)),
+          between(crimeReports.latitude, bounds.south, bounds.north),
+          between(crimeReports.longitude, bounds.west, bounds.east),
+        ),
+      )
+      // By position: the cell size is bound once per mention, so Postgres cannot match the expressions themselves.
+      .groupBy(sql`1`, sql`2`);
+    return {
+      throughMonth: latest.month,
+      months: CRIME_MONTHS,
+      cellMetres,
+      cells: cells.map((cell) => ({
+        latitude: (Number(cell.row) + 0.5) * tall,
+        longitude: (Number(cell.column) + 0.5) * wide,
+        count: cell.count,
       })),
     };
   };
@@ -604,6 +691,10 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
     trial,
 
     workbench,
+
+    mapData,
+
+    crimeCells,
 
     destinations: async (): Promise<Destination[]> =>
       (await db.select().from(destinations).orderBy(asc(destinations.createdAt))).map(toDestination),

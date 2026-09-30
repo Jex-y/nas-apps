@@ -370,6 +370,54 @@ export const CreateDestination = z.object({
 });
 export type CreateDestination = z.infer<typeof CreateDestination>;
 
+/** Where the server serves MapLibre's web worker; see mapWorker.ts. */
+export const MAP_WORKER_PATH = "/flats/api/map/worker.js";
+
+/** A listed property where it is, with what the map shows about it. */
+export const MapProperty = PropertySummary.pick({
+  id: true,
+  status: true,
+  address: true,
+  postcode: true,
+  price: true,
+  priceQualifier: true,
+  bedrooms: true,
+  sizeSqft: true,
+  thumbnailUrl: true,
+  crime: true,
+  ranking: true,
+}).extend({ latitude: z.number(), longitude: z.number() });
+export type MapProperty = z.infer<typeof MapProperty>;
+
+export const MapPlace = z.object({ id: z.uuid(), name: z.string(), latitude: z.number(), longitude: z.number() });
+export type MapPlace = z.infer<typeof MapPlace>;
+
+export const MapData = z.object({ properties: z.array(MapProperty), places: z.array(MapPlace) });
+export type MapData = z.infer<typeof MapData>;
+
+/** The part of the map in view, from the query string. */
+export const MapBounds = z
+  .object({
+    south: z.coerce.number().min(-90).max(90),
+    west: z.coerce.number().min(-180).max(180),
+    north: z.coerce.number().min(-90).max(90),
+    east: z.coerce.number().min(-180).max(180),
+  })
+  .refine((bounds) => bounds.south < bounds.north && bounds.west < bounds.east, {
+    message: "south must be below north, and west left of east",
+  });
+export type MapBounds = z.infer<typeof MapBounds>;
+
+/** Street crime in view, counted in square cells over the latest months stored. */
+export const CrimeCells = z.object({
+  /** `null` until crime has been counted anywhere. */
+  throughMonth: z.string().nullable(),
+  months: z.number(),
+  cellMetres: z.number(),
+  cells: z.array(z.object({ latitude: z.number(), longitude: z.number(), count: z.number() })),
+});
+export type CrimeCells = z.infer<typeof CrimeCells>;
+
 export const TrialRequest = z.object({ requirements: Requirements, propertyId: z.uuid() });
 export type TrialRequest = z.infer<typeof TrialRequest>;
 

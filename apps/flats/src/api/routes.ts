@@ -1,10 +1,19 @@
-import { defineRoutes, HttpError, type IdentityMode, parseBody, parseParam, resolveViewer } from "@apps/core";
+import {
+  defineRoutes,
+  HttpError,
+  type IdentityMode,
+  parseBody,
+  parseParam,
+  parseQuery,
+  resolveViewer,
+} from "@apps/core";
 import { z } from "zod";
 import {
   AddListing,
   CreateDestination,
   CreateSearch,
   CreateViewing,
+  MapBounds,
   PROPERTY_STATUSES,
   Requirements,
   TrialRequest,
@@ -125,6 +134,12 @@ export const createFlatsRoutes = ({ service, identity }: FlatsRoutesDeps) => {
       POST: viewer(async (request) =>
         Response.json(await service.trial(await parseBody(request, TrialRequest), request.signal)),
       ),
+    },
+    "/flats/api/map": {
+      GET: viewer(async () => Response.json(await service.mapData())),
+    },
+    "/flats/api/map/crime": {
+      GET: viewer(async (request) => Response.json(await service.crimeCells(parseQuery(request, MapBounds)))),
     },
     "/flats/api/destinations": {
       GET: viewer(async () => Response.json(await service.destinations())),
