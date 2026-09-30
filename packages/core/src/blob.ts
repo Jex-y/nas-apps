@@ -46,6 +46,7 @@ export type BlobDownload = {
 /** Object storage scoped to one app: every key lives under `<namespace>/` in the shared bucket. */
 export type BlobStore = {
   readonly write: (key: string, data: Blob, contentType: string) => Promise<void>;
+  readonly read: (key: string) => Promise<Uint8Array>;
   readonly delete: (key: string) => Promise<void>;
   readonly exists: (key: string) => Promise<boolean>;
   readonly downloadUrl: (key: string, download: BlobDownload) => string;
@@ -71,6 +72,7 @@ export const createBlobStore = (config: BlobConfig, namespace: string): BlobStor
     write: async (key, data, contentType) => {
       await internal.write(path(key), data, { type: contentType });
     },
+    read: (key) => internal.file(path(key)).bytes(),
     delete: (key) => internal.delete(path(key)),
     exists: (key) => internal.exists(path(key)),
     downloadUrl: (key, { filename, expiresInSeconds = 300 }) =>

@@ -13,6 +13,15 @@ storage, push and the test harness.
 
 The server refuses to start if two apps share a slug or an app declares a route outside `/<slug>/`.
 
+## Serve tools over MCP
+
+Anything a person can do in an app's UI should also be a tool. An app's `mcp` gives its instructions for the model and
+registers its tools for the connected viewer; the server serves them at `/<slug>/mcp` and with every other app's at
+`/mcp`, so tool names must be unique across apps. Keep the logic in a service the HTTP routes and the tools both call
+(`apps/tasks/src/api/service.ts`), and wrap each tool in `toolResult` so an `HttpError` reaches the model as a tool
+error it can act on. Answer a list tool briefly and leave the full record to a `get_` tool: Claude Code truncates tool
+results over 25,000 tokens.
+
 ## Change the schema
 
 Edit `apps/<slug>/src/api/schema.ts`, then:

@@ -1,5 +1,6 @@
 import { type AppModule, routePaths, serveRoutes } from "./app-module";
 import { errorResponse } from "./http";
+import { createMcpRoutes } from "./mcp";
 import { createShellRoutes, SHELL_SLUG, type ShellOptions } from "./shell/routes";
 
 const mergeAppRoutes = (apps: readonly AppModule[]): Bun.Serve.Routes<undefined, string> => {
@@ -35,6 +36,7 @@ export const startServer = ({ port, development, apps, shell }: ServerOptions): 
       ...createShellRoutes(apps, shell),
       "/healthz": new Response("ok"),
       ...mergeAppRoutes(apps),
+      ...createMcpRoutes(apps, shell.identity),
     },
     fetch: () => Response.json({ error: "Not found" }, { status: 404 }),
     error: errorResponse,

@@ -17,14 +17,6 @@ one push notification a day, on their own devices only.
 
 ## Manage tasks from Claude
 
-The app serves an MCP server at `https://apps.<tailnet>.ts.net/tasks/mcp` (Streamable HTTP, stateless), with tools
-to read your list with its critical-path schedule and to create, edit, move, link and delete tasks. It acts as the
-same Tailscale identity as the web app, so it only ever sees your own tasks, and it works from any client on a
-tailnet device, e.g. Claude Code:
-
-```sh
-claude mcp add --transport http --scope user tasks https://apps.<tailnet>.ts.net/tasks/mcp
-```
-
-Clients that connect from the cloud rather than your device, such as claude.ai's custom connectors, cannot reach
-the tailnet.
+The tasks tools (read your list with its critical-path schedule; create, edit, move, link and delete tasks) are on the
+stack's MCP server; see the [root README](../../README.md#use-from-claude). They act as your Tailscale identity, so
+they only ever see your own tasks.

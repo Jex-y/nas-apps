@@ -3,6 +3,7 @@ import type { BlobConfig } from "./blob";
 import type { IdentityMode } from "./identity";
 import type { JobQueue, RegisteredJob } from "./jobs/queue";
 import type { Schedule } from "./jobs/schedule";
+import type { AppMcp } from "./mcp";
 import type { NotifierFactory } from "./notify";
 
 export type AppContext = {
@@ -48,6 +49,7 @@ export type AppModule = {
   readonly routes: AppRoutes;
   readonly jobs: readonly RegisteredJob[];
   readonly schedules: readonly Schedule[];
+  readonly mcp: AppMcp;
 };
 
 export const trailingSlashRedirect = (slug: string): Response =>

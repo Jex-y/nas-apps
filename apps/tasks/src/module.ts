@@ -1,6 +1,6 @@
-import { type AppContext, type AppModule, appRoutes, resolveViewer, trailingSlashRedirect } from "@apps/core";
+import { type AppContext, type AppModule, appRoutes, trailingSlashRedirect } from "@apps/core";
 import { tasksDb } from "./api/db";
-import { handleMcp } from "./api/mcp";
+import { createTasksMcp } from "./api/mcp";
 import { createTasksRoutes } from "./api/routes";
 import { createTasksService } from "./api/service";
 import { createTasksWork } from "./api/work";
@@ -18,8 +18,6 @@ export const createTasksApp = (context: AppContext, { now }: TasksAdapters = { n
     publicUrl: context.publicUrl,
     now,
   });
-  const mcp = handleMcp({ service, now });
-  const serveMcp = (request: Request) => mcp(request, resolveViewer(context.identity, request).login);
 
   return {
     slug: "tasks",
@@ -27,10 +25,10 @@ export const createTasksApp = (context: AppContext, { now }: TasksAdapters = { n
     routes: appRoutes({
       "/tasks": trailingSlashRedirect("tasks"),
       "/tasks/*": page,
-      "/tasks/mcp": { GET: serveMcp, POST: serveMcp, DELETE: serveMcp },
       ...createTasksRoutes({ service, identity: context.identity }),
     }),
     jobs: work.jobs,
     schedules: work.schedules,
+    mcp: createTasksMcp({ service, now }),
   };
 };

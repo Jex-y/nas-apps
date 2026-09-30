@@ -113,6 +113,7 @@ describe("shell", () => {
       routes: {} as never,
       jobs: [],
       schedules: [],
+      mcp: { instructions: "", registerTools: () => {} },
     };
     expect(() => startServer({ port: 0, development: false, apps: [app], shell })).toThrow(/reserved/);
   });

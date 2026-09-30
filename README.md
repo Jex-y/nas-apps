@@ -9,12 +9,13 @@ request carries the viewer's tailnet login, so there are no accounts or password
 | App                      | What it does                                                                                          |
 | ------------------------ | ----------------------------------------------------------------------------------------------------- |
 | [`flats`](apps/flats)    | Watches Rightmove saved searches, triages new listings by swiping, and times commutes with the TfL API |
-| [`tasks`](apps/tasks)    | A personal to-do list with dependencies, a board, a critical-path timeline and an MCP server          |
+| [`tasks`](apps/tasks)    | A personal to-do list with dependencies, a board and a critical-path timeline                         |
 | [`status`](apps/status)  | Health of the stack: services, job queue, schedules and recent failures                               |
 
 One Bun server hosts every app. Each app is its own workspace package owning its routes, its Postgres schema,
 its migrations, its prefix in object storage and its React UI, so any one of them can move to its own server later.
-All of them install together as one PWA with Web Push notifications.
+All of them install together as one PWA with Web Push notifications, and serve their tools to Claude over one MCP
+server.
 
 ```
 packages/core     shared runtime: config, identity, server, jobs, migrations, blob storage, push, test harness
@@ -23,6 +24,19 @@ server            composition root: the app list, the server, worker and migrate
 scripts/build.ts  bundles server + UIs into a self-contained dist/
 deploy/           the production stack, the host's deploy script and its .env template
 ```
+
+## Use from Claude
+
+Every app's functionality is also served over MCP (Streamable HTTP, stateless) at `https://apps.<tailnet>.ts.net/mcp`,
+or one app alone at `/<slug>/mcp`. It acts as the same Tailscale identity as the web apps and works from any client
+on a tailnet device, e.g. Claude Code:
+
+```sh
+claude mcp add --transport http --scope user apps https://apps.<tailnet>.ts.net/mcp
+```
+
+Clients that connect from the cloud rather than your device, such as claude.ai's custom connectors, cannot reach the
+tailnet.
 
 ## Develop
 

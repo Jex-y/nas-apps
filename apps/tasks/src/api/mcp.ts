@@ -1,7 +1,4 @@
-import { HttpError } from "@apps/core";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { type AppMcp, HttpError, type McpServer, toolResult } from "@apps/core";
 import { z } from "zod";
 import { CreateTask, DurationDays, STATUSES, type TaskList, UpdateTask } from "../contract";
 import { blockers, dateOfDay, schedule, topologicalOrder } from "../plan";
@@ -57,24 +54,7 @@ const planOf = (list: TaskList, today: number) => {
   };
 };
 
-const text = (value: unknown): CallToolResult => ({
-  content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
-});
-
-/** Refusals go back to the model as tool errors it can read and act on, rather than protocol failures. */
-const run = async (work: () => Promise<unknown>): Promise<CallToolResult> => {
-  try {
-    return text(await work());
-  } catch (error) {
-    if (error instanceof HttpError) {
-      return { isError: true, content: [{ type: "text", text: error.message }] };
-    }
-    throw error;
-  }
-};
-
-const createServer = ({ service, now }: TasksMcpDeps, owner: string): McpServer => {
-  const server = new McpServer({ name: "nas-tasks", version: "1.0.0" }, { instructions: INSTRUCTIONS });
+const registerTools = ({ service, now }: TasksMcpDeps, server: McpServer, owner: string) => {
   const plan = async (list: Promise<TaskList>) => planOf(await list, londonDay(now()));
 
   const change = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
@@ -86,7 +66,7 @@ const createServer = ({ service, now }: TasksMcpDeps, owner: string): McpServer 
       description: "Reads every task in dependency order, with what each waits on and its schedule.",
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    () => run(() => plan(service.list(owner))),
+    () => toolResult(() => plan(service.list(owner))),
   );
   server.registerTool(
     "create_task",
@@ -102,7 +82,7 @@ const createServer = ({ service, now }: TasksMcpDeps, owner: string): McpServer 
       },
       annotations: change,
     },
-    (input) => run(() => plan(service.createTask(owner, input))),
+    (input) => toolResult(() => plan(service.createTask(owner, input))),
   );
   server.registerTool(
     "update_task",
@@ -119,7 +99,7 @@ const createServer = ({ service, now }: TasksMcpDeps, owner: string): McpServer 
       annotations: edit,
     },
     ({ taskId, ...fields }) =>
-      run(async () => {
+      toolResult(async () => {
         const update = UpdateTask.safeParse(fields);
         if (!update.success) {
           throw new HttpError(400, z.prettifyError(update.error));
@@ -143,7 +123,7 @@ const createServer = ({ service, now }: TasksMcpDeps, owner: string): McpServer 
       },
       annotations: edit,
     },
-    ({ taskId, ...move }) => run(() => plan(service.moveTask(owner, taskId, move))),
+    ({ taskId, ...move }) => toolResult(() => plan(service.moveTask(owner, taskId, move))),
   );
   server.registerTool(
     "delete_task",
@@ -152,7 +132,7 @@ const createServer = ({ service, now }: TasksMcpDeps, owner: string): McpServer 
       inputSchema: { taskId: TaskId },
       annotations: { ...change, destructiveHint: true },
     },
-    ({ taskId }) => run(() => plan(service.deleteTask(owner, taskId))),
+    ({ taskId }) => toolResult(() => plan(service.deleteTask(owner, taskId))),
   );
   server.registerTool(
     "add_dependency",
@@ -161,7 +141,7 @@ const createServer = ({ service, now }: TasksMcpDeps, owner: string): McpServer 
       inputSchema: { taskId: TaskId, dependsOnId: z.uuid().describe("The task that must be done first") },
       annotations: edit,
     },
-    ({ taskId, dependsOnId }) => run(() => plan(service.addDependency(owner, taskId, dependsOnId))),
+    ({ taskId, dependsOnId }) => toolResult(() => plan(service.addDependency(owner, taskId, dependsOnId))),
   );
   server.registerTool(
     "remove_dependency",
@@ -170,19 +150,12 @@ const createServer = ({ service, now }: TasksMcpDeps, owner: string): McpServer 
       inputSchema: { taskId: TaskId, dependsOnId: z.uuid().describe("The task it should no longer wait on") },
       annotations: edit,
     },
-    ({ taskId, dependsOnId }) => run(() => plan(service.removeDependency(owner, taskId, dependsOnId))),
+    ({ taskId, dependsOnId }) => toolResult(() => plan(service.removeDependency(owner, taskId, dependsOnId))),
   );
-  return server;
 };
 
-/**
- * Serves `owner`'s list over MCP Streamable HTTP, statelessly: each request gets its own server and transport, and
- * answers with plain JSON, so nothing is held between requests and any server instance can answer.
- */
-export const handleMcp =
-  (deps: TasksMcpDeps) =>
-  async (request: Request, owner: string): Promise<Response> => {
-    const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });
-    await createServer(deps, owner).connect(transport);
-    return transport.handleRequest(request);
-  };
+/** Acts on the connected person's own list only. */
+export const createTasksMcp = (deps: TasksMcpDeps): AppMcp => ({
+  instructions: INSTRUCTIONS,
+  registerTools: (server, viewer) => registerTools(deps, server, viewer.login),
+});

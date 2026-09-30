@@ -51,6 +51,9 @@ export type FlatsServiceDeps = {
   readonly extractor: FeatureExtractor | null;
 };
 
+/** A stored image's bytes, for a client that cannot follow a presigned URL. */
+export type StoredImage = { readonly data: Uint8Array; readonly contentType: string };
+
 export type AddedListing = { readonly portal: Portal; readonly portalId: string };
 
 /** Pages polled when a search is added, so it starts with what is on the market now. */
@@ -357,7 +360,7 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
 
   const requirePhoto = async (id: string) => {
     const [photo] = await db
-      .select({ id: photos.id, kind: photos.kind, position: photos.position })
+      .select({ id: photos.id, kind: photos.kind, position: photos.position, contentType: photos.contentType })
       .from(photos)
       .where(eq(photos.id, id));
     if (photo === undefined) {
@@ -365,6 +368,11 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
     }
     return photo;
   };
+
+  const image = async (key: string, contentType: string): Promise<StoredImage> => ({
+    data: await blob.read(key),
+    contentType,
+  });
 
   return {
     /** Newest first, optionally only those with `status`. */
@@ -448,6 +456,11 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       return blob.downloadUrl(`viewing-photos/${photo.id}`, { filename: photo.filename });
     },
 
+    viewingPhoto: async (id: string): Promise<StoredImage> => {
+      const photo = await requireViewingPhoto(id);
+      return image(`viewing-photos/${photo.id}`, photo.contentType);
+    },
+
     deleteViewingPhoto: async (id: string): Promise<void> => {
       const deleted = await db
         .delete(viewingPhotos)
@@ -465,6 +478,11 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
         filename: `${photo.kind}-${photo.position + 1}.jpg`,
         expiresInSeconds: 3600,
       });
+    },
+
+    photo: async (id: string): Promise<StoredImage> => {
+      const photo = await requirePhoto(id);
+      return image(`photos/${photo.id}`, photo.contentType);
     },
 
     searches: async (): Promise<Search[]> =>

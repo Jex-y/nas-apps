@@ -1,4 +1,7 @@
 import { afterAll } from "bun:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { AppContext, AppModule } from "./app-module";
 import { parseRuntimeConfig } from "./config";
 import { createSql } from "./database";
@@ -52,3 +55,23 @@ export const startTestServer = (
 };
 
 export const uniqueLogin = (): string => `${crypto.randomUUID()}@test.local`;
+
+/** The MCP SDK's own client, reaching `path` on the test server as `as` from a tailnet device. */
+export const connectMcp = async (request: TestRequest, path: string, as: string): Promise<Client> => {
+  const client = new Client({ name: "test", version: "1.0.0" });
+  const transport = new StreamableHTTPClientTransport(new URL(path, "http://apps.test"), {
+    fetch: (url, init) => request(new URL(url).pathname, { ...init, as }),
+  });
+  // The SDK's optional `sessionId` is typed without `| undefined`, which `exactOptionalPropertyTypes` rejects.
+  await client.connect(transport as Transport);
+  return client;
+};
+
+export type ToolText = { readonly isError: boolean; readonly text: string };
+
+/** Calls a tool that answers in text, as most do. */
+export const callTool = async (client: Client, name: string, args: Record<string, unknown> = {}): Promise<ToolText> => {
+  const result = await client.callTool({ name, arguments: args });
+  const [content] = result.content as { type: string; text: string }[];
+  return { isError: result.isError === true, text: content?.text ?? "" };
+};

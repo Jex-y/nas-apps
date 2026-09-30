@@ -3,6 +3,7 @@ import { parseFlatsConfig } from "./api/config";
 import { flatsDb } from "./api/db";
 import { createJevExtractor, type FeatureExtractor } from "./api/extractor";
 import { BROWSER_USER_AGENT, createHttpFetcher } from "./api/fetcher";
+import { createFlatsMcp } from "./api/mcp";
 import { createPostcodesIo, createTflPlanner, type Geocoder, type JourneyPlanner } from "./api/places";
 import { rightmove } from "./api/portals/rightmove";
 import { createFlatsRoutes } from "./api/routes";
@@ -64,5 +65,6 @@ export const createFlatsApp = (context: AppContext, adapters: FlatsAdapters = re
     }),
     jobs: work.jobs,
     schedules: work.schedules,
+    mcp: createFlatsMcp(service),
   };
 };

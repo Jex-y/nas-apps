@@ -6,6 +6,7 @@ export * from "./database";
 export * from "./http";
 export * from "./identity";
 export * from "./jobs";
+export * from "./mcp";
 export * from "./migrations";
 export * from "./notify";
 export * from "./push/send";

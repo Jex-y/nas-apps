@@ -1,13 +1,16 @@
-import { defineRoutes, resolveViewer } from "@apps/core";
-import { createStatusReporter, type StatusDeps } from "./report";
+import { defineRoutes, type IdentityMode, resolveViewer } from "@apps/core";
+import type { StatusReport } from "../contract";
 
-export const createStatusRoutes = (deps: StatusDeps) => {
-  const report = createStatusReporter(deps);
+export type StatusRoutesDeps = {
+  readonly identity: IdentityMode;
+  readonly report: () => Promise<StatusReport>;
+};
 
-  return defineRoutes({
+export const createStatusRoutes = ({ identity, report }: StatusRoutesDeps) =>
+  defineRoutes({
     "/status/api/report": {
       GET: async (request) => {
-        resolveViewer(deps.context.identity, request);
+        resolveViewer(identity, request);
         return Response.json(await report(), {
           headers: { "Cache-Control": "no-store" },
         });
@@ -15,4 +18,3 @@ export const createStatusRoutes = (deps: StatusDeps) => {
     },
     "/status/api/*": Response.json({ error: "Not found" }, { status: 404 }),
   });
-};
