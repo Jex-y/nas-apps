@@ -1,5 +1,7 @@
 import { json, jsonParseLinter } from "@codemirror/lang-json";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { linter, lintGutter } from "@codemirror/lint";
+import { tags } from "@lezer/highlight";
 import { basicSetup, EditorView } from "codemirror";
 import { useEffect, useRef } from "react";
 
@@ -12,6 +14,15 @@ const appTheme = EditorView.theme({
   ".cm-activeLine, .cm-activeLineGutter": { backgroundColor: "var(--surface-2)" },
   ".cm-cursor": { borderLeftColor: "var(--fg)" },
 });
+
+/** Syntax colours from the theme too: the default style's dark reds all but vanish on a dark ground. */
+const appHighlight = HighlightStyle.define([
+  { tag: tags.propertyName, color: "var(--fg)" },
+  { tag: tags.string, color: "var(--accent)" },
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--pink)" },
+  { tag: [tags.brace, tags.squareBracket, tags.separator, tags.punctuation], color: "var(--muted)" },
+  { tag: tags.invalid, color: "var(--error)" },
+]);
 
 /** A JSON editor; replacing `value` from outside (e.g. reverting) replaces the text being edited. */
 export const JsonEditor = ({ value, onChange }: { value: string; onChange: (text: string) => void }) => {
@@ -38,6 +49,7 @@ export const JsonEditor = ({ value, onChange }: { value: string; onChange: (text
         lintGutter(),
         EditorView.lineWrapping,
         appTheme,
+        syntaxHighlighting(appHighlight),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             latestOnChange.current(update.state.doc.toString());
