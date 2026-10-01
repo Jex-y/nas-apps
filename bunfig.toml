@@ -1,2 +1,5 @@
 [test]
 preload = ["./server/src/test-preload.ts"]
+
+[serve.static]
+plugins = ["./scripts/bundle-sqlite-worker.ts"]

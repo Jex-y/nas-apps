@@ -1,0 +1,505 @@
+@import "@apps/core/theme.css";
+
+a {
+  color: inherit;
+}
+
+h1,
+h2 {
+  margin: 0 0 0.75rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+}
+
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  padding-top: calc(0.75rem + env(safe-area-inset-top));
+  border-bottom: 1px solid var(--edge);
+  background: var(--chrome);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.site-header nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.nav-link,
+.label {
+  text-decoration: none;
+  color: var(--muted);
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
+}
+
+.nav-link.active {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+main {
+  display: grid;
+  gap: 1rem;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+main > h2 {
+  margin: 0.5rem 0 -0.25rem;
+}
+
+.page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-heading h1 {
+  margin: 0;
+}
+
+.page-heading .title {
+  flex: 1;
+  min-width: 10rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.actions,
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.inline-form > input:first-child {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.badge {
+  padding: 0.05rem 0.4rem;
+  color: var(--accent);
+  font-family: var(--label-font);
+  font-size: var(--label-size-small);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-small);
+}
+
+.card {
+  padding: 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+button.quiet {
+  padding: 0.3rem 0.55rem;
+  background: none;
+  border-color: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Sync */
+
+.sync-pending {
+  color: var(--muted);
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
+}
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  border-radius: var(--radius-small);
+  font-size: 0.875rem;
+}
+
+/* Logging */
+
+button.start {
+  padding: 1rem;
+  font-size: 1.05rem;
+}
+
+.rest {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.entry {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.entry-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.entry-heading h2 {
+  flex: 1;
+  margin: 0;
+}
+
+.entry-heading a {
+  text-decoration: none;
+}
+
+.sets {
+  display: grid;
+  gap: 0.4rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sets:empty {
+  display: none;
+}
+
+.set-row {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(3.5rem, 1fr) auto minmax(2.75rem, 0.7fr) minmax(4.6rem, auto) auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.set-row input,
+.set-row select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.5rem;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.set-row select {
+  text-align-last: center;
+}
+
+.set-kind {
+  padding: 0.55rem 0;
+  font-family: var(--figure-font);
+  font-variant-numeric: tabular-nums;
+}
+
+.set-row.warmup .set-kind {
+  color: var(--muted);
+  border-style: dashed;
+}
+
+.set-row.warmup input {
+  color: var(--muted);
+}
+
+.add-set {
+  justify-content: space-between;
+  padding: 0.75rem 0.9rem;
+}
+
+.picker {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.choices:empty {
+  display: none;
+}
+
+.workout-meta {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.workout-meta .field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.workout-meta .field input {
+  width: 6rem;
+}
+
+/* Lists */
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rows li {
+  padding: 0.7rem 0.9rem;
+}
+
+.rows li + li {
+  border-top: 1px solid var(--border);
+}
+
+.row-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.row-title .trailing {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* Exercises */
+
+.standings {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.standings .card {
+  padding: 0.7rem 0.8rem;
+}
+
+.standings dd {
+  margin: 0.15rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.records {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.records th {
+  color: var(--muted);
+  font-family: var(--label-font);
+  font-size: var(--label-size-small);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
+}
+
+.records th,
+.records td {
+  padding: 0.35rem 0;
+  text-align: left;
+}
+
+.records tbody tr {
+  border-top: 1px solid var(--border);
+}
+
+/* Chart */
+
+.chart {
+  position: relative;
+  min-height: 220px;
+}
+
+.chart svg {
+  display: block;
+  touch-action: pan-y;
+}
+
+/* The keyboard's way through the sessions: unseen, with its focus drawn round the chart it drives. */
+.chart-scrub {
+  position: absolute;
+  inset: auto 0 0;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chart:has(.chart-scrub:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-small);
+}
+
+.chart .grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.chart .tick {
+  fill: var(--muted);
+  font-family: var(--figure-font);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart .crosshair {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.chart .line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* The ring in the surface colour keeps each dot legible where it sits on the line. */
+.chart .marker {
+  fill: var(--accent);
+  stroke: var(--surface-raised);
+  stroke-width: 2;
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: 0.5rem;
+  z-index: 1;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow-raised);
+  font-size: 0.8rem;
+  pointer-events: none;
+}
+
+.chart-tooltip time {
+  color: var(--muted);
+}
+
+.chart-tooltip strong {
+  font-family: var(--figure-font);
+  font-size: 1.05rem;
+}
+
+/* Tabs */
+
+.icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tab-bar {
+  display: none;
+}
+
+@media (max-width: 40rem) {
+  main {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .site-header .section-link {
+    display: none;
+  }
+
+  .standings {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tab-bar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 0.25rem max(0.25rem, env(safe-area-inset-right)) env(safe-area-inset-bottom)
+      max(0.25rem, env(safe-area-inset-left));
+    background: var(--chrome);
+    -webkit-backdrop-filter: var(--chrome-blur);
+    backdrop-filter: var(--chrome-blur);
+    border-top: 1px solid var(--edge);
+  }
+
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.4rem 0 0.5rem;
+    color: var(--muted);
+    font-family: var(--label-font);
+    font-size: var(--label-size-small);
+    letter-spacing: var(--label-tracking);
+    text-transform: var(--label-case);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tab.active {
+    color: var(--accent);
+    font-weight: 600;
+  }
+}

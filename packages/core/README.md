@@ -48,6 +48,18 @@ notifications on, test them or turn them off in the app's Settings (`/<slug>/she
 `https://apps.<tailnet>.ts.net/<slug>/` in Safari, Share → Add to Home Screen, and open the app from the Home Screen;
 iOS only offers Web Push to an installed app.
 
+## Work offline
+
+Set the app's `offlinePage` to its page, and the shell keeps that page and every file it loads on the device: the
+app then opens with no network, from the copy the last deploy left there. While there is a connection the page
+still comes from the network, so a deploy shows at once. Only a built server knows a page's files, so under
+`bun run dev` nothing is kept.
+
+That covers the page, not its data. `apps/lifts` is the worked example of the rest: TanStack DB collections
+persisted to SQLite in the browser (`src/web/lib/store.ts`), changes queued on the device and pushed in batches the
+server applies at most once (`src/api/service.ts`). The SQLite worker is bundled by
+`scripts/bundle-sqlite-worker.ts`, which `bunfig.toml` and `scripts/build.ts` both load.
+
 ## Store files
 
 `createBlobStore(context.blob, "<slug>")` gives an app its own prefix in the shared `apps` bucket. Upload through

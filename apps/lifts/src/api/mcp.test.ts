@@ -1,0 +1,196 @@
+import { describe, expect, test } from "bun:test";
+import { callTool, connectMcp, startTestServer, uniqueLogin } from "@apps/core/testing";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { createLiftsTestContext, NOW } from "../../test/support";
+import { createLiftsApp } from "../module";
+
+const context = createLiftsTestContext();
+const request = startTestServer((ctx) => [createLiftsApp(ctx, { now: () => NOW })], context);
+const me = uniqueLogin();
+
+const connect = (as = me) => connectMcp(request, "/lifts/mcp", as);
+
+type ExerciseSummary = { id: string; name: string; sessions: number; bestEstimatedMaxKg: number | null };
+type FullWorkout = {
+  id: string;
+  finishedAt: string | null;
+  tonnageKg: number;
+  exercises: { entryId: string; sets: { setId: string; weightKg: number; reps: number; estimatedMaxKg?: number }[] }[];
+};
+
+type History = { exercise: object; bestEstimatedMax: object | null; repRecords: object[]; sessions: object[] };
+
+const call = async <T = object>(client: Client, name: string, args: Record<string, unknown> = {}) => {
+  const result = await callTool(client, name, args);
+  expect(result.isError).toBe(false);
+  return JSON.parse(result.text) as T;
+};
+
+const createExercise = async (client: Client, name: string, lift: string | null = null) => {
+  const exercises = await call<ExerciseSummary[]>(client, "create_exercise", { name, lift });
+  const created = exercises.find((exercise) => exercise.name === name);
+  if (created === undefined) {
+    throw new Error(`${name} was not created`);
+  }
+  return created.id;
+};
+
+describe("lifts mcp", () => {
+  test("requires a Tailscale identity", async () => {
+    const response = await request("/lifts/mcp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    expect(response.status).toBe(401);
+  });
+
+  test("offers tools for exercises, workouts and sets", async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+
+    expect(tools.map((tool) => tool.name).sort()).toEqual([
+      "add_workout_exercise",
+      "create_exercise",
+      "delete_exercise",
+      "delete_set",
+      "delete_workout",
+      "get_exercise_history",
+      "get_workout",
+      "list_exercises",
+      "list_workouts",
+      "log_set",
+      "log_workout",
+      "remove_workout_exercise",
+      "update_exercise",
+      "update_set",
+      "update_workout",
+      "update_workout_exercise",
+    ]);
+    expect(client.getInstructions()).toContain("RPE");
+  });
+
+  test("logs a workout and reads it back, for the connected person only", async () => {
+    const client = await connect();
+    const squat = await createExercise(client, "Squat", "squat");
+
+    const workout = await call<FullWorkout>(client, "log_workout", {
+      date: "2026-10-01",
+      bodyweightKg: 82.5,
+      exercises: [
+        {
+          exerciseId: squat,
+          sets: [
+            { weightKg: 60, reps: 5, kind: "warmup" },
+            { weightKg: 140, reps: 5, rpe: 8 },
+            { weightKg: 145, reps: 3, rpe: 9 },
+          ],
+        },
+      ],
+    });
+
+    expect(workout).toMatchObject({ finishedAt: NOW.toISOString(), tonnageKg: 1135 });
+    expect(workout.exercises[0]?.sets).toEqual([
+      expect.objectContaining({ weightKg: 60, reps: 5, kind: "warmup" }),
+      expect.objectContaining({ weightKg: 140, reps: 5, rpe: 8, estimatedMaxKg: 172.6 }),
+      expect.objectContaining({ weightKg: 145, reps: 3, rpe: 9, estimatedMaxKg: 162.6 }),
+    ]);
+    expect(workout.exercises[0]?.sets[0]).not.toHaveProperty("estimatedMaxKg");
+    expect(await call<object[]>(client, "list_workouts")).toEqual([
+      {
+        id: workout.id,
+        date: "2026-10-01",
+        finished: true,
+        bodyweightKg: 82.5,
+        exercises: [{ name: "Squat", sets: ["60×5 (warm-up)", "140×5 @8", "145×3 @9"] }],
+      },
+    ]);
+
+    const stranger = await connect(uniqueLogin());
+    expect(await call<object[]>(stranger, "list_workouts")).toEqual([]);
+    expect(await callTool(stranger, "get_workout", { workoutId: workout.id })).toEqual({
+      isError: true,
+      text: "Not found",
+    });
+    expect(await callTool(stranger, "delete_workout", { workoutId: workout.id })).toEqual({
+      isError: true,
+      text: "Not found",
+    });
+  });
+
+  test("builds a session up set by set and corrects it", async () => {
+    const client = await connect();
+    const bench = await createExercise(client, "Bench press");
+    const open = await call<FullWorkout>(client, "log_workout", { date: "2026-10-01", finished: false });
+    expect(open.finishedAt).toBeNull();
+
+    const added = await call<FullWorkout>(client, "add_workout_exercise", { workoutId: open.id, exerciseId: bench });
+    const entryId = added.exercises[0]?.entryId;
+    await call<FullWorkout>(client, "log_set", { entryId, weightKg: 100, reps: 5 });
+    const logged = await call<FullWorkout>(client, "log_set", { entryId, weightKg: 100, reps: 4, rpe: 9.5 });
+    const [first, second] = logged.exercises[0]?.sets ?? [];
+
+    const corrected = await call<FullWorkout>(client, "update_set", { setId: second?.setId, reps: 5, rpe: null });
+    expect(corrected.exercises[0]?.sets[1]).toMatchObject({ weightKg: 100, reps: 5, rpe: null });
+
+    const trimmed = await call<FullWorkout>(client, "delete_set", { setId: first?.setId });
+    expect(trimmed.exercises[0]?.sets).toEqual([expect.objectContaining({ setId: second?.setId })]);
+
+    const finished = await call<FullWorkout>(client, "update_workout", { workoutId: open.id, finished: true });
+    expect(finished.finishedAt).toBe(NOW.toISOString());
+
+    const emptied = await call<FullWorkout>(client, "remove_workout_exercise", { entryId });
+    expect(emptied.exercises).toEqual([]);
+  });
+
+  test("reads an exercise's history with its best estimate and rep records", async () => {
+    const client = await connect();
+    const deadlift = await createExercise(client, "Deadlift", "deadlift");
+    const sessionOf = (date: string, sets: object[]) =>
+      call<FullWorkout>(client, "log_workout", { date, exercises: [{ exerciseId: deadlift, sets }] });
+    await sessionOf("2026-09-24", [{ weightKg: 180, reps: 5, rpe: 8 }]);
+    const latest = await sessionOf("2026-10-01", [
+      { weightKg: 200, reps: 1, rpe: 8 },
+      { weightKg: 170, reps: 5 },
+    ]);
+
+    expect(await call<History>(client, "get_exercise_history", { exerciseId: deadlift, limit: 1 })).toEqual({
+      exercise: { id: deadlift, name: "Deadlift", lift: "deadlift" },
+      bestEstimatedMax: { maxKg: 221.9, from: "180×5 @8", date: "2026-09-24" },
+      repRecords: [
+        { reps: 1, weightKg: 200, date: "2026-10-01" },
+        { reps: 5, weightKg: 180, date: "2026-09-24" },
+      ],
+      sessions: [{ workoutId: latest.id, date: "2026-10-01", estimatedMaxKg: 216.9, sets: ["200×1 @8", "170×5"] }],
+    });
+    expect(await call<ExerciseSummary[]>(client, "list_exercises")).toEqual([
+      expect.objectContaining({
+        name: "Deadlift",
+        sessions: 2,
+        lastTrainedOn: "2026-10-01",
+        bestEstimatedMaxKg: 221.9,
+      }),
+    ]);
+  });
+
+  test("hands refusals back as tool errors", async () => {
+    const client = await connect();
+    const squat = await createExercise(client, "Squat", "squat");
+    await call(client, "log_workout", { date: "2026-10-01", exercises: [{ exerciseId: squat }] });
+
+    expect(await callTool(client, "create_exercise", { name: "Low bar", lift: "squat" })).toEqual({
+      isError: true,
+      text: '"Squat" is already your squat',
+    });
+    expect(await callTool(client, "delete_exercise", { exerciseId: squat })).toEqual({
+      isError: true,
+      text: '"Squat" has been logged 1 times, so it cannot be deleted',
+    });
+    expect(await callTool(client, "log_set", { entryId: crypto.randomUUID(), weightKg: 100, reps: 5 })).toEqual({
+      isError: true,
+      text: "Not found",
+    });
+    expect((await callTool(client, "update_exercise", { exerciseId: squat, lift: null })).isError).toBe(false);
+    expect((await callTool(client, "create_exercise", { name: "Low bar", lift: "squat" })).isError).toBe(false);
+  });
+});

@@ -9,6 +9,7 @@ request carries the viewer's tailnet login, so there are no accounts or password
 | App                      | What it does                                                                                          |
 | ------------------------ | ----------------------------------------------------------------------------------------------------- |
 | [`flats`](apps/flats)    | Watches Rightmove saved searches, triages new listings by swiping, and times commutes with the TfL API |
+| [`lifts`](apps/lifts)    | A strength training log with estimated maxes and rep records, which works without a connection        |
 | [`money`](apps/money)    | Net worth over time, bank transactions split into tagged line items, and investment holdings          |
 | [`streets`](apps/streets) | Tracks progress towards running every street in London, from Strava runs matched to OpenStreetMap |
 | [`tasks`](apps/tasks)    | A personal to-do list with dependencies, a board and a critical-path timeline                         |

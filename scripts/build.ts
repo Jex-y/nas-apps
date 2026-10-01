@@ -1,5 +1,6 @@
 import { cp, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import bundleSqliteWorker from "./bundle-sqlite-worker";
 
 /**
  * Produces a self-contained `dist/`. The bundle resolves its HTML assets and the migrations resolve their
@@ -17,6 +18,7 @@ const result = await Bun.build({
   sourcemap: "linked",
   publicPath: "/",
   define: { "process.env.NODE_ENV": JSON.stringify("production") },
+  plugins: [bundleSqliteWorker],
 });
 
 if (!result.success) {
