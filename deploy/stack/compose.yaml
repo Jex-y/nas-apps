@@ -31,6 +31,8 @@ x-notify-env: &notify-env
 x-app-secrets-env: &app-secrets-env
   TFL_API_KEY: ${TFL_API_KEY:-}
   TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+  ENABLE_BANKING_APP_ID: ${ENABLE_BANKING_APP_ID:-}
+  ENABLE_BANKING_PRIVATE_KEY: ${ENABLE_BANKING_PRIVATE_KEY:-}
 
 x-tailnet: &tailnet
   network_mode: service:tailscale
