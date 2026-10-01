@@ -1,5 +1,5 @@
 import type { SQL } from "bun";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/bun-sql";
 import webpush from "web-push";
 import type { Notification, Notifier } from "../notify";
@@ -41,13 +41,14 @@ export const toPushPayload = (topic: string, { title, message, clickUrl, tag }: 
 export type WebPushNotifierOptions = {
   readonly config: WebPushConfig;
   readonly sql: SQL;
+  /** The slug of the app whose subscribers receive it. */
   readonly topic: string;
   /** Only this person's browsers; everyone's when omitted. */
   readonly login?: string;
   readonly send?: typeof fetch;
 };
 
-/** Sends to every subscribed browser, forgetting the ones the push service reports as gone. */
+/** Sends to every browser subscribed to the topic, forgetting the ones the push service reports as gone. */
 export const createWebPushNotifier = ({
   config,
   sql,
@@ -62,7 +63,7 @@ export const createWebPushNotifier = ({
       const targets = await db
         .select()
         .from(subscriptions)
-        .where(login === undefined ? undefined : eq(subscriptions.login, login));
+        .where(and(eq(subscriptions.topic, topic), login === undefined ? undefined : eq(subscriptions.login, login)));
       const results = await Promise.allSettled(
         targets.map(async (target) => {
           const request = webpush.generateRequestDetails(

@@ -1,7 +1,8 @@
 import { type AppModule, routePaths, serveRoutes } from "./app-module";
 import { errorResponse } from "./http";
 import { createMcpRoutes } from "./mcp";
-import { createShellRoutes, SHELL_SLUG, type ShellOptions } from "./shell/routes";
+import { appShellPath, SHELL_SLUG } from "./shell/contract";
+import { createShellRoutes, type ShellOptions } from "./shell/routes";
 
 const mergeAppRoutes = (apps: readonly AppModule[]): Bun.Serve.Routes<undefined, string> => {
   const slugs = apps.map((app) => app.slug);
@@ -16,6 +17,13 @@ const mergeAppRoutes = (apps: readonly AppModule[]): Bun.Serve.Routes<undefined,
     const stray = routePaths(app.routes).find((path) => path !== `/${app.slug}` && !path.startsWith(`/${app.slug}/`));
     if (stray !== undefined) {
       throw new Error(`App "${app.slug}" declares route "${stray}" outside /${app.slug}/`);
+    }
+    const shell = appShellPath(app.slug);
+    const taken = routePaths(app.routes).find((path) => path === shell || path.startsWith(`${shell}/`));
+    if (taken !== undefined) {
+      throw new Error(
+        `App "${app.slug}" declares route "${taken}" under ${shell}/, which is reserved for the app shell`,
+      );
     }
   }
   return Object.assign({}, ...apps.map((app) => serveRoutes(app.routes)));

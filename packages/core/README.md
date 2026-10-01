@@ -11,7 +11,8 @@ storage, push and the test harness.
 3. Add `"@apps/<slug>": "workspace:*"` to `server/package.json`, register the app and its migrations in
    `server/src/apps.ts`, then `bun install`.
 
-The server refuses to start if two apps share a slug or an app declares a route outside `/<slug>/`.
+The server refuses to start if two apps share a slug, or an app declares a route outside `/<slug>/` or under
+`/<slug>/shell/`, where the shell serves the app's manifest, icons and settings page.
 
 ## Serve tools over MCP
 
@@ -39,12 +40,13 @@ things only once no deployed code reads them.
 
 ## Notify
 
-An app sends with `context.notifier("<slug>").send(...)`, which reaches every subscribed device, or
+An app sends with `context.notifier("<slug>").send(...)`, which reaches every device subscribed to that app, or
 `context.notifier("<slug>", login)` to reach only that person's.
 
-To receive them on iOS, open `https://apps.<tailnet>.ts.net/` in Safari, Share → Add to Home Screen, then open it
-from the Home Screen and turn notifications on. Test or turn them off under Settings (`/shell/settings`). iOS only
-offers Web Push to an installed app.
+Each app installs on its own, under its own name and icon, and a device subscribes to each app separately: turn
+notifications on, test them or turn them off in the app's Settings (`/<slug>/shell/settings`). On iOS, first open
+`https://apps.<tailnet>.ts.net/<slug>/` in Safari, Share → Add to Home Screen, and open the app from the Home Screen;
+iOS only offers Web Push to an installed app.
 
 ## Store files
 

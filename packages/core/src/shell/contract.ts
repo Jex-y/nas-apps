@@ -1,6 +1,22 @@
 import { z } from "zod";
 
-export const SHELL_API = "/shell/api";
+/**
+ * Reserved as an app slug and as the first path segment inside every app, so no app's routes can collide with the
+ * shell's.
+ */
+export const SHELL_SLUG = "shell";
+
+/** The launcher's own API. */
+export const SHELL_API = `/${SHELL_SLUG}/api`;
+
+/** Where the shell serves an app's manifest, icons, settings page and push API: inside the app's own scope. */
+export const appShellPath = (slug: string) => `/${slug}/${SHELL_SLUG}`;
+
+/** The app a page belongs to, from its first path segment; `null` on the launcher's own pages. */
+export const appSlugAt = (pathname: string): string | null => {
+  const [, first = ""] = pathname.split("/");
+  return first === "" || first === SHELL_SLUG ? null : first;
+};
 
 export const ShellApp = z.object({ slug: z.string(), title: z.string() });
 export const ShellApps = z.array(ShellApp);

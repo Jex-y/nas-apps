@@ -1,0 +1,1 @@
+ALTER TABLE "push"."subscriptions" ADD COLUMN "topic" text DEFAULT 'shell' NOT NULL;

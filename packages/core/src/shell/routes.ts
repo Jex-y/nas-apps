@@ -6,93 +6,128 @@ import { parseBody } from "../http";
 import { type IdentityMode, resolveViewer } from "../identity";
 import { subscriptions } from "../push/schema";
 import { createWebPushNotifier, type WebPushConfig } from "../push/send";
-import { PushEndpoint, type PushSettings, PushSubscriptionInput, SHELL_API, type ShellApp } from "./contract";
-import { renderIcons } from "./icons" with { type: "macro" };
+import { identityAt, markFor } from "./artwork";
+import {
+  appShellPath,
+  PushEndpoint,
+  type PushSettings,
+  PushSubscriptionInput,
+  SHELL_API,
+  SHELL_SLUG,
+  type ShellApp,
+} from "./contract";
+import { ICON_SIZES, type IconSize, renderIcons } from "./icons";
 import page from "./index.html";
 import settingsPage from "./settings.html";
 import serviceWorker from "./sw.js" with { type: "text" };
 
-/** The installable wrapper around every app: launcher, manifest, service worker and push subscriptions. */
+/** The launcher, and around each app its own installable wrapper: manifest, icons, settings and push subscriptions. */
 export type ShellOptions = {
   readonly identity: IdentityMode;
   readonly sql: SQL;
   readonly webPush: WebPushConfig;
 };
 
-/** Reserved so no app's routes can collide with the shell's. */
-export const SHELL_SLUG = "shell";
-
 /** The default theme's light ground; the manifest is fixed, so the pages set their own colour once they load. */
 const THEME_COLOR = "#e4e8ee";
 
-const manifest = {
-  name: "Apps",
-  short_name: "Apps",
-  id: "/",
-  start_url: "/",
-  scope: "/",
+const MANIFEST_ICON_SIZES = [192, 512] as const satisfies readonly IconSize[];
+
+/** Each app's scope is its own path, so the apps install side by side without one capturing another's pages. */
+const manifest = ({ slug, title }: ShellApp) => ({
+  name: title,
+  short_name: title,
+  id: `/${slug}/`,
+  start_url: `/${slug}/`,
+  scope: `/${slug}/`,
   display: "standalone",
   background_color: THEME_COLOR,
   theme_color: THEME_COLOR,
-  icons: [
-    { src: "/shell/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
-    { src: "/shell/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
-  ],
+  icons: MANIFEST_ICON_SIZES.map((size) => ({
+    src: `${appShellPath(slug)}/icons/icon-${size}.png`,
+    sizes: `${size}x${size}`,
+    type: "image/png",
+    purpose: "any maskable",
+  })),
+});
+
+const lazy = <T>(make: () => Promise<T>): (() => Promise<T>) => {
+  let made: Promise<T> | undefined;
+  return () => {
+    made ??= make();
+    return made;
+  };
 };
 
-/** Rendered while bundling (or transpiling, in development), so the PNGs are part of the build. */
-const icons = await renderIcons();
-
-const icon = (size: keyof typeof icons) =>
-  new Response(Buffer.from(icons[size], "base64"), {
-    headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" },
-  });
-
-export const createShellRoutes = (apps: readonly AppModule[], { identity, sql, webPush }: ShellOptions) => {
+export const createShellRoutes = (
+  apps: readonly AppModule[],
+  { identity, sql, webPush }: ShellOptions,
+): Bun.Serve.Routes<undefined, string> => {
   const db = drizzle({ client: sql });
   const launchable: ShellApp[] = apps.map(({ slug, title }) => ({ slug, title }));
   const settings: PushSettings = { publicKey: webPush.publicKey };
 
+  const appRoutes = (app: ShellApp, index: number): Bun.Serve.Routes<undefined, string> => {
+    const { slug, title } = app;
+    const base = appShellPath(slug);
+    const api = `${base}/api`;
+    // The launcher draws the same mark on the app's tile.
+    const icons = lazy(() => renderIcons(markFor(slug, identityAt(index, launchable.length))));
+    const icon = (size: IconSize) => async () =>
+      new Response((await icons())[size], {
+        headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" },
+      });
+
+    return {
+      [`${base}/settings`]: settingsPage,
+      [`${base}/manifest.webmanifest`]: Response.json(manifest(app), {
+        headers: { "Content-Type": "application/manifest+json" },
+      }),
+      ...Object.fromEntries(ICON_SIZES.map((size) => [`${base}/icons/icon-${size}.png`, icon(size)])),
+      [`${api}/push`]: Response.json(settings),
+      [`${api}/push/subscriptions`]: {
+        POST: async (request: Request) => {
+          const { login } = resolveViewer(identity, request);
+          const { endpoint, keys } = await parseBody(request, PushSubscriptionInput);
+          const subscription = { p256dh: keys.p256dh, auth: keys.auth, login, topic: slug };
+          await db
+            .insert(subscriptions)
+            .values({ endpoint, ...subscription })
+            .onConflictDoUpdate({ target: subscriptions.endpoint, set: subscription });
+          return new Response(null, { status: 204 });
+        },
+        DELETE: async (request: Request) => {
+          const { login } = resolveViewer(identity, request);
+          const { endpoint } = await parseBody(request, PushEndpoint);
+          await db
+            .delete(subscriptions)
+            .where(
+              and(eq(subscriptions.endpoint, endpoint), eq(subscriptions.login, login), eq(subscriptions.topic, slug)),
+            );
+          return new Response(null, { status: 204 });
+        },
+      },
+      [`${api}/push/test`]: {
+        POST: async (request: Request) => {
+          const { login } = resolveViewer(identity, request);
+          await createWebPushNotifier({ config: webPush, sql, topic: slug, login }).send({
+            title: "Notifications are on",
+            message: `This is how updates from ${title} will arrive.`,
+          });
+          return new Response(null, { status: 204 });
+        },
+      },
+    };
+  };
+
   return {
     "/": page,
-    "/shell/settings": settingsPage,
-    "/manifest.webmanifest": Response.json(manifest, { headers: { "Content-Type": "application/manifest+json" } }),
+    [`/${SHELL_SLUG}/settings`]: settingsPage,
     "/sw.js": () =>
       new Response(serviceWorker, {
         headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" },
       }),
-    "/shell/icons/icon-180.png": icon(180),
-    "/shell/icons/icon-192.png": icon(192),
-    "/shell/icons/icon-512.png": icon(512),
     [`${SHELL_API}/apps`]: Response.json(launchable),
-    [`${SHELL_API}/push`]: Response.json(settings),
-    [`${SHELL_API}/push/subscriptions`]: {
-      POST: async (request: Request) => {
-        const { login } = resolveViewer(identity, request);
-        const { endpoint, keys } = await parseBody(request, PushSubscriptionInput);
-        await db
-          .insert(subscriptions)
-          .values({ endpoint, p256dh: keys.p256dh, auth: keys.auth, login })
-          .onConflictDoUpdate({ target: subscriptions.endpoint, set: { p256dh: keys.p256dh, auth: keys.auth, login } });
-        return new Response(null, { status: 204 });
-      },
-      DELETE: async (request: Request) => {
-        const { login } = resolveViewer(identity, request);
-        const { endpoint } = await parseBody(request, PushEndpoint);
-        await db.delete(subscriptions).where(and(eq(subscriptions.endpoint, endpoint), eq(subscriptions.login, login)));
-        return new Response(null, { status: 204 });
-      },
-    },
-    [`${SHELL_API}/push/test`]: {
-      POST: async (request: Request) => {
-        const { login } = resolveViewer(identity, request);
-        await createWebPushNotifier({ config: webPush, sql, topic: SHELL_SLUG, login }).send({
-          title: "Notifications are on",
-          message: "This is how updates from your apps will arrive.",
-          clickUrl: "/",
-        });
-        return new Response(null, { status: 204 });
-      },
-    },
+    ...Object.assign({}, ...launchable.map(appRoutes)),
   };
 };

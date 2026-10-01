@@ -11,11 +11,16 @@ const SHELL_DIR = join(REPO_ROOT, "packages/core/src/shell");
 const READ_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD"]);
 
 /** The shell re-registers an existing push subscription on every visit; a 405 there would surface as a page error. */
-const HARMLESS_WRITES: ReadonlySet<string> = new Set(["POST /shell/api/push/subscriptions"]);
+const isHarmlessWrite = (method: string, pathname: string): boolean =>
+  method === "POST" && /^\/[a-z0-9-]+\/shell\/api\/push\/subscriptions$/.test(pathname);
 
-/** Paths that are data, not pages. A page path the worktree lacks must 404 here, never render production's HTML. */
+/**
+ * Paths that are data, not pages: an app's or the launcher's API, and what the shell serves inside each app. A page
+ * path the worktree lacks must 404 here, never render production's HTML.
+ */
 const isUpstreamPath = (pathname: string): boolean =>
-  /^\/[a-z0-9-]+\/api\//.test(pathname) || pathname.startsWith("/shell/icons/") || pathname === "/manifest.webmanifest";
+  /^\/[a-z0-9-]+\/api\//.test(pathname) ||
+  /^\/[a-z0-9-]+\/shell\/(api\/|icons\/|manifest\.webmanifest$)/.test(pathname);
 
 const FORWARDED_REQUEST_HEADERS = ["accept", "accept-language", "if-none-match", "if-modified-since", "range"];
 
@@ -46,7 +51,10 @@ const discoverApps = async (): Promise<readonly AppEntry[]> => {
   );
 };
 
-/** `index.html` is the launcher at `/`; any other `<name>.html` is served at `/shell/<name>`, as the shell does. */
+/**
+ * `index.html` is the launcher at `/`; any other `<name>.html` is served at `/shell/<name>` and inside every app at
+ * `/<slug>/shell/<name>`, as the shell does.
+ */
 const discoverShellPages = async (): Promise<readonly ShellEntry[]> => {
   const files = await Array.fromAsync(new Bun.Glob("*.html").scan({ cwd: SHELL_DIR }));
   return Promise.all(
@@ -101,7 +109,7 @@ export const startHarnessServer = async ({
     if (!READ_METHODS.has(request.method)) {
       const key = `${request.method} ${pathname}`;
       refused.push({ method: request.method, path: pathname });
-      return HARMLESS_WRITES.has(key)
+      return isHarmlessWrite(request.method, pathname)
         ? new Response(null, { status: 204 })
         : Response.json({ error: `ui-harness is read-only: ${key} was not forwarded` }, { status: 405 });
     }
@@ -111,12 +119,15 @@ export const startHarnessServer = async ({
     return forward(upstream, request, pathname, search);
   };
 
+  const inAppShellPages = shellPages.filter(({ path }) => path !== "/");
   const pageRoutes = Object.fromEntries([
     ...shellPages.map(({ path, page }) => [path, { GET: page }] as const),
     ...apps.flatMap(({ slug, page }) => [
       [`/${slug}`, { GET: new Response(null, { status: 308, headers: { Location: `/${slug}/` } }) }] as const,
       [`/${slug}/*`, { GET: page }] as const,
       [`/${slug}/api/*`, handle] as const,
+      [`/${slug}/shell/*`, handle] as const,
+      ...inAppShellPages.map(({ path, page: shellPage }) => [`/${slug}${path}`, { GET: shellPage }] as const),
     ]),
   ]);
 

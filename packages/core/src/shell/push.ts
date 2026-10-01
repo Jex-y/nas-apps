@@ -1,5 +1,5 @@
 import { requestEmpty, requestJson } from "../web";
-import { PushSettings, SHELL_API } from "./contract";
+import { appShellPath, PushSettings, type ShellApp } from "./contract";
 
 export const element = <T extends HTMLElement>(id: string): T => {
   const found = document.getElementById(id);
@@ -23,13 +23,11 @@ type PushView =
   | { readonly kind: "off" }
   | { readonly kind: "on"; readonly subscription: PushSubscription };
 
-export type PushKind = PushView["kind"];
+type ViewText = { readonly status: string; readonly buttons: readonly string[] };
 
-export const ALL_PUSH_KINDS: ReadonlySet<PushKind> = new Set(["install", "unsupported", "blocked", "off", "on"]);
-
-const VIEWS: Record<PushKind, { readonly status: string; readonly buttons: readonly string[] }> = {
+const viewsFor = (title: string): Record<PushView["kind"], ViewText> => ({
   install: {
-    status: "Add this page to your Home Screen (Share → Add to Home Screen), then open it from there.",
+    status: `Add ${title} to your Home Screen (Share → Add to Home Screen), then open it from there.`,
     buttons: [],
   },
   unsupported: {
@@ -37,22 +35,24 @@ const VIEWS: Record<PushKind, { readonly status: string; readonly buttons: reado
     buttons: [],
   },
   blocked: {
-    status: "Notifications are blocked. Allow them for this app in Settings.",
+    status: `Notifications are blocked. Allow them for ${title} in your device's settings.`,
     buttons: [],
   },
   off: {
-    status: "Get notified here when your apps have news, e.g. a new flat.",
+    status: `Get notified on this device when ${title} has news.`,
     buttons: ["push-enable"],
   },
   on: {
-    status: "Notifications are on for this device.",
+    status: `Notifications from ${title} are on for this device.`,
     buttons: ["push-test", "push-disable"],
   },
-};
+});
 
-/** Drives the page's `#push` card, which stays hidden while the device is in a state outside `shownFor`. */
-export const setupPush = async (registration: ServiceWorkerRegistration | null, shownFor: ReadonlySet<PushKind>) => {
-  const settings = await requestJson(`${SHELL_API}/push`, PushSettings);
+/** Drives the page's `#push` card for one app's notifications; `registration` is the worker scoped to that app. */
+export const setupPush = async ({ slug, title }: ShellApp, registration: ServiceWorkerRegistration | null) => {
+  const api = `${appShellPath(slug)}/api/push`;
+  const views = viewsFor(title);
+  const settings = await requestJson(api, PushSettings);
   const currentView = async (): Promise<PushView> => {
     if (needsInstall()) {
       return { kind: "install" };
@@ -69,11 +69,11 @@ export const setupPush = async (registration: ServiceWorkerRegistration | null, 
 
   const render = async () => {
     const view = await currentView();
-    element("push").hidden = !shownFor.has(view.kind);
-    element("push-status").textContent = VIEWS[view.kind].status;
+    element("push-status").textContent = views[view.kind].status;
     for (const id of ["push-enable", "push-test", "push-disable"]) {
-      element(id).hidden = !VIEWS[view.kind].buttons.includes(id);
+      element(id).hidden = !views[view.kind].buttons.includes(id);
     }
+    element("push").hidden = false;
     return view;
   };
 
@@ -97,7 +97,7 @@ export const setupPush = async (registration: ServiceWorkerRegistration | null, 
         userVisibleOnly: true,
         applicationServerKey: fromBase64Url(settings.publicKey),
       });
-      await requestEmpty(`${SHELL_API}/push/subscriptions`, {
+      await requestEmpty(`${api}/subscriptions`, {
         method: "POST",
         body: JSON.stringify(subscription.toJSON()),
       });
@@ -105,7 +105,7 @@ export const setupPush = async (registration: ServiceWorkerRegistration | null, 
   );
   element("push-test").addEventListener(
     "click",
-    run(() => requestEmpty(`${SHELL_API}/push/test`, { method: "POST" })),
+    run(() => requestEmpty(`${api}/test`, { method: "POST" })),
   );
   element("push-disable").addEventListener(
     "click",
@@ -114,7 +114,7 @@ export const setupPush = async (registration: ServiceWorkerRegistration | null, 
       if (view.kind !== "on") {
         return;
       }
-      await requestEmpty(`${SHELL_API}/push/subscriptions`, {
+      await requestEmpty(`${api}/subscriptions`, {
         method: "DELETE",
         body: JSON.stringify({ endpoint: view.subscription.endpoint }),
       });
@@ -125,7 +125,7 @@ export const setupPush = async (registration: ServiceWorkerRegistration | null, 
   const view = await render();
   if (view.kind === "on") {
     // Re-register on every visit: it recovers a subscription the server dropped, e.g. after a restore.
-    await requestEmpty(`${SHELL_API}/push/subscriptions`, {
+    await requestEmpty(`${api}/subscriptions`, {
       method: "POST",
       body: JSON.stringify(view.subscription.toJSON()),
     });

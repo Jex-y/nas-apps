@@ -1,4 +1,5 @@
 import { followTheme } from "../web/theme";
+import { appShellPath, appSlugAt } from "./contract";
 
 const append = (tag: "link" | "meta", attributes: Record<string, string>) => {
   const element = document.createElement(tag);
@@ -9,15 +10,24 @@ const append = (tag: "link" | "meta", attributes: Record<string, string>) => {
 };
 
 /**
- * Applies the stored theme, makes any page installable as the one Home Screen app and registers the worker that
- * receives push. The head tags are added here rather than in each index.html because Bun's HTML bundler tries to
- * resolve their hrefs as files.
+ * Applies the stored theme, makes the page installable as its app's own Home Screen app and registers the worker that
+ * receives that app's push. The head tags are added here rather than in each index.html because Bun's HTML bundler
+ * tries to resolve their hrefs as files.
  */
-export const installShell = async (): Promise<ServiceWorkerRegistration | null> => {
+export const installApp = async (slug: string): Promise<ServiceWorkerRegistration | null> => {
   followTheme();
-  append("link", { rel: "manifest", href: "/manifest.webmanifest" });
-  append("link", { rel: "apple-touch-icon", href: "/shell/icons/icon-180.png" });
-  append("meta", { name: "apple-mobile-web-app-title", content: "Apps" });
+  const shell = appShellPath(slug);
+  append("link", { rel: "manifest", href: `${shell}/manifest.webmanifest` });
+  append("link", { rel: "apple-touch-icon", href: `${shell}/icons/icon-180.png` });
   append("meta", { name: "mobile-web-app-capable", content: "yes" });
-  return "serviceWorker" in navigator ? navigator.serviceWorker.register("/sw.js", { scope: "/" }) : null;
+  return "serviceWorker" in navigator ? navigator.serviceWorker.register("/sw.js", { scope: `/${slug}/` }) : null;
+};
+
+/** {@link installApp} for the app the page is served under. */
+export const installShell = (): Promise<ServiceWorkerRegistration | null> => {
+  const slug = appSlugAt(location.pathname);
+  if (slug === null) {
+    throw new Error(`${location.pathname} is not an app's page`);
+  }
+  return installApp(slug);
 };

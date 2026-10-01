@@ -16,8 +16,8 @@ request carries the viewer's tailnet login, so there are no accounts or password
 
 One Bun server hosts every app. Each app is its own workspace package owning its routes, its Postgres schema,
 its migrations, its prefix in object storage and its React UI, so any one of them can move to its own server later.
-All of them install together as one PWA with Web Push notifications, and serve their tools to Claude over one MCP
-server.
+Each installs as its own PWA, with its own icon and Web Push notifications, and they serve their tools to Claude over
+one MCP server.
 
 ```
 packages/core     shared runtime: config, identity, server, jobs, migrations, blob storage, push, test harness

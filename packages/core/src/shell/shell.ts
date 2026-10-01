@@ -1,8 +1,8 @@
 import { requestJson } from "../web";
+import { followTheme } from "../web/theme";
 import { artworkSvg, identityAt, markFor, themedPalette } from "./artwork";
 import { SHELL_API, ShellApps } from "./contract";
-import { element, type PushKind, setupPush } from "./push";
-import { installShell } from "./register";
+import { element } from "./push";
 
 const tileArtwork = (slug: string, index: number, count: number) => {
   const mark = markFor(slug, identityAt(index, count));
@@ -28,7 +28,5 @@ const renderApps = async () => {
   );
 };
 
-/** On the launcher the card only nudges towards turning notifications on; the rest lives on the settings page. */
-const PROMPTS: ReadonlySet<PushKind> = new Set(["install", "off"]);
-
-await Promise.all([renderApps(), installShell().then((registration) => setupPush(registration, PROMPTS))]);
+followTheme();
+await renderApps();

@@ -3,22 +3,34 @@ import { createECDH, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/bun-sql";
 import webpush from "web-push";
+import { type AppModule, appRoutes } from "../app-module";
 import { createNotifierFactory, parseNotifyConfig } from "../notify";
 import { subscriptions } from "../push/schema";
 import { createWebPushNotifier, type WebPushConfig } from "../push/send";
 import { startServer } from "../server";
 import { createTestContext, uniqueLogin } from "../testing";
+import { appSlugAt } from "./contract";
 
 const context = createTestContext();
 const db = drizzle({ client: context.sql });
 const vapid = webpush.generateVAPIDKeys();
 const webPush: WebPushConfig = { ...vapid, subject: "mailto:apps@example.com" };
+const shell = { identity: context.identity, sql: context.sql, webPush };
+
+const app = (slug: string, title: string, routes: Record<string, Response> = {}): AppModule => ({
+  slug,
+  title,
+  routes: appRoutes(routes),
+  jobs: [],
+  schedules: [],
+  mcp: { instructions: "", registerTools: () => {} },
+});
 
 const server = startServer({
   port: 0,
   development: false,
-  apps: [],
-  shell: { identity: context.identity, sql: context.sql, webPush },
+  apps: [app("flats", "Flat hunt"), app("tasks", "Tasks")],
+  shell,
 });
 afterAll(() => server.stop(true));
 
@@ -43,8 +55,8 @@ const browserSubscription = (endpoint = `https://push.example/${crypto.randomUUI
   };
 };
 
-const subscribe = (as: string, subscription = browserSubscription()) =>
-  request("/shell/api/push/subscriptions", {
+const subscribe = (as: string, subscription = browserSubscription(), slug = "flats") =>
+  request(`/${slug}/shell/api/push/subscriptions`, {
     method: "POST",
     as,
     body: JSON.stringify(subscription),
@@ -67,60 +79,78 @@ describe("notify config", () => {
 });
 
 describe("shell", () => {
-  test("serves an installable manifest scoped to every app", async () => {
-    const response = await request("/manifest.webmanifest");
+  test("serves each app a manifest that installs it alone, under its own name", async () => {
+    const response = await request("/flats/shell/manifest.webmanifest");
     expect(response.headers.get("Content-Type")).toBe("application/manifest+json");
     expect(await response.json()).toMatchObject({
-      start_url: "/",
-      scope: "/",
+      name: "Flat hunt",
+      id: "/flats/",
+      start_url: "/flats/",
+      scope: "/flats/",
       display: "standalone",
+      icons: [{ src: "/flats/shell/icons/icon-192.png" }, { src: "/flats/shell/icons/icon-512.png" }],
+    });
+    expect(await (await request("/tasks/shell/manifest.webmanifest")).json()).toMatchObject({
+      name: "Tasks",
+      scope: "/tasks/",
     });
   });
 
-  test("serves the service worker from the root, uncached, and the icons", async () => {
+  test("the launcher is not installable", async () => {
+    expect((await request("/manifest.webmanifest")).status).toBe(404);
+  });
+
+  test("serves the service worker from the root, uncached", async () => {
     const worker = await request("/sw.js");
     expect(worker.headers.get("Content-Type")).toStartWith("text/javascript");
     expect(worker.headers.get("Cache-Control")).toBe("no-cache");
     expect(await worker.text()).toContain('addEventListener("push"');
+  });
+
+  test("draws each app its own icons", async () => {
+    const icon = async (slug: string, size: number) => {
+      const response = await request(`/${slug}/shell/icons/icon-${size}.png`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toBe("image/png");
+      return new Uint8Array(await response.arrayBuffer());
+    };
+    const pngSignature = [0x89, 0x50, 0x4e, 0x47];
     for (const size of [180, 192, 512]) {
-      const icon = await request(`/shell/icons/icon-${size}.png`);
-      expect(icon.status).toBe(200);
-      expect(icon.headers.get("Content-Type")).toBe("image/png");
+      expect([...(await icon("flats", size)).slice(0, 4)]).toEqual(pngSignature);
+    }
+    expect(Buffer.from(await icon("flats", 192)).equals(Buffer.from(await icon("tasks", 192)))).toBe(false);
+  });
+
+  test("serves the settings page for the launcher and inside each app", async () => {
+    for (const path of ["/shell/settings", "/flats/shell/settings", "/tasks/shell/settings"]) {
+      const response = await request(path);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain("<title>Settings</title>");
     }
   });
 
-  test("serves the settings page under the shell's reserved prefix", async () => {
-    const response = await request("/shell/settings");
-    expect(response.status).toBe(200);
-    expect(await response.text()).toContain("<title>Settings</title>");
-  });
-
-  test("tells the launcher the key to subscribe with", async () => {
-    expect(await (await request("/shell/api/push")).json()).toEqual({
+  test("tells an app's pages the key to subscribe with", async () => {
+    expect(await (await request("/flats/shell/api/push")).json()).toEqual({
       publicKey: vapid.publicKey,
     });
   });
 
-  test("an app cannot take the shell's slug", () => {
-    const shell = {
-      identity: context.identity,
-      sql: context.sql,
-      webPush,
-    };
-    const app = {
-      slug: "shell",
-      title: "Shell",
-      routes: {} as never,
-      jobs: [],
-      schedules: [],
-      mcp: { instructions: "", registerTools: () => {} },
-    };
-    expect(() => startServer({ port: 0, development: false, apps: [app], shell })).toThrow(/reserved/);
+  test("a page belongs to the app its path starts with, and the shell's own pages to none", () => {
+    expect(appSlugAt("/flats/")).toBe("flats");
+    expect(appSlugAt("/flats/shell/settings")).toBe("flats");
+    expect(appSlugAt("/")).toBeNull();
+    expect(appSlugAt("/shell/settings")).toBeNull();
+  });
+
+  test("an app cannot take the shell's slug, or routes under its own shell path", () => {
+    const start = (taken: AppModule) => () => startServer({ port: 0, development: false, apps: [taken], shell });
+    expect(start(app("shell", "Shell"))).toThrow(/reserved/);
+    expect(start(app("pet", "Pet", { "/pet/shell/settings": new Response("mine") }))).toThrow(/reserved/);
   });
 });
 
 describe("push subscriptions", () => {
-  test("stores a subscription against the viewer, and resubscribing updates it", async () => {
+  test("stores a subscription against the viewer and the app, and resubscribing updates it", async () => {
     const me = uniqueLogin();
     const subscription = browserSubscription();
     expect((await subscribe(me, subscription)).status).toBe(204);
@@ -128,35 +158,37 @@ describe("push subscriptions", () => {
     expect((await subscribe(me, renewed)).status).toBe(204);
 
     const rows = await db.select().from(subscriptions).where(eq(subscriptions.endpoint, subscription.endpoint));
-    expect(rows).toMatchObject([{ login: me, p256dh: renewed.keys.p256dh, auth: renewed.keys.auth }]);
+    expect(rows).toMatchObject([{ login: me, topic: "flats", p256dh: renewed.keys.p256dh, auth: renewed.keys.auth }]);
   });
 
-  test("refuses anonymous and non-HTTPS subscriptions", async () => {
+  test("refuses anonymous and non-HTTPS subscriptions, and apps that do not exist", async () => {
     expect(
       (
-        await request("/shell/api/push/subscriptions", {
+        await request("/flats/shell/api/push/subscriptions", {
           method: "POST",
           body: JSON.stringify(browserSubscription()),
         })
       ).status,
     ).toBe(401);
     expect((await subscribe(uniqueLogin(), browserSubscription("http://push.example/x"))).status).toBe(400);
+    expect((await subscribe(uniqueLogin(), browserSubscription(), "nope")).status).toBe(404);
   });
 
-  test("only removes the viewer's own subscription", async () => {
+  test("only removes the viewer's own subscription, through the app it belongs to", async () => {
     const me = uniqueLogin();
     const subscription = browserSubscription();
     await subscribe(me, subscription);
-    const remove = (as: string) =>
-      request("/shell/api/push/subscriptions", {
+    const remove = (as: string, slug: string) =>
+      request(`/${slug}/shell/api/push/subscriptions`, {
         method: "DELETE",
         as,
         body: JSON.stringify({ endpoint: subscription.endpoint }),
       });
 
-    await remove(uniqueLogin());
+    await remove(uniqueLogin(), "flats");
+    await remove(me, "tasks");
     expect(await db.select().from(subscriptions)).toHaveLength(1);
-    await remove(me);
+    await remove(me, "flats");
     expect(await db.select().from(subscriptions)).toHaveLength(0);
   });
 });
@@ -175,10 +207,11 @@ describe("web push notifier", () => {
     return { send, sent };
   };
 
-  test("sends an encrypted, VAPID-signed message to every subscribed browser", async () => {
+  test("sends an encrypted, VAPID-signed message to every browser subscribed to the app", async () => {
     const [mine, theirs] = [browserSubscription(), browserSubscription()];
     await subscribe(uniqueLogin(), mine);
     await subscribe(uniqueLogin(), theirs);
+    await subscribe(uniqueLogin(), browserSubscription(), "tasks");
     const service = recordingPushService(() => 201);
 
     await createWebPushNotifier({
@@ -211,7 +244,7 @@ describe("web push notifier", () => {
     await createWebPushNotifier({
       config: webPush,
       sql: context.sql,
-      topic: "shell",
+      topic: "flats",
       login: me,
       send: service.send,
     }).send({
@@ -222,7 +255,7 @@ describe("web push notifier", () => {
     expect(service.sent.map((request) => request.url)).toEqual([mine.endpoint]);
   });
 
-  test("an app's notifier reaches only one person's browsers when given their login", async () => {
+  test("an app's notifier reaches only its own subscribers, and one person's when given their login", async () => {
     const received: string[] = [];
     const pushService = Bun.serve({
       port: 0,
@@ -233,19 +266,22 @@ describe("web push notifier", () => {
     });
     afterAll(() => pushService.stop(true));
     const me = uniqueLogin();
-    const subscribeAt = (login: string, path: string) => {
+    const subscribeAt = (login: string, topic: string, path: string) => {
       const { endpoint, keys } = browserSubscription(new URL(path, pushService.url).href);
-      return db.insert(subscriptions).values({ endpoint, ...keys, login });
+      return db.insert(subscriptions).values({ endpoint, ...keys, login, topic });
     };
-    await subscribeAt(me, "/mine");
-    await subscribeAt(uniqueLogin(), "/theirs");
+    await subscribeAt(me, "tasks", "/my-tasks");
+    await subscribeAt(me, "flats", "/my-flats");
+    await subscribeAt(uniqueLogin(), "tasks", "/their-tasks");
+    await subscribeAt(uniqueLogin(), "flats", "/their-flats");
     const notifier = createNotifierFactory(webPush, context.sql);
 
-    await notifier("pet", me).send({ title: "Pip", message: "3,200 steps to go" });
-    expect(received).toEqual(["/mine"]);
+    await notifier("tasks", me).send({ title: "Due today", message: "Book the survey" });
+    expect(received).toEqual(["/my-tasks"]);
 
+    received.length = 0;
     await notifier("flats").send({ title: "New flat", message: "2 bed, Hackney" });
-    expect(received.toSorted()).toEqual(["/mine", "/mine", "/theirs"]);
+    expect(received.toSorted()).toEqual(["/my-flats", "/their-flats"]);
   });
 
   test("forgets browsers the push service reports gone, and fails after trying the rest", async () => {

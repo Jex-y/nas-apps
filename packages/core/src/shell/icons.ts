@@ -1,16 +1,19 @@
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
-import { artworkSvg, fixedPalette, markFor, type Oklch } from "./artwork";
+import { artworkSvg, fixedPalette, type Mark, type Oklch } from "./artwork";
+import { resvgWasm } from "./resvg-wasm" with { type: "macro" };
 
-/**
- * The Home Screen icon: the launcher's badge seeded with the shell's reserved slug, in the dark theme's colours.
- * Imported as a Bun macro, so it is rasterised while bundling and the PNGs are inlined into the server.
- */
+/** An app's Home Screen icon: its launcher badge in the dark theme's colours. */
 
-const ICON_SIZES = [180, 192, 512] as const;
-type IconSize = (typeof ICON_SIZES)[number];
+export const ICON_SIZES = [180, 192, 512] as const;
+export type IconSize = (typeof ICON_SIZES)[number];
 
-/** A fold no launcher tile takes until the fifth app, so the icon does not read as one of them. */
-const ICON_MARK = markFor("shell", { hue: 185, fold: 8 });
+/** PNG bytes by size. */
+export type Icons = Readonly<Record<IconSize, Uint8Array<ArrayBuffer>>>;
+
+const RESVG_WASM = await resvgWasm();
+
+/** `initWasm` throws when called twice, so every render awaits the one call. */
+let resvg: Promise<void> | undefined;
 
 /** OKLab to linear sRGB (Björn Ottosson), clipped to gamut and gamma-encoded. */
 const toHex = ({ l, c, h }: Oklch) => {
@@ -35,17 +38,17 @@ const toHex = ({ l, c, h }: Oklch) => {
   return `#${linear.map(encode).join("")}`;
 };
 
-/** Base64 PNGs by size; a macro can only return plain data. */
-export const renderIcons = async (): Promise<Record<IconSize, string>> => {
-  await initWasm(Bun.file(Bun.resolveSync("@resvg/resvg-wasm/index_bg.wasm", import.meta.dir)).arrayBuffer());
+export const renderIcons = async (mark: Mark): Promise<Icons> => {
+  resvg ??= initWasm(Bun.gunzipSync(Buffer.from(RESVG_WASM, "base64")));
+  await resvg;
   // resvg reads no oklch(). Maskable icons are cropped to a circle of 80% of the width, so the badge stays inside it.
-  const svg = artworkSvg(ICON_MARK, {
+  const svg = artworkSvg(mark, {
     width: 200,
     height: 200,
     scale: 0.78,
-    palette: fixedPalette(ICON_MARK.hue, "dark", toHex),
+    palette: fixedPalette(mark.hue, "dark", toHex),
   });
   const render = (size: IconSize) =>
-    Buffer.from(new Resvg(svg, { fitTo: { mode: "width", value: size } }).render().asPng()).toString("base64");
-  return Object.fromEntries(ICON_SIZES.map((size) => [size, render(size)])) as Record<IconSize, string>;
+    new Uint8Array(new Resvg(svg, { fitTo: { mode: "width", value: size } }).render().asPng());
+  return Object.fromEntries(ICON_SIZES.map((size) => [size, render(size)])) as Icons;
 };
