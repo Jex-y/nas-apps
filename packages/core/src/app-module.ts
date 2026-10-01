@@ -50,6 +50,8 @@ export type AppModule = {
   readonly jobs: readonly RegisteredJob[];
   readonly schedules: readonly Schedule[];
   readonly mcp: AppMcp;
+  /** The page to keep on the device, with everything it loads, so the app opens without the network. */
+  readonly offlinePage?: Bun.HTMLBundle;
 };
 
 export const trailingSlashRedirect = (slug: string): Response =>

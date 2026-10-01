@@ -18,19 +18,29 @@ const vapid = webpush.generateVAPIDKeys();
 const webPush: WebPushConfig = { ...vapid, subject: "mailto:apps@example.com" };
 const shell = { identity: context.identity, sql: context.sql, webPush };
 
-const app = (slug: string, title: string, routes: Record<string, Response> = {}): AppModule => ({
+const app = (slug: string, title: string, fields: Partial<AppModule> = {}): AppModule => ({
   slug,
   title,
-  routes: appRoutes(routes),
+  routes: appRoutes({}),
   jobs: [],
   schedules: [],
   mcp: { instructions: "", registerTools: () => {} },
+  ...fields,
 });
+
+/** A page as the build leaves it, with the files it loads. */
+const builtPage: Bun.HTMLBundle = {
+  index: "./index.html",
+  files: [
+    { path: "./index.html", loader: "html", isEntry: true, headers: { etag: "a", "content-type": "text/html" } },
+    { path: "./chunk-1.js", loader: "js", isEntry: true, headers: { etag: "b", "content-type": "text/javascript" } },
+  ],
+};
 
 const server = startServer({
   port: 0,
   development: false,
-  apps: [app("flats", "Flat hunt"), app("tasks", "Tasks")],
+  apps: [app("flats", "Flat hunt"), app("tasks", "Tasks"), app("lifts", "Lifts", { offlinePage: builtPage })],
   shell,
 });
 afterAll(() => server.stop(true));
@@ -102,11 +112,23 @@ describe("shell", () => {
     expect((await request("/manifest.webmanifest")).status).toBe(404);
   });
 
-  test("serves the service worker from the root, uncached", async () => {
-    const worker = await request("/sw.js");
+  test("serves each app its service worker, uncached and allowed the whole app", async () => {
+    const worker = await request("/tasks/shell/sw.js");
     expect(worker.headers.get("Content-Type")).toStartWith("text/javascript");
     expect(worker.headers.get("Cache-Control")).toBe("no-cache");
-    expect(await worker.text()).toContain('addEventListener("push"');
+    expect(worker.headers.get("Service-Worker-Allowed")).toBe("/tasks/");
+    const script = await worker.text();
+    expect(script).toStartWith("const OFFLINE = false;\n");
+    expect(script).toContain('addEventListener("push"');
+    expect((await request("/sw.js")).status).toBe(404);
+  });
+
+  test("lists what to keep on the device for an app that works offline, and for no other", async () => {
+    const manifest = await request("/lifts/shell/offline.json");
+    expect(manifest.headers.get("Cache-Control")).toBe("no-cache");
+    expect(await manifest.json()).toEqual({ version: expect.any(String), urls: ["/lifts/", "/chunk-1.js"] });
+    expect(await (await request("/lifts/shell/sw.js")).text()).toStartWith("const OFFLINE = true;\n");
+    expect((await request("/tasks/shell/offline.json")).status).toBe(404);
   });
 
   test("draws each app its own icons", async () => {
@@ -147,7 +169,9 @@ describe("shell", () => {
   test("an app cannot take the shell's slug, or routes under its own shell path", () => {
     const start = (taken: AppModule) => () => startServer({ port: 0, development: false, apps: [taken], shell });
     expect(start(app("shell", "Shell"))).toThrow(/reserved/);
-    expect(start(app("pet", "Pet", { "/pet/shell/settings": new Response("mine") }))).toThrow(/reserved/);
+    expect(start(app("pet", "Pet", { routes: appRoutes({ "/pet/shell/settings": new Response("mine") }) }))).toThrow(
+      /reserved/,
+    );
   });
 });
 

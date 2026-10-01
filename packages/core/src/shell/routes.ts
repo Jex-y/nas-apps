@@ -21,6 +21,7 @@ import {
 } from "./contract";
 import { ICON_SIZES, type IconSize, renderIcons } from "./icons";
 import page from "./index.html";
+import { offlineManifest } from "./offline";
 import { themes } from "./schema";
 import settingsPage from "./settings.html";
 import serviceWorker from "./sw.js" with { type: "text" };
@@ -71,8 +72,9 @@ export const createShellRoutes = (
   const launchable: ShellApp[] = apps.map(({ slug, title }) => ({ slug, title }));
   const settings: PushSettings = { publicKey: webPush.publicKey };
 
-  const appRoutes = (app: ShellApp, index: number): Bun.Serve.Routes<undefined, string> => {
+  const appRoutes = (app: AppModule, index: number): Bun.Serve.Routes<undefined, string> => {
     const { slug, title } = app;
+    const offline = app.offlinePage === undefined ? null : offlineManifest(slug, app.offlinePage);
     const base = appShellPath(slug);
     const api = `${base}/api`;
     // The launcher draws the same mark on the app's tile.
@@ -86,6 +88,17 @@ export const createShellRoutes = (
       [`${base}/settings`]: settingsPage,
       [`${base}/manifest.webmanifest`]: Response.json(manifest(app), {
         headers: { "Content-Type": "application/manifest+json" },
+      }),
+      [`${base}/sw.js`]: () =>
+        new Response(`const OFFLINE = ${offline !== null};\n${serviceWorker}`, {
+          headers: {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "Cache-Control": "no-cache",
+            "Service-Worker-Allowed": `/${slug}/`,
+          },
+        }),
+      ...(offline !== null && {
+        [`${base}/offline.json`]: Response.json(offline, { headers: { "Cache-Control": "no-cache" } }),
       }),
       ...Object.fromEntries(ICON_SIZES.map((size) => [`${base}/icons/icon-${size}.png`, icon(size)])),
       [`${api}/push`]: Response.json(settings),
@@ -127,10 +140,6 @@ export const createShellRoutes = (
   return {
     "/": page,
     [`/${SHELL_SLUG}/settings`]: settingsPage,
-    "/sw.js": () =>
-      new Response(serviceWorker, {
-        headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" },
-      }),
     [`${SHELL_API}/apps`]: Response.json(launchable),
     [`${SHELL_API}/theme`]: {
       GET: async (request: Request) => {
@@ -148,6 +157,6 @@ export const createShellRoutes = (
         return new Response(null, { status: 204 });
       },
     },
-    ...Object.assign({}, ...launchable.map(appRoutes)),
+    ...Object.assign({}, ...apps.map(appRoutes)),
   };
 };

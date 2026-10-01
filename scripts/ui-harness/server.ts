@@ -39,6 +39,16 @@ export type HarnessServer = {
   readonly stop: () => Promise<void>;
 };
 
+/** The app's worker as the shell serves it, without the offline cache: the harness has no bundle to keep. */
+const serviceWorker = async (slug: string): Promise<Response> =>
+  new Response(`const OFFLINE = false;\n${await Bun.file(join(SHELL_DIR, "sw.js")).text()}`, {
+    headers: {
+      "Content-Type": "text/javascript; charset=utf-8",
+      "Cache-Control": "no-cache",
+      "Service-Worker-Allowed": `/${slug}/`,
+    },
+  });
+
 const importPage = async (file: string): Promise<Bun.HTMLBundle> => (await import(file)).default;
 
 const discoverApps = async (): Promise<readonly AppEntry[]> => {
@@ -127,6 +137,7 @@ export const startHarnessServer = async ({
       [`/${slug}/*`, { GET: page }] as const,
       [`/${slug}/api/*`, handle] as const,
       [`/${slug}/shell/*`, handle] as const,
+      [`/${slug}/shell/sw.js`, { GET: () => serviceWorker(slug) }] as const,
       ...inAppShellPages.map(({ path, page: shellPage }) => [`/${slug}${path}`, { GET: shellPage }] as const),
     ]),
   ]);
@@ -139,12 +150,6 @@ export const startHarnessServer = async ({
       ...pageRoutes,
       // No saved theme, so each page keeps the one its screenshot stored rather than the deployed viewer's.
       "/shell/api/theme": { GET: Response.json({ theme: null }) },
-      "/sw.js": {
-        GET: () =>
-          new Response(Bun.file(join(SHELL_DIR, "sw.js")), {
-            headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" },
-          }),
-      },
     },
     fetch: handle,
   });

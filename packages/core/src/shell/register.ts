@@ -20,7 +20,9 @@ export const installApp = async (slug: string): Promise<ServiceWorkerRegistratio
   append("link", { rel: "manifest", href: `${shell}/manifest.webmanifest` });
   append("link", { rel: "apple-touch-icon", href: `${shell}/icons/icon-180.png` });
   append("meta", { name: "mobile-web-app-capable", content: "yes" });
-  return "serviceWorker" in navigator ? navigator.serviceWorker.register("/sw.js", { scope: `/${slug}/` }) : null;
+  return "serviceWorker" in navigator
+    ? navigator.serviceWorker.register(`${shell}/sw.js`, { scope: `/${slug}/` })
+    : null;
 };
 
 /** {@link installApp} for the app the page is served under. */
