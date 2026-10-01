@@ -1,11 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import { uniqueLogin } from "@apps/core/testing";
-import { and, count, eq } from "drizzle-orm";
-import { bankWays, createStreetsPipeline, createStreetsTestContext, gpxRun, NOON, record } from "../../test/support";
+import { and, count, desc, eq } from "drizzle-orm";
+import {
+  bankWays,
+  boroughList,
+  createStreetsPipeline,
+  createStreetsTestContext,
+  fakeOverpass,
+  gpxRun,
+  NOON,
+  record,
+} from "../../test/support";
 import { requiredNodes } from "../contract";
+import { boroughQuery, type Overpass } from "./overpass";
 import { activities, boroughs, connections, nodes, refreshes, streetProgress, streets } from "./schema";
 import { parseGpx } from "./track";
-import { isActiveHour, isImported } from "./work";
+import { isActiveHour, isImported, OVERPASS_SPACING_MS } from "./work";
 
 const testbed = createStreetsTestContext();
 const { db, connect, streetNamed, importNetwork } = testbed;
@@ -77,6 +87,42 @@ describe("street network", () => {
 
     await importNetwork();
     expect(await db.select({ nodes: count() }).from(nodes)).toEqual(before);
+  });
+
+  test("asks Overpass for one borough at a time, and plans no tiles until it has them all", async () => {
+    const start = new Date("2099-01-01T00:00:00Z");
+    const hackney = {
+      type: "relation",
+      id: 51781,
+      tags: { name: "London Borough of Hackney", "ref:gss": "E09000012" },
+    };
+    const recorded = fakeOverpass();
+    const overpass: Overpass = {
+      query: async (ql, signal, attempt) =>
+        ql.includes("out tags")
+          ? { elements: [...(boroughList as { elements: unknown[] }).elements, hackney] }
+          : recorded.query(ql, signal, attempt),
+    };
+    const { work, drain } = createStreetsPipeline(testbed, { now: () => start, overpass });
+
+    await work.refreshNetwork();
+    await drain(start);
+
+    const waiting = await testbed.context.sql`
+      select run_at, payload from jobs.jobs where name = 'streets.fetch-borough' and state = 'pending'
+    `;
+    const [refresh] = await db.select().from(refreshes).orderBy(desc(refreshes.id)).limit(1);
+    expect(recorded.asked).toEqual([boroughQuery(51800)]);
+    expect(waiting).toEqual([
+      {
+        run_at: new Date(start.getTime() + OVERPASS_SPACING_MS),
+        payload: { refreshId: refresh?.id ?? 0, boroughId: hackney.id },
+      },
+    ]);
+    expect(refresh?.tiles).toBe(0);
+
+    await importNetwork();
+    expect(await db.select({ name: boroughs.name }).from(boroughs)).toEqual([{ name: "City of London" }]);
   });
 });
 

@@ -48,8 +48,10 @@ const TOKEN_MARGIN_MS = 5 * MINUTE;
 export const NETWORK_MAX_AGE_MS = 30 * DAY;
 /** A refresh still unfinished after this long is presumed stuck (a tile gave up) and a new one starts. */
 const STUCK_REFRESH_MS = 2 * DAY;
-/** Tile queries are spread out, so the import is a light, steady load on Overpass rather than a burst. */
-export const TILE_SPACING_MS = 20_000;
+/** Queries are spread out, so the import is a light, steady load on Overpass rather than a burst it refuses. */
+export const OVERPASS_SPACING_MS = 20_000;
+/** A busy Overpass answers 429 or 504 for minutes at a time; these back off over about twenty. */
+const OVERPASS_ATTEMPTS = 8;
 /** Overpass can take minutes on a big query; still inside the job lease. */
 const OVERPASS_TIMEOUT_MS = 4 * MINUTE;
 
@@ -355,6 +357,7 @@ export const createStreetsWork = (deps: StreetsWorkDeps) => {
     name: "streets.import-tile",
     payload: z.object({ refreshId: z.number().int(), row: z.number().int(), col: z.number().int() }),
     timeoutMs: OVERPASS_TIMEOUT_MS,
+    maxAttempts: OVERPASS_ATTEMPTS,
     handle: async ({ refreshId, row, col }, { signal, attempt }) => {
       const tile = { row, col };
       const box = tileBox(tile);
@@ -433,7 +436,7 @@ export const createStreetsWork = (deps: StreetsWorkDeps) => {
         tx,
         importTile,
         { refreshId, row, col },
-        { dedupeKey: `${refreshId}:${row}:${col}`, runAt: new Date(start + index * TILE_SPACING_MS) },
+        { dedupeKey: `${refreshId}:${row}:${col}`, runAt: new Date(start + index * OVERPASS_SPACING_MS) },
       );
     }
     await tx.update(refreshes).set({ tiles: tiles.length }).where(eq(refreshes.id, refreshId));
@@ -443,6 +446,7 @@ export const createStreetsWork = (deps: StreetsWorkDeps) => {
     name: "streets.fetch-borough",
     payload: z.object({ refreshId: z.number().int(), boroughId: z.number().int() }),
     timeoutMs: OVERPASS_TIMEOUT_MS,
+    maxAttempts: OVERPASS_ATTEMPTS,
     handle: async ({ refreshId, boroughId }, { signal, attempt }) => {
       const boundary = parseBoroughBoundary(await overpass.query(boroughQuery(boroughId), signal, attempt), boroughId);
       const box = boxOf(boundary.flat());
@@ -501,12 +505,13 @@ export const createStreetsWork = (deps: StreetsWorkDeps) => {
             target: boroughs.id,
             set: { name: sql`excluded.name`, generation: sql`excluded.generation`, boundary: null },
           });
-        for (const borough of listed) {
+        const start = deps.now().getTime();
+        for (const [index, borough] of listed.entries()) {
           await insertJob(
             tx,
             fetchBorough,
             { refreshId: refresh.id, boroughId: borough.id },
-            { dedupeKey: `${refresh.id}:${borough.id}` },
+            { dedupeKey: `${refresh.id}:${borough.id}`, runAt: new Date(start + index * OVERPASS_SPACING_MS) },
           );
         }
       });
