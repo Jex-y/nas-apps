@@ -46,7 +46,7 @@ export type BlobDownload = {
 /** Object storage scoped to one app: every key lives under `<namespace>/` in the shared bucket. */
 export type BlobStore = {
   readonly write: (key: string, data: Blob, contentType: string) => Promise<void>;
-  readonly read: (key: string) => Promise<Uint8Array>;
+  readonly read: (key: string) => Promise<Uint8Array<ArrayBuffer>>;
   readonly delete: (key: string) => Promise<void>;
   readonly exists: (key: string) => Promise<boolean>;
   readonly downloadUrl: (key: string, download: BlobDownload) => string;
