@@ -7,7 +7,7 @@ import {
 import { type Collection, createCollection, type PendingMutation } from "@tanstack/db";
 import { NonRetriableError, startOfflineExecutor } from "@tanstack/offline-transactions";
 import { QueryClient } from "@tanstack/query-core";
-import { queryCollectionOptions } from "@tanstack/query-db-collection";
+import { DeleteOperationItemNotFoundError, queryCollectionOptions } from "@tanstack/query-db-collection";
 import type { z } from "zod";
 import {
   type Entry,
@@ -30,8 +30,12 @@ type CollectionName = keyof typeof ROWS;
 /** Bumped whenever a row's shape changes, so a device drops the rows it kept and loads them again. */
 const SCHEMA_VERSION = 1;
 
-/** How long the first screen waits for the server before showing what the device already holds. */
-const FIRST_LOAD_WAIT_MS = 400;
+/** The longest the first screen waits for rows it expects before showing whatever has arrived. */
+const RESTORE_WAIT_MS = 1500;
+const RESTORE_POLL_MS = 8;
+
+/** Where the device remembers which collections held rows when the app was last open. */
+const KEPT_KEY = "lifts:kept";
 
 /** Refusals the server will repeat however often it is asked, as opposed to a connection that may come back. */
 const isRefusal = (error: unknown): boolean =>
@@ -72,6 +76,54 @@ export type Durability = "device" | "other-tab" | "none";
 
 type Listener = () => void;
 
+/** Puts changes the server has accepted into the rows it is known to hold. */
+type Confirm = (changes: readonly PendingMutation[]) => Promise<void>;
+
+type Sized = {
+  readonly size: number;
+  readonly status: string;
+  readonly subscribeChanges: (listener: Listener) => unknown;
+};
+
+/** Which collections held rows last time; `null` on a device that has never opened the app. */
+const readKept = (): Partial<Record<CollectionName, boolean>> | null => {
+  try {
+    const stored = localStorage.getItem(KEPT_KEY);
+    return stored === null ? null : (JSON.parse(stored) as Partial<Record<CollectionName, boolean>>);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Resolves once every collection that held rows last time holds some again, or has heard from the server, so the
+ * first screen is drawn from the whole log rather than from whichever part came back first. A device new to the
+ * app waits for the server instead. Afterwards keeps the record of which collections hold rows up to date.
+ */
+const restored = async (collections: Record<CollectionName, Sized>): Promise<void> => {
+  const names = Object.keys(collections) as CollectionName[];
+  const kept = readKept();
+  const back = (name: CollectionName) =>
+    collections[name].status === "ready" || (kept !== null && (kept[name] !== true || collections[name].size > 0));
+  const deadline = Date.now() + RESTORE_WAIT_MS;
+  while (!names.every(back) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, RESTORE_POLL_MS));
+  }
+
+  const remember = () => {
+    try {
+      localStorage.setItem(
+        KEPT_KEY,
+        JSON.stringify(Object.fromEntries(names.map((name) => [name, collections[name].size > 0]))),
+      );
+    } catch {}
+  };
+  remember();
+  for (const name of names) {
+    collections[name].subscribeChanges(remember);
+  }
+};
+
 export type Store = {
   readonly exercises: Collection<Exercise, string>;
   readonly workouts: Collection<Workout, string>;
@@ -96,17 +148,34 @@ export const openStore = async (): Promise<Store> => {
   const persistence = await openPersistence();
   const queryClient = new QueryClient();
 
-  const refetch = new Map<string, () => Promise<unknown>>();
+  const confirm = new Map<string, Confirm>();
 
   const collection = <T extends { id: string }>(name: CollectionName, list: z.ZodType<T[]>): Collection<T, string> => {
+    const queryKey = ["lifts", name];
     const synced = queryCollectionOptions<T, unknown, string[], string>({
       id: name,
       queryClient,
-      queryKey: ["lifts", name],
+      queryKey,
       queryFn: () => requestJson(`${LIFTS_API}/${name}`, list),
       getKey: (row) => row.id,
     });
-    refetch.set(name, () => synced.utils.refetch());
+    confirm.set(name, async (changes) => {
+      // A read begun before the push was answered would put back what the push replaced.
+      await queryClient.cancelQueries({ queryKey });
+      for (const change of changes) {
+        if (change.type !== "delete") {
+          synced.utils.writeUpsert(change.modified as T);
+          continue;
+        }
+        try {
+          synced.utils.writeDelete(change.key);
+        } catch (error) {
+          if (!(error instanceof DeleteOperationItemNotFoundError)) {
+            throw error;
+          }
+        }
+      }
+    });
     return persistence === null
       ? createCollection(synced)
       : createCollection(persistedCollectionOptions({ ...synced, persistence, schemaVersion: SCHEMA_VERSION }));
@@ -133,16 +202,19 @@ export const openStore = async (): Promise<Store> => {
         } catch (error) {
           throw isRefusal(error) ? new NonRetriableError((error as ApiError).message) : error;
         }
-        // Read back before the optimistic rows are dropped, so nothing flickers out and in again.
-        const touched = new Set(transaction.mutations.map((mutation) => mutation.collection.id));
-        await Promise.all([...touched].map((name) => refetch.get(name)?.()));
+        const changed = Map.groupBy(transaction.mutations, (mutation) => mutation.collection.id);
+        for (const [name, changes] of changed) {
+          await confirm.get(name)?.(changes);
+        }
       },
     },
   });
   await executor.waitForInit();
 
-  const loaded = Promise.all(Object.values(collections).map((each) => each.preload()));
-  await Promise.race([loaded.catch(() => {}), new Promise((resolve) => setTimeout(resolve, FIRST_LOAD_WAIT_MS))]);
+  for (const each of Object.values(collections)) {
+    void each.preload().catch(() => {});
+  }
+  await restored(collections);
 
   let refusal: string | null = null;
   const listeners = new Set<Listener>();
