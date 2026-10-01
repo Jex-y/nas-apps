@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { COMPETITION_LIFTS, type Exercise } from "../../../../contract";
-import { sessionsOf, type WorkoutDetail } from "../../../../log";
-import { repRecords } from "../../../../strength";
-import { formatDay, formatKg, formatSet } from "../../../utils/format";
+import { type Session, sessionsOf, type WorkoutDetail } from "../../../../log";
+import { bestEstimate, isWorkSet, repRecords } from "../../../../strength";
+import { ConfirmButton } from "../../../components/ConfirmButton";
+import { Icon } from "../../../components/Icon";
+import { dayBadge, formatDay, formatKg, formatSet } from "../../../utils/format";
 import { useExerciseActions } from "../api/exercises";
 import { trend } from "../utils/chart";
 import { LIFT_NAMES } from "../utils/lifts";
@@ -15,23 +17,34 @@ type Props = {
   readonly exerciseId: string;
 };
 
-const History = ({
-  exercise,
-  workouts,
-}: {
-  readonly exercise: Exercise;
-  readonly workouts: readonly WorkoutDetail[];
-}) => {
-  const sessions = sessionsOf(workouts, exercise.id);
-  const points = trend(sessions);
-  const dateOf = new Map(sessions.flatMap(({ workout, sets }) => sets.map((set) => [set.id, workout.date] as const)));
-  const records = repRecords(sessions.flatMap((session) => session.sets));
+const sessionMax = (sets: Session["sets"]): string => {
+  const best = bestEstimate(sets);
+  return best === null ? "" : `est. max ${formatKg(best.maxKg)} kg`;
+};
 
-  if (sessions.length === 0) {
-    return <p className="muted">Not logged yet.</p>;
-  }
+const History = ({ sessions }: { readonly sessions: readonly Session[] }) => {
+  const points = trend(sessions);
+  const all = sessions.flatMap((session) => session.sets);
+  const dateOf = new Map(sessions.flatMap(({ workout, sets }) => sets.map((set) => [set.id, workout.date] as const)));
+  const records = repRecords(all);
+  const best = bestEstimate(all);
+
   return (
     <>
+      <dl className="card standings">
+        <div className="total">
+          <dt className="label">Est. max</dt>
+          <dd className="numeric">{best === null ? "–" : formatKg(best.maxKg)}</dd>
+        </div>
+        <div>
+          <dt className="label">Sessions</dt>
+          <dd className="numeric">{sessions.length}</dd>
+        </div>
+        <div>
+          <dt className="label">Work sets</dt>
+          <dd className="numeric">{all.filter(isWorkSet).length}</dd>
+        </div>
+      </dl>
       {points.length > 1 && (
         <section className="card">
           <h2>Estimated max</h2>
@@ -62,15 +75,30 @@ const History = ({
         </section>
       )}
       <h2>Sessions</h2>
-      <ul className="card rows">
-        {sessions.toReversed().map(({ workout, sets }) => (
-          <li key={workout.id}>
-            <Link href={`/workouts/${workout.id}`} className="row-title">
-              <time dateTime={workout.date}>{formatDay(workout.date)}</time>
-            </Link>
-            <p className="muted numeric">{sets.map(formatSet).join(" · ")}</p>
-          </li>
-        ))}
+      <ul className="workouts">
+        {sessions.toReversed().map(({ workout, sets }) => {
+          const { weekday, day } = dayBadge(workout.date);
+          return (
+            <li key={workout.id}>
+              <Link href={`/workouts/${workout.id}`} className="card workout">
+                <time dateTime={workout.date} className="day">
+                  <span className="label">{weekday}</span>
+                  <strong className="numeric">{day}</strong>
+                </time>
+                <span className="workout-lines">
+                  <span className="set-chips numeric">
+                    {sets.map((set) => (
+                      <span key={set.id} className={isWorkSet(set) ? undefined : "warmup"}>
+                        {formatSet(set)}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="workout-foot numeric">{sessionMax(sets)}</span>
+                </span>
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </>
   );
@@ -82,15 +110,22 @@ export const ExercisePage = ({ exercises, workouts, exerciseId }: Props) => {
   const exercise = exercises.find((other) => other.id === exerciseId);
   const [name, setName] = useState(exercise?.name ?? "");
 
+  const back = (
+    <Link href="/exercises" className="back-link">
+      <Icon name="back" />
+      Exercises
+    </Link>
+  );
   if (exercise === undefined) {
     return (
-      <p className="muted">
-        That exercise is not in the log. <Link href="/exercises">Back to exercises</Link>
-      </p>
+      <>
+        {back}
+        <p className="muted">That exercise is not in the log.</p>
+      </>
     );
   }
   const taken = (lift: Exercise["lift"]) => exercises.some((other) => other.lift === lift && other.id !== exercise.id);
-  const logged = sessionsOf(workouts, exercise.id).length > 0;
+  const sessions = sessionsOf(workouts, exercise.id);
   const rename = () => {
     const next = name.trim();
     if (next === "") {
@@ -102,7 +137,8 @@ export const ExercisePage = ({ exercises, workouts, exerciseId }: Props) => {
 
   return (
     <>
-      <div className="page-heading">
+      {back}
+      <div className="exercise-heading">
         <input
           className="title"
           value={name}
@@ -110,36 +146,39 @@ export const ExercisePage = ({ exercises, workouts, exerciseId }: Props) => {
           maxLength={100}
           onChange={(event) => setName(event.target.value)}
           onBlur={rename}
+          onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
         />
-        <div className="actions">
-          <select
-            value={exercise.lift ?? ""}
-            aria-label="Competition lift"
-            onChange={(event) =>
-              actions.update(exercise, { lift: COMPETITION_LIFTS.find((each) => each === event.target.value) ?? null })
-            }
-          >
-            <option value="">Not a competition lift</option>
-            {COMPETITION_LIFTS.filter((lift) => !taken(lift)).map((lift) => (
-              <option key={lift} value={lift}>
-                {LIFT_NAMES[lift]}
-              </option>
-            ))}
-          </select>
-          {!logged && (
-            <button
-              type="button"
-              onClick={() => {
-                actions.remove(exercise);
-                navigate("/exercises");
-              }}
-            >
-              Delete
-            </button>
-          )}
-        </div>
+        <select
+          value={exercise.lift ?? ""}
+          aria-label="Competition lift"
+          onChange={(event) =>
+            actions.update(exercise, { lift: COMPETITION_LIFTS.find((each) => each === event.target.value) ?? null })
+          }
+        >
+          <option value="">Accessory</option>
+          {COMPETITION_LIFTS.filter((lift) => !taken(lift)).map((lift) => (
+            <option key={lift} value={lift}>
+              Competition {LIFT_NAMES[lift].toLowerCase()}
+            </option>
+          ))}
+        </select>
       </div>
-      <History exercise={exercise} workouts={workouts} />
+      {sessions.length === 0 ? (
+        <>
+          <p className="muted">Not logged yet. Add it to a workout and its records build up here.</p>
+          <ConfirmButton
+            confirm="Delete this exercise?"
+            onConfirm={() => {
+              actions.remove(exercise);
+              navigate("/exercises");
+            }}
+          >
+            Delete exercise
+          </ConfirmButton>
+        </>
+      ) : (
+        <History sessions={sessions} />
+      )}
     </>
   );
 };

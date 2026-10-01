@@ -1,5 +1,7 @@
 import type { Exercise } from "../../../../contract";
 import type { WorkoutDetail } from "../../../../log";
+import { formatLongDay, localToday } from "../../../utils/format";
+import { Standings } from "../../exercises/components/Standings";
 import { useWorkoutActions } from "../api/workouts";
 import { WorkoutEditor } from "./WorkoutEditor";
 import { WorkoutList } from "./WorkoutList";
@@ -9,9 +11,6 @@ type Props = {
   readonly workouts: readonly WorkoutDetail[];
 };
 
-/** How many past sessions sit under the start button, as a reminder of where things stand. */
-const RECENT = 3;
-
 /** The session under way, or the way into a new one. */
 export const LogPage = ({ exercises, workouts }: Props) => {
   const actions = useWorkoutActions();
@@ -20,16 +19,21 @@ export const LogPage = ({ exercises, workouts }: Props) => {
   if (open !== undefined) {
     return <WorkoutEditor key={open.id} workout={open} workouts={workouts} exercises={exercises} />;
   }
-  const recent = workouts.slice(-RECENT).reverse();
+  const last = workouts.at(-1);
   return (
     <>
-      <button type="button" className="primary start" onClick={actions.start}>
-        Start workout
-      </button>
-      {recent.length > 0 && (
+      <section className="hero">
+        <p className="label">{formatLongDay(localToday())}</p>
+        <h1>{last === undefined ? "Log your first session" : "Ready when you are"}</h1>
+        <button type="button" className="primary start" onClick={actions.start}>
+          Start workout
+        </button>
+      </section>
+      <Standings exercises={exercises} workouts={workouts} />
+      {last !== undefined && (
         <>
-          <h2>Recent</h2>
-          <WorkoutList workouts={recent} />
+          <h2>Last session</h2>
+          <WorkoutList workouts={[last]} />
         </>
       )}
     </>

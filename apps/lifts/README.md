@@ -3,8 +3,9 @@
 A strength training log built for powerlifting: each tailnet login keeps its own, which nobody else sees. A workout
 holds exercises in order, each with its sets: weight, reps, an optional RPE, and whether it was a warm-up.
 
-- **Log**: the session under way. Adding a set repeats the one before it, or opens with last session's first work
-  set, so most sets are one tap; a clock counts the rest since the last one.
+- **Log**: the session under way. Each set is built with the thumb: weight and reps on steppers, RPE on a row of
+  chips, one button to log it. It starts as the set before it, or as last session's first work set, so most sets are
+  one tap; a clock counts the rest since the last one. Tapping a logged set brings it back to correct or delete.
 - **History**: every workout, newest first, each open to correction.
 - **Exercises**: the estimated squat, bench and deadlift maxes and their total, then each exercise with its trend,
   the heaviest set at each rep count and every session.

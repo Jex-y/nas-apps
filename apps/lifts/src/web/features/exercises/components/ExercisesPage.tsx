@@ -4,7 +4,8 @@ import { COMPETITION_LIFTS, type CompetitionLift, type Exercise } from "../../..
 import type { WorkoutDetail } from "../../../../log";
 import { formatDay, formatKg } from "../../../utils/format";
 import { useExerciseActions } from "../api/exercises";
-import { LIFT_NAMES, missingLifts, standings, summarise } from "../utils/lifts";
+import { LIFT_NAMES, missingLifts, summarise } from "../utils/lifts";
+import { Standings } from "./Standings";
 
 type Props = {
   readonly exercises: readonly Exercise[];
@@ -19,7 +20,6 @@ export const ExercisesPage = ({ exercises, workouts }: Props) => {
   const [lift, setLift] = useState<CompetitionLift | "">("");
 
   const summaries = summarise(exercises.toSorted(byName), workouts);
-  const { lifts, totalKg } = standings(summaries);
   const free = missingLifts(exercises);
 
   const submit = (event: FormEvent) => {
@@ -31,40 +31,34 @@ export const ExercisesPage = ({ exercises, workouts }: Props) => {
 
   return (
     <>
-      <dl className="standings">
-        {lifts.map(({ lift: each, maxKg }) => (
-          <div key={each} className="card">
-            <dt className="label">{LIFT_NAMES[each]}</dt>
-            <dd className="numeric">{maxKg === null ? "–" : formatKg(maxKg)}</dd>
-          </div>
-        ))}
-        <div className="card">
-          <dt className="label">Total</dt>
-          <dd className="numeric">{totalKg === null ? "–" : formatKg(totalKg)}</dd>
-        </div>
-      </dl>
-      <p className="muted">Estimated one-rep maxes in kilograms, from the best work set logged.</p>
-
-      <h2>Exercises</h2>
+      <h1>Exercises</h1>
+      <Standings exercises={exercises} workouts={workouts} />
+      {summaries.length === 0 && <p className="muted">Exercises you log appear here with their records.</p>}
       {summaries.length > 0 && (
         <ul className="card rows">
           {summaries.map(({ exercise, sessions, lastTrainedOn, bestMaxKg }) => (
             <li key={exercise.id}>
-              <Link href={`/exercises/${exercise.id}`} className="row-title">
-                {exercise.name}
-                {exercise.lift !== null && <span className="badge">{exercise.lift}</span>}
-                <span className="trailing numeric">{bestMaxKg === null ? "" : `${formatKg(bestMaxKg)} kg`}</span>
+              <Link href={`/exercises/${exercise.id}`} className="row">
+                <span className="row-main">
+                  <strong>{exercise.name}</strong>
+                  <span className="muted">
+                    {lastTrainedOn === null
+                      ? "Not logged yet"
+                      : `${sessions === 1 ? "1 session" : `${sessions} sessions`} · ${formatDay(lastTrainedOn)}`}
+                  </span>
+                </span>
+                {bestMaxKg !== null && (
+                  <span className="figure">
+                    <span className="label">Est. max</span>
+                    <span className="numeric">{formatKg(bestMaxKg)}</span>
+                  </span>
+                )}
               </Link>
-              <p className="muted">
-                {lastTrainedOn === null
-                  ? "Not logged yet"
-                  : `${sessions === 1 ? "1 session" : `${sessions} sessions`}, last on ${formatDay(lastTrainedOn)}`}
-              </p>
             </li>
           ))}
         </ul>
       )}
-      <form className="inline-form" onSubmit={submit}>
+      <form className="card new-exercise" onSubmit={submit}>
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -73,18 +67,20 @@ export const ExercisesPage = ({ exercises, workouts }: Props) => {
           maxLength={100}
           required
         />
-        <select
-          value={lift}
-          aria-label="Competition lift"
-          onChange={(event) => setLift(COMPETITION_LIFTS.find((each) => each === event.target.value) ?? "")}
-        >
-          <option value="">Not a competition lift</option>
-          {free.map((each) => (
-            <option key={each} value={each}>
-              {LIFT_NAMES[each]}
-            </option>
-          ))}
-        </select>
+        {free.length > 0 && (
+          <select
+            value={lift}
+            aria-label="Competition lift"
+            onChange={(event) => setLift(COMPETITION_LIFTS.find((each) => each === event.target.value) ?? "")}
+          >
+            <option value="">Accessory</option>
+            {free.map((each) => (
+              <option key={each} value={each}>
+                Competition {LIFT_NAMES[each].toLowerCase()}
+              </option>
+            ))}
+          </select>
+        )}
         <button type="submit" disabled={name.trim() === ""}>
           Add
         </button>

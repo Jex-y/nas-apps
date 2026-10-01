@@ -38,16 +38,19 @@ const actions = (store: Store) => ({
     });
   },
 
-  addEntry: (workout: WorkoutDetail, exerciseId: string) => {
+  /** Adds an exercise to the end of the workout, answering the id of its place there. */
+  addEntry: (workout: WorkoutDetail, exerciseId: string): string => {
+    const id = crypto.randomUUID();
     store.write(() => {
       store.entries.insert({
-        id: crypto.randomUUID(),
+        id,
         workoutId: workout.id,
         exerciseId,
         position: nextPosition(workout.entries),
         notes: "",
       });
     });
+    return id;
   },
 
   updateEntry: (entry: Entry, notes: string) => {

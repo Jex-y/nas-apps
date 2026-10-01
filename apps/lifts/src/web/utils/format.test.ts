@@ -1,5 +1,14 @@
 import { expect, test } from "bun:test";
-import { formatDay, formatElapsed, formatKg, formatSet, localToday } from "./format";
+import {
+  dayBadge,
+  formatDay,
+  formatElapsed,
+  formatKg,
+  formatLongDay,
+  formatMonth,
+  formatSet,
+  localToday,
+} from "./format";
 
 test("formats days, weights, sets and rests as the screens show them", () => {
   expect(localToday(new Date(2026, 9, 1, 23, 30))).toBe("2026-10-01");
@@ -9,4 +18,8 @@ test("formats days, weights, sets and rests as the screens show them", () => {
   expect(formatSet({ weightKg: 142.5, reps: 5, rpe: 8.5 })).toBe("142.5×5 @8.5");
   expect(formatSet({ weightKg: 60, reps: 10, rpe: null })).toBe("60×10");
   expect([formatElapsed(0), formatElapsed(95_400), formatElapsed(-5)]).toEqual(["0:00", "1:35", "0:00"]);
+  expect(formatKg(2060)).toBe("2,060");
+  expect(formatMonth("2026-10-01")).toBe("October 2026");
+  expect(formatLongDay("2026-10-01")).toBe("Thursday 1 October");
+  expect(dayBadge("2026-10-01")).toEqual({ weekday: "Thu", day: 1 });
 });

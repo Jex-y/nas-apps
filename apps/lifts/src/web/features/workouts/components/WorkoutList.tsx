@@ -1,27 +1,39 @@
 import { Link } from "wouter";
 import type { WorkoutDetail } from "../../../../log";
-import { isWorkSet, tonnage } from "../../../../strength";
-import { formatDay, formatKg, formatSet } from "../../../utils/format";
+import { bestEstimate, tonnage } from "../../../../strength";
+import { dayBadge, formatKg, formatSet } from "../../../utils/format";
 
-/** Workouts as given, each with its exercises and their work sets in brief. */
+/** Workouts as given, each a card: its day, each exercise with its top set, and what was lifted in all. */
 export const WorkoutList = ({ workouts }: { readonly workouts: readonly WorkoutDetail[] }) => (
-  <ul className="card rows">
-    {workouts.map((workout) => (
-      <li key={workout.id}>
-        <Link href={`/workouts/${workout.id}`} className="row-title">
-          <time dateTime={workout.date}>{formatDay(workout.date)}</time>
-          {workout.finishedAt === null && <span className="badge">Open</span>}
-          <span className="trailing numeric">
-            {formatKg(tonnage(workout.entries.flatMap((entry) => entry.sets)))} kg
-          </span>
-        </Link>
-        {workout.entries.map((entry) => (
-          <p key={entry.id} className="muted">
-            {entry.exercise.name}{" "}
-            <span className="numeric">{entry.sets.filter(isWorkSet).map(formatSet).join(" · ")}</span>
-          </p>
-        ))}
-      </li>
-    ))}
+  <ul className="workouts">
+    {workouts.map((workout) => {
+      const { weekday, day } = dayBadge(workout.date);
+      return (
+        <li key={workout.id}>
+          <Link href={`/workouts/${workout.id}`} className="card workout">
+            <time dateTime={workout.date} className="day">
+              <span className="label">{weekday}</span>
+              <strong className="numeric">{day}</strong>
+            </time>
+            <span className="workout-lines">
+              {workout.entries.length === 0 && <span className="muted">Nothing logged</span>}
+              {workout.entries.map((entry) => {
+                const top = bestEstimate(entry.sets)?.set ?? entry.sets.at(-1);
+                return (
+                  <span key={entry.id} className="workout-line">
+                    <span>{entry.exercise.name}</span>
+                    <span className="numeric">{top === undefined ? "" : formatSet(top)}</span>
+                  </span>
+                );
+              })}
+              <span className="workout-foot">
+                {workout.finishedAt === null && <span className="badge">Under way</span>}
+                <span className="numeric">{formatKg(tonnage(workout.entries.flatMap((entry) => entry.sets)))} kg</span>
+              </span>
+            </span>
+          </Link>
+        </li>
+      );
+    })}
   </ul>
 );

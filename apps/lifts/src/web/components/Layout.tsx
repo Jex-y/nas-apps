@@ -1,78 +1,98 @@
 import type { ReactNode } from "react";
 import { useStore } from "../hooks/useStore";
 import { useSyncStatus } from "../hooks/useSyncStatus";
+import { Icon, type IconName } from "./Icon";
 import { NavLink } from "./NavLink";
 
-type Section = { readonly href: string; readonly label: string; readonly icon: string };
+type Section = { readonly href: string; readonly label: string; readonly icon: IconName };
 
-/** 24×24 stroked icon paths; on phones the sections sit in a bottom tab bar within thumb reach. */
+/** On phones the sections sit in a bottom tab bar within thumb reach. */
 const SECTIONS: readonly Section[] = [
-  { href: "/", label: "Log", icon: "M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12" },
-  { href: "/history", label: "History", icon: "M5 4h14v16H5zM5 9h14M9 4v5M15 4v5" },
-  { href: "/exercises", label: "Exercises", icon: "M4 19h16M7 16v-5M12 16V6M17 16v-8" },
+  { href: "/", label: "Log", icon: "log" },
+  { href: "/history", label: "History", icon: "history" },
+  { href: "/exercises", label: "Exercises", icon: "exercises" },
 ];
 
-const Icon = ({ path }: { path: string }) => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
-    <path d={path} />
-  </svg>
-);
+/** Why changes made here cannot wait for a connection, where they cannot. */
+const LIMITS = {
+  device: null,
+  none: "This browser cannot keep the log on the device, so changes need a connection.",
+  "other-tab": "The log is open in another tab, so changes made in this one need a connection.",
+} as const;
 
-/** Says what has not reached the server, what it refused, and when the log cannot outlive the page. */
-const SyncNotice = () => {
-  const store = useStore();
-  const { pending, durability, refusal } = useSyncStatus();
+/**
+ * Sits in the header, where nothing moves when it changes: quiet while everything is on the server, a count while
+ * changes wait to be sent, and a standing word where the device cannot hold them at all.
+ */
+const SyncChip = () => {
+  const { pending, durability } = useSyncStatus();
+  const limit = LIMITS[durability];
 
+  if (limit !== null) {
+    return (
+      <span className="sync limited" role="status" title={limit}>
+        <span className="sync-dot" aria-hidden="true" />
+        Online only
+        <span className="visually-hidden">{limit}</span>
+      </span>
+    );
+  }
   return (
-    <>
-      {pending > 0 && (
-        <p className="sync-pending" role="status">
-          {pending === 1 ? "1 change" : `${pending} changes`} waiting to sync
-        </p>
-      )}
-      {refusal !== null && (
-        <p className="notice" role="alert">
-          A change was undone: {refusal}
-          <button type="button" onClick={store.dismissRefusal}>
-            Dismiss
-          </button>
-        </p>
-      )}
-      {durability === "none" && (
-        <p className="notice">This browser cannot keep the log on the device, so changes need a connection.</p>
-      )}
-      {durability === "other-tab" && (
-        <p className="notice">The log is open in another tab, so changes made in this one need a connection.</p>
-      )}
-    </>
+    <span className={pending > 0 ? "sync waiting" : "sync"} role="status">
+      <span className="sync-dot" aria-hidden="true" />
+      {pending > 0 ? `${pending} to sync` : <span className="visually-hidden">Everything is synced</span>}
+    </span>
   );
 };
 
-export const Layout = ({ children }: { children: ReactNode }) => (
+/** Laid over the page rather than in it, so it comes and goes without moving what is being tapped. */
+const Refusal = () => {
+  const store = useStore();
+  const { refusal } = useSyncStatus();
+
+  return refusal === null ? null : (
+    <div className="notices">
+      <p className="notice" role="alert">
+        <span>Undone: {refusal}</span>
+        <button type="button" className="quiet" aria-label="Dismiss" onClick={store.dismissRefusal}>
+          <Icon name="close" />
+        </button>
+      </p>
+    </div>
+  );
+};
+
+type Props = {
+  /** Without it the frame is drawn alone, while the log is being opened. */
+  readonly ready: boolean;
+  readonly children: ReactNode;
+};
+
+export const Layout = ({ ready, children }: Props) => (
   <>
     <header className="site-header">
+      <a href="/" className="nav-link launcher-link" aria-label="All apps">
+        <Icon name="back" />
+      </a>
+      <span className="brand">Lifts</span>
       <nav>
-        <a href="/" className="nav-link launcher-link">
-          ‹ Apps
-        </a>
         {SECTIONS.map(({ href, label }) => (
           <NavLink key={href} href={href} className="nav-link section-link">
             {label}
           </NavLink>
         ))}
-        <a href="/lifts/shell/settings" className="nav-link">
-          Settings
-        </a>
       </nav>
+      {ready && <SyncChip />}
+      <a href="/lifts/shell/settings" className="nav-link" aria-label="Settings">
+        <Icon name="settings" />
+      </a>
     </header>
-    <main>
-      <SyncNotice />
-      {children}
-    </main>
+    <main>{children}</main>
+    {ready && <Refusal />}
     <nav className="tab-bar" aria-label="Sections">
       {SECTIONS.map(({ href, label, icon }) => (
         <NavLink key={href} href={href} className="tab">
-          <Icon path={icon} />
+          <Icon name={icon} />
           {label}
         </NavLink>
       ))}
