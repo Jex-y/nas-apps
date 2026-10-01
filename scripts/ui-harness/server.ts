@@ -137,6 +137,8 @@ export const startHarnessServer = async ({
     development: { hmr, console: false },
     routes: {
       ...pageRoutes,
+      // No saved theme, so each page keeps the one its screenshot stored rather than the deployed viewer's.
+      "/shell/api/theme": { GET: Response.json({ theme: null }) },
       "/sw.js": {
         GET: () =>
           new Response(Bun.file(join(SHELL_DIR, "sw.js")), {

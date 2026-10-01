@@ -66,3 +66,10 @@ test("serves the shell's settings page for the launcher and inside each app", as
     expect(await response.text()).toContain("<title>Settings</title>");
   }
 });
+
+test("answers the saved theme itself, so a page keeps the theme it was given", async () => {
+  seen.length = 0;
+  expect(await (await call("GET", "/shell/api/theme")).json()).toEqual({ theme: null });
+  expect((await call("PUT", "/shell/api/theme")).status).toBe(405);
+  expect(seen).toEqual([]);
+});

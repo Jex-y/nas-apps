@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { THEMES } from "../web/theme";
 
 /**
  * Reserved as an app slug and as the first path segment inside every app, so no app's routes can collide with the
@@ -34,3 +35,12 @@ export type PushSubscriptionInput = z.infer<typeof PushSubscriptionInput>;
 
 export const PushEndpoint = z.object({ endpoint: z.url() });
 export type PushEndpoint = z.infer<typeof PushEndpoint>;
+
+const ThemeIdSchema = z.enum(THEMES.map((theme) => theme.id));
+
+/** The theme the viewer chose, on any device; `null` until they choose one. */
+export const SavedTheme = z.object({ theme: ThemeIdSchema.nullable() });
+export type SavedTheme = z.infer<typeof SavedTheme>;
+
+export const ThemeChoice = z.object({ theme: ThemeIdSchema });
+export type ThemeChoice = z.infer<typeof ThemeChoice>;

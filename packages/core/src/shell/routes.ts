@@ -6,18 +6,22 @@ import { parseBody } from "../http";
 import { type IdentityMode, resolveViewer } from "../identity";
 import { subscriptions } from "../push/schema";
 import { createWebPushNotifier, type WebPushConfig } from "../push/send";
+import { findTheme } from "../web/theme";
 import { identityAt, markFor } from "./artwork";
 import {
   appShellPath,
   PushEndpoint,
   type PushSettings,
   PushSubscriptionInput,
+  type SavedTheme,
   SHELL_API,
   SHELL_SLUG,
   type ShellApp,
+  ThemeChoice,
 } from "./contract";
 import { ICON_SIZES, type IconSize, renderIcons } from "./icons";
 import page from "./index.html";
+import { themes } from "./schema";
 import settingsPage from "./settings.html";
 import serviceWorker from "./sw.js" with { type: "text" };
 
@@ -128,6 +132,22 @@ export const createShellRoutes = (
         headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" },
       }),
     [`${SHELL_API}/apps`]: Response.json(launchable),
+    [`${SHELL_API}/theme`]: {
+      GET: async (request: Request) => {
+        const { login } = resolveViewer(identity, request);
+        const [saved] = await db.select().from(themes).where(eq(themes.login, login));
+        return Response.json({ theme: findTheme(saved?.theme ?? null) } satisfies SavedTheme);
+      },
+      PUT: async (request: Request) => {
+        const { login } = resolveViewer(identity, request);
+        const { theme } = await parseBody(request, ThemeChoice);
+        await db
+          .insert(themes)
+          .values({ login, theme })
+          .onConflictDoUpdate({ target: themes.login, set: { theme, updatedAt: new Date() } });
+        return new Response(null, { status: 204 });
+      },
+    },
     ...Object.assign({}, ...launchable.map(appRoutes)),
   };
 };

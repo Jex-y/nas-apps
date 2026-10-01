@@ -1,8 +1,8 @@
 import { requestJson } from "../web";
-import { followTheme } from "../web/theme";
 import { artworkSvg, identityAt, markFor, themedPalette } from "./artwork";
 import { SHELL_API, ShellApps } from "./contract";
 import { element } from "./push";
+import { followSavedTheme } from "./saved-theme";
 
 const tileArtwork = (slug: string, index: number, count: number) => {
   const mark = markFor(slug, identityAt(index, count));
@@ -28,5 +28,5 @@ const renderApps = async () => {
   );
 };
 
-followTheme();
+followSavedTheme();
 await renderApps();

@@ -1,5 +1,5 @@
 export { installShell } from "../shell/register";
-export { applyTheme, DEFAULT_THEME, saveTheme, storedTheme, THEMES, type ThemeId } from "./theme";
+export { applyTheme, DEFAULT_THEME, storedTheme, THEMES, type ThemeId } from "./theme";
 
 import type { z } from "zod";
 

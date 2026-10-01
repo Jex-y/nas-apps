@@ -1,5 +1,5 @@
-import { followTheme } from "../web/theme";
 import { appShellPath, appSlugAt } from "./contract";
+import { followSavedTheme } from "./saved-theme";
 
 const append = (tag: "link" | "meta", attributes: Record<string, string>) => {
   const element = document.createElement(tag);
@@ -10,12 +10,12 @@ const append = (tag: "link" | "meta", attributes: Record<string, string>) => {
 };
 
 /**
- * Applies the stored theme, makes the page installable as its app's own Home Screen app and registers the worker that
+ * Applies the viewer's theme, makes the page installable as its app's own Home Screen app and registers the worker that
  * receives that app's push. The head tags are added here rather than in each index.html because Bun's HTML bundler
  * tries to resolve their hrefs as files.
  */
 export const installApp = async (slug: string): Promise<ServiceWorkerRegistration | null> => {
-  followTheme();
+  followSavedTheme();
   const shell = appShellPath(slug);
   append("link", { rel: "manifest", href: `${shell}/manifest.webmanifest` });
   append("link", { rel: "apple-touch-icon", href: `${shell}/icons/icon-180.png` });

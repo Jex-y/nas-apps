@@ -10,6 +10,7 @@ import { createWebPushNotifier, type WebPushConfig } from "../push/send";
 import { startServer } from "../server";
 import { createTestContext, uniqueLogin } from "../testing";
 import { appSlugAt } from "./contract";
+import { themes } from "./schema";
 
 const context = createTestContext();
 const db = drizzle({ client: context.sql });
@@ -64,6 +65,7 @@ const subscribe = (as: string, subscription = browserSubscription(), slug = "fla
 
 beforeEach(async () => {
   await db.delete(subscriptions);
+  await db.delete(themes);
 });
 
 describe("notify config", () => {
@@ -146,6 +148,33 @@ describe("shell", () => {
     const start = (taken: AppModule) => () => startServer({ port: 0, development: false, apps: [taken], shell });
     expect(start(app("shell", "Shell"))).toThrow(/reserved/);
     expect(start(app("pet", "Pet", { "/pet/shell/settings": new Response("mine") }))).toThrow(/reserved/);
+  });
+});
+
+describe("saved theme", () => {
+  const theme = async (as: string) => (await request("/shell/api/theme", { as })).json();
+  const choose = (as: string, chosen: string) =>
+    request("/shell/api/theme", { method: "PUT", as, body: JSON.stringify({ theme: chosen }) });
+
+  test("keeps the theme each person chose, and none until they choose", async () => {
+    const [me, them] = [uniqueLogin(), uniqueLogin()];
+    expect(await theme(me)).toEqual({ theme: null });
+
+    expect((await choose(me, "drafting")).status).toBe(204);
+    expect((await choose(me, "command")).status).toBe(204);
+    expect(await theme(me)).toEqual({ theme: "command" });
+    expect(await theme(them)).toEqual({ theme: null });
+  });
+
+  test("refuses a theme that does not exist, and anonymous viewers", async () => {
+    expect((await choose(uniqueLogin(), "paper")).status).toBe(400);
+    expect((await request("/shell/api/theme")).status).toBe(401);
+  });
+
+  test("a saved theme that has since been removed reads as no choice", async () => {
+    const me = uniqueLogin();
+    await db.insert(themes).values({ login: me, theme: "paper" });
+    expect(await theme(me)).toEqual({ theme: null });
   });
 });
 

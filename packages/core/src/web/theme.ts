@@ -23,10 +23,15 @@ const STORAGE_KEY = "theme";
  */
 export const THEME_BOOT_SCRIPT = `<script>try{document.documentElement.dataset.theme=localStorage.getItem("${STORAGE_KEY}")??"${DEFAULT_THEME}"}catch{}</script>`;
 
-export const parseTheme = (value: string | null): ThemeId =>
-  THEMES.find((theme) => theme.id === value)?.id ?? DEFAULT_THEME;
+export const findTheme = (value: string | null): ThemeId | null =>
+  THEMES.find((theme) => theme.id === value)?.id ?? null;
 
-/** Storage can throw, e.g. in a locked-down private window; the default theme is then used. */
+export const parseTheme = (value: string | null): ThemeId => findTheme(value) ?? DEFAULT_THEME;
+
+/**
+ * This browser's copy of the theme, which the boot script paints from before any request can answer. Storage can throw,
+ * e.g. in a locked-down private window; the default theme is then used.
+ */
 export const storedTheme = (): ThemeId => {
   try {
     return parseTheme(localStorage.getItem(STORAGE_KEY));
@@ -57,7 +62,7 @@ export const saveTheme = (theme: ThemeId) => {
   applyTheme(theme);
 };
 
-/** Applies the stored theme, and follows changes to it from other tabs and to the system colour scheme. */
+/** Applies this browser's copy of the theme, and follows changes to it from other tabs and to the system colour scheme. */
 export const followTheme = () => {
   applyTheme(storedTheme());
   window.addEventListener("storage", (event) => {

@@ -29,6 +29,13 @@
       "when": 1790888731796,
       "tag": "0003_subscribe_per_app",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790890028651,
+      "tag": "0004_save_themes",
+      "breakpoints": true
     }
   ]
 }
