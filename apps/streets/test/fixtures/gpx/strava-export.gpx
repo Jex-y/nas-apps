@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx creator="StravaGPX" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd http://www.garmin.com/xmlschemas/GpxExtensions/v3 http://www.garmin.com/xmlschemas/GpxExtensionsv3.xsd http://www.garmin.com/xmlschemas/TrackPointExtension/v1 http://www.garmin.com/xmlschemas/TrackPointExtensionv1.xsd" version="1.1" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3">
+ <metadata>
+  <time>2026-09-20T07:30:05Z</time>
+ </metadata>
+ <trk>
+  <name>Bank &amp; Monument loop</name>
+  <type>running</type>
+  <trkseg>
+   <trkpt lat="51.5133100" lon="-0.0889400">
+    <ele>14.2</ele>
+    <time>2026-09-20T07:30:05Z</time>
+    <extensions>
+     <gpxtpx:TrackPointExtension>
+      <gpxtpx:hr>121</gpxtpx:hr>
+     </gpxtpx:TrackPointExtension>
+    </extensions>
+   </trkpt>
+   <trkpt lat="51.5131800" lon="-0.0884700">
+    <ele>14.0</ele>
+    <time>2026-09-20T07:30:11Z</time>
+   </trkpt>
+   <trkpt lon="-0.0879900" lat="51.5130600">
+    <ele>13.8</ele>
+    <time>2026-09-20T07:30:17Z</time>
+   </trkpt>
+   <trkpt lat='51.5129300' lon='-0.0875100'>
+    <ele>13.5</ele>
+    <time>2026-09-20T07:30:23Z</time>
+   </trkpt>
+   <trkpt lat="not-a-number" lon="-0.0870000">
+    <time>2026-09-20T07:30:26Z</time>
+   </trkpt>
+   <trkpt lat="51.5128000" lon="-0.0870300"/>
+  </trkseg>
+ </trk>
+</gpx>
