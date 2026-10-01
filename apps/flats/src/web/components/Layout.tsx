@@ -27,6 +27,9 @@ const MORE: readonly Omit<Section, "icon">[] = [
   { href: "/requirements", label: "Requirements" },
 ];
 
+/** Served by the app shell, outside the router: theme and notifications. */
+const SETTINGS_HREF = "/flats/shell/settings";
+
 const Icon = ({ path }: { path: string }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className="icon">
     <path d={path} />
@@ -108,6 +111,9 @@ const TabBar = () => {
             {label}
           </NavLink>
         ))}
+        <a href={SETTINGS_HREF} className="more-link">
+          Settings
+        </a>
       </div>
     </nav>
   );
@@ -117,7 +123,7 @@ export const Layout = ({ children }: { children: ReactNode }) => (
   <>
     <header className="site-header">
       <nav>
-        <a href="/" className="nav-link">
+        <a href="/" className="nav-link launcher-link">
           ‹ Apps
         </a>
         {[...TABS, ...MORE].map(({ href, label }) => (
@@ -125,6 +131,9 @@ export const Layout = ({ children }: { children: ReactNode }) => (
             {label}
           </NavLink>
         ))}
+        <a href={SETTINGS_HREF} className="nav-link section-link">
+          Settings
+        </a>
       </nav>
       <AddListingForm />
     </header>

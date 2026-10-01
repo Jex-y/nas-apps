@@ -301,6 +301,12 @@ pre {
   font-size: 0.75rem;
 }
 
+.page-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .home-link {
   color: var(--muted);
   text-decoration: none;

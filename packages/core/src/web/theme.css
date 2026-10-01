@@ -173,3 +173,10 @@ kbd,
 .numeric {
   font-variant-numeric: tabular-nums;
 }
+
+/* An installed app's scope ends at its own path, so its link to the launcher would open outside the app. */
+@media (display-mode: standalone) {
+  .launcher-link {
+    display: none;
+  }
+}

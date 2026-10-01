@@ -22,7 +22,7 @@ export const Layout = ({ children }: { children: ReactNode }) => (
   <>
     <header className="site-header">
       <nav>
-        <a href="/" className="nav-link">
+        <a href="/" className="nav-link launcher-link">
           ‹ Apps
         </a>
         {SECTIONS.map(({ href, label }) => (
@@ -30,6 +30,9 @@ export const Layout = ({ children }: { children: ReactNode }) => (
             {label}
           </NavLink>
         ))}
+        <a href="/money/shell/settings" className="nav-link">
+          Settings
+        </a>
       </nav>
     </header>
     <main>{children}</main>

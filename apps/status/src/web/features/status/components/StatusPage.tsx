@@ -28,9 +28,14 @@ export const StatusPage = () => {
 
   return (
     <main>
-      <a href="/" className="home-link">
-        ‹ Apps
-      </a>
+      <nav className="page-nav">
+        <a href="/" className="home-link launcher-link">
+          ‹ Apps
+        </a>
+        <a href="/status/shell/settings" className="home-link">
+          Settings
+        </a>
+      </nav>
       <header className="page-header">
         <h1>System status</h1>
         {report.data && (
