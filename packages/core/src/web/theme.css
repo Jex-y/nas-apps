@@ -122,10 +122,13 @@ button,
     color 120ms ease-out;
 }
 
-button:hover,
-.button:hover {
-  background: var(--control-hover-bg);
-  color: var(--control-hover-fg);
+/* Only where a pointer can hover: on a touch screen the state would stick to whatever was last tapped. */
+@media (hover: hover) {
+  button:hover,
+  .button:hover {
+    background: var(--control-hover-bg);
+    color: var(--control-hover-fg);
+  }
 }
 
 button:disabled {
@@ -142,11 +145,13 @@ button.primary {
   color: var(--primary-fg);
 }
 
-button[type="submit"]:hover,
-button.primary:hover {
-  background: var(--primary-hover-bg);
-  border-color: var(--primary-hover-bg);
-  color: var(--primary-hover-fg);
+@media (hover: hover) {
+  button[type="submit"]:hover,
+  button.primary:hover {
+    background: var(--primary-hover-bg);
+    border-color: var(--primary-hover-bg);
+    color: var(--primary-hover-fg);
+  }
 }
 
 kbd {
