@@ -1,0 +1,433 @@
+@import "@nas/core/theme.css";
+@import "leaflet/dist/leaflet.css";
+
+a {
+  color: inherit;
+}
+
+h1,
+h2 {
+  margin: 0 0 0.75rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  margin-top: 1.75rem;
+  font-size: 1.1rem;
+}
+
+p {
+  margin: 0.25rem 0 0.75rem;
+}
+
+code,
+.figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+code {
+  font-size: 0.875em;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.error {
+  color: var(--error);
+  font-size: 0.875rem;
+}
+
+.notice {
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.site-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nav-link.active {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+main {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0;
+}
+
+.card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.badge {
+  padding: 0.1rem 0.5rem;
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* The map fills the space between the header and, on phones, the tab bar. */
+main:has(.map-page) {
+  max-width: none;
+  padding: 0;
+}
+
+.map-page {
+  position: relative;
+  height: calc(100dvh - 2.8rem);
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-2);
+}
+
+.map-overlay {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.map-overlay > * {
+  pointer-events: auto;
+}
+
+.map-overlay button {
+  margin-left: auto;
+}
+
+.map-hint {
+  padding: 0.35rem 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.map-legend {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 1.75rem;
+  z-index: 500;
+  display: flex;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.35rem 0.6rem;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+}
+
+.swatch {
+  display: inline-block;
+  width: 1rem;
+  height: 0.25rem;
+  vertical-align: middle;
+}
+
+.swatch.complete {
+  background: var(--accent);
+}
+
+.swatch.partial {
+  background: var(--accent);
+  opacity: 0.45;
+}
+
+.swatch.untouched {
+  background: var(--pink);
+  opacity: 0.5;
+}
+
+.leaflet-container {
+  font-family: var(--font-body);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.fact {
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.fact dt {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fact dd {
+  margin: 0;
+}
+
+.fact dd.figure {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.chart {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.bars {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.bar {
+  display: flex;
+  flex: 1;
+  flex-direction: column-reverse;
+  min-width: 0;
+}
+
+.segment {
+  background: var(--accent);
+}
+
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+}
+
+.recent,
+.activities,
+.suggestions,
+.steps {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.steps {
+  list-style: decimal inside;
+}
+
+.recent li,
+.activities li,
+.suggestions li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.activities li > div {
+  display: grid;
+  min-width: 0;
+}
+
+.suggestions li {
+  display: grid;
+  justify-content: stretch;
+}
+
+.suggestions .button {
+  justify-self: start;
+}
+
+.street-names {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.new-streets {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.boroughs {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.boroughs th,
+.boroughs td {
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.boroughs thead th {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.boroughs th[scope="row"] {
+  font-weight: 500;
+}
+
+.boroughs .percent {
+  position: relative;
+  width: 30%;
+}
+
+.boroughs .percent span {
+  position: relative;
+}
+
+.boroughs .meter {
+  position: absolute;
+  inset: 0.3rem auto 0.3rem 0;
+  background: var(--accent);
+  opacity: 0.2;
+}
+
+.connect label.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.75rem 0;
+}
+
+.icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tab-bar {
+  display: none;
+}
+
+/* Phones: sections move to a bottom tab bar within thumb reach. */
+@media (max-width: 40rem) {
+  .site-header {
+    padding-top: calc(0.75rem + env(safe-area-inset-top));
+  }
+
+  .site-header .section-link {
+    display: none;
+  }
+
+  main {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .map-page {
+    height: calc(100dvh - 2.8rem - env(safe-area-inset-top) - 3.6rem - env(safe-area-inset-bottom));
+  }
+
+  .tab-bar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 1000;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 0.25rem max(0.25rem, env(safe-area-inset-right)) env(safe-area-inset-bottom)
+      max(0.25rem, env(safe-area-inset-left));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.4rem 0 0.5rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tab.active {
+    color: var(--accent);
+    font-weight: 600;
+  }
+}

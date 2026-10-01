@@ -48,6 +48,8 @@ export type BlobStore = {
   readonly write: (key: string, data: Blob, contentType: string) => Promise<void>;
   readonly delete: (key: string) => Promise<void>;
   readonly exists: (key: string) => Promise<boolean>;
+  /** For the server's own reprocessing; browsers download through `downloadUrl` instead. */
+  readonly read: (key: string) => Promise<Uint8Array<ArrayBuffer>>;
   readonly downloadUrl: (key: string, download: BlobDownload) => string;
 };
 
@@ -73,6 +75,7 @@ export const createBlobStore = (config: BlobConfig, namespace: string): BlobStor
     },
     delete: (key) => internal.delete(path(key)),
     exists: (key) => internal.exists(path(key)),
+    read: (key) => internal.file(path(key)).bytes(),
     downloadUrl: (key, { filename, expiresInSeconds = 300 }) =>
       public_.presign(path(key), {
         method: "GET",
