@@ -38,6 +38,10 @@ export type ParsedGpx = {
 
 /** Strava's export writes its activity type into `<type>`, as a word or as a Garmin-style number. */
 const SPORT_TYPES: Readonly<Record<string, string>> = {
+  cycling: "Ride",
+  biking: "Ride",
+  ride: "Ride",
+  "1": "Ride",
   running: "Run",
   run: "Run",
   "9": "Run",

@@ -96,6 +96,7 @@ export const readStravaStatus = async (db: StreetsDb, login: string, configured:
         : {
             athleteName: connection.athleteName,
             includeWalks: connection.includeWalks,
+            includeRides: connection.includeRides,
             backfill: connection.backfill,
             backfillFinishedAt: iso(connection.backfillFinishedAt),
             lastPolledAt: iso(connection.lastPolledAt),

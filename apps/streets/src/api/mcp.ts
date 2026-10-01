@@ -1,6 +1,6 @@
-import { type AppMcp, type McpServer, toolResult } from "@apps/core";
+import { type AppMcp, HttpError, type McpServer, toolResult } from "@apps/core";
 import { z } from "zod";
-import { COMPLETION_PERCENT, MATCH_RADIUS_METRES } from "../contract";
+import { COMPLETION_PERCENT, MATCH_RADIUS_METRES, UpdateStrava } from "../contract";
 import { MAX_NEARBY_METRES, type StreetsService } from "./service";
 
 const INSTRUCTIONS = `The connected person's progress towards running every street in London, as CityStrides counts it.
@@ -8,7 +8,8 @@ const INSTRUCTIONS = `The connected person's progress towards running every stre
 - A street is every named road of one name within one borough. It is made of nodes about 50 m apart, and a node is run
   once a GPS track passes within ${MATCH_RADIUS_METRES} m of it. A street is complete at ${COMPLETION_PERCENT}% of its
   nodes; state is complete, partial or untouched.
-- Runs come from Strava, checked every half hour during the day, or from uploaded GPX files. Connecting Strava needs a
+- Runs come from Strava, checked every half hour during the day, or from uploaded GPX files. Walks, hikes and bike
+  rides count too once switched on. Each new Strava activity sends the person a notification. Connecting Strava needs a
   browser: send the person to the app's Connect page. Everything else can be done here.
 - Positions are WGS84 latitude and longitude in degrees, and only Greater London is tracked.
 - The street network is imported from OpenStreetMap monthly and is the same for everyone; progress, runs and the
@@ -77,14 +78,22 @@ const registerTools = (service: StreetsService, server: McpServer, login: string
       toolResult(async () => ({ strava: await service.stravaStatus(login), network: await service.networkStatus() })),
   );
   server.registerTool(
-    "set_include_walks",
+    "set_counted_activities",
     {
       description:
-        "Chooses whether Strava walks and hikes count as well as runs. Turning it on re-reads the whole history.",
-      inputSchema: { includeWalks: z.boolean() },
+        "Chooses whether Strava walks and hikes, and bike rides, count as well as runs. A setting left out is " +
+        "kept. Turning either on re-reads the whole history.",
+      inputSchema: { includeWalks: z.boolean().optional(), includeRides: z.boolean().optional() },
       annotations: repeatable,
     },
-    ({ includeWalks }) => toolResult(() => service.setIncludeWalks(login, includeWalks)),
+    (change) =>
+      toolResult(async () => {
+        const update = UpdateStrava.safeParse(change);
+        if (!update.success) {
+          throw new HttpError(400, z.prettifyError(update.error));
+        }
+        return service.setIncluded(login, update.data);
+      }),
   );
   server.registerTool(
     "reimport_strava_history",

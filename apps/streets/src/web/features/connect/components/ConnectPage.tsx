@@ -98,6 +98,15 @@ const Connection = ({ status }: { status: StravaStatus }) => {
         />{" "}
         Count walks and hikes too
       </label>
+      <label className="toggle">
+        <input
+          type="checkbox"
+          checked={connection.includeRides}
+          disabled={update.isPending}
+          onChange={(event) => update.mutate({ includeRides: event.target.checked })}
+        />{" "}
+        Count bike rides too
+      </label>
       <div className="card-actions">
         <button type="button" onClick={() => rescan.mutate()} disabled={rescan.isPending}>
           Re-scan history

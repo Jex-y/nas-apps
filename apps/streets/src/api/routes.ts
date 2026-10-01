@@ -63,8 +63,7 @@ export const createStreetsRoutes = ({ service, identity }: StreetsRoutesDeps) =>
       GET: async (request) => Response.json(await service.stravaStatus(login(request))),
       PATCH: async (request) => {
         const owner = login(request);
-        const { includeWalks } = await parseBody(request, UpdateStrava);
-        return Response.json(await service.setIncludeWalks(owner, includeWalks));
+        return Response.json(await service.setIncluded(owner, await parseBody(request, UpdateStrava)));
       },
       DELETE: async (request) => {
         await service.disconnect(login(request));

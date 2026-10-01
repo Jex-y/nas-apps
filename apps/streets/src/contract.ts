@@ -28,6 +28,7 @@ export const StravaStatus = z.object({
     .object({
       athleteName: z.string(),
       includeWalks: z.boolean(),
+      includeRides: z.boolean(),
       backfill: z.enum(BACKFILL_STATES),
       backfillFinishedAt: z.iso.datetime().nullable(),
       lastPolledAt: z.iso.datetime().nullable(),
@@ -39,7 +40,11 @@ export const StravaStatus = z.object({
 });
 export type StravaStatus = z.infer<typeof StravaStatus>;
 
-export const UpdateStrava = z.object({ includeWalks: z.boolean() });
+/** Which activities count besides runs; a field left out keeps its setting. */
+export const UpdateStrava = z
+  .object({ includeWalks: z.boolean(), includeRides: z.boolean() })
+  .partial()
+  .refine((change) => Object.keys(change).length > 0, { message: "Nothing to change" });
 export type UpdateStrava = z.infer<typeof UpdateStrava>;
 
 export const NetworkStatus = z.object({

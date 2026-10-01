@@ -106,6 +106,7 @@ describe("connecting Strava", () => {
     expect((await read("/streets/api/strava", StravaStatus, me)).connection).toMatchObject({
       athleteName: "Ed Runner",
       includeWalks: false,
+      includeRides: false,
       backfill: "running",
     });
 
@@ -146,29 +147,40 @@ describe("connecting Strava", () => {
     ]);
   });
 
-  test("counting walks re-reads the history, and disconnecting revokes access", async () => {
+  test("counting walks or rides re-reads the history, and disconnecting revokes access", async () => {
     const me = uniqueLogin();
     const stranger = uniqueLogin();
+    const patch = (change: object) =>
+      request("/streets/api/strava", { method: "PATCH", body: JSON.stringify(change), as: me });
     await callback(me, GRANTED);
     await drain();
     record(strava, 2, "2026-09-20T07:00:00Z", ["Tokenhouse Yard"], { sportType: "Walk" });
+    record(strava, 3, "2026-09-19T07:00:00Z", ["Lothbury"], { sportType: "Ride" });
 
-    const patched = await request("/streets/api/strava", {
-      method: "PATCH",
-      body: JSON.stringify({ includeWalks: true }),
-      as: me,
-    });
-    expect(StravaStatus.parse(await patched.json()).connection).toMatchObject({
+    expect(StravaStatus.parse(await (await patch({ includeWalks: true })).json()).connection).toMatchObject({
       includeWalks: true,
+      includeRides: false,
       backfill: "running",
     });
     await drain();
     expect((await read("/streets/api/activities", ActivityList, me)).map((run) => run.sportType)).toEqual(["Walk"]);
 
+    expect(StravaStatus.parse(await (await patch({ includeRides: true })).json()).connection).toMatchObject({
+      includeWalks: true,
+      includeRides: true,
+      backfill: "running",
+    });
+    await drain();
+    expect((await read("/streets/api/activities", ActivityList, me)).map((run) => run.sportType)).toEqual([
+      "Walk",
+      "Ride",
+    ]);
+    expect((await patch({})).status).toBe(400);
+
     expect((await request("/streets/api/strava", { method: "DELETE", as: me })).status).toBe(204);
     expect(strava.calls.at(-1)).toMatch(/^deauthorize access-\d+$/);
     expect((await read("/streets/api/strava", StravaStatus, me)).connection).toBeNull();
-    expect(await read("/streets/api/activities", ActivityList, me)).toHaveLength(1);
+    expect(await read("/streets/api/activities", ActivityList, me)).toHaveLength(2);
 
     for (const [method, path] of [
       ["DELETE", "/streets/api/strava"],

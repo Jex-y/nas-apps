@@ -11,6 +11,7 @@ import {
   type StravaStatus,
   type StreetNode,
   type Suggestion,
+  type UpdateStrava,
   type UploadResult,
 } from "../contract";
 import type { StreetsDb } from "./db";
@@ -162,17 +163,17 @@ export const createStreetsService = ({ db, work, strava, states, publicUrl, now 
       return "connected";
     },
 
-    /** Walks and hikes only count once asked for; turning them on re-reads the history to find them. */
-    setIncludeWalks: async (login: string, includeWalks: boolean): Promise<StravaStatus> => {
+    /** Walks, hikes and rides only count once asked for; turning either on re-reads the history to find them. */
+    setIncluded: async (login: string, change: UpdateStrava): Promise<StravaStatus> => {
       const [updated] = await db
         .update(connections)
-        .set({ includeWalks })
+        .set(change)
         .where(eq(connections.login, login))
         .returning({ login: connections.login });
       if (updated === undefined) {
         throw new HttpError(404, "Strava is not connected");
       }
-      if (includeWalks) {
+      if (change.includeWalks === true || change.includeRides === true) {
         await restartBackfill(login);
       }
       return stravaStatus(login);

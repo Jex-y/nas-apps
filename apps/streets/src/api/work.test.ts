@@ -33,13 +33,21 @@ const runsOf = (login: string) =>
   db.select().from(activities).where(eq(activities.login, login)).orderBy(activities.startAt);
 
 describe("what counts", () => {
-  test("runs always, walks and hikes only when opted in, and never rides or treadmill runs", () => {
-    expect(isImported("Run", false)).toBe(true);
-    expect(isImported("TrailRun", false)).toBe(true);
-    expect(isImported("Walk", false)).toBe(false);
-    expect(isImported("Hike", true)).toBe(true);
-    expect(isImported("Ride", true)).toBe(false);
-    expect(isImported("VirtualRun", true)).toBe(false);
+  test("runs always, walks, hikes and rides only when opted in, and never anything done indoors", () => {
+    const runsOnly = { walks: false, rides: false };
+    const everything = { walks: true, rides: true };
+
+    expect(isImported("Run", runsOnly)).toBe(true);
+    expect(isImported("TrailRun", runsOnly)).toBe(true);
+    expect(isImported("Walk", runsOnly)).toBe(false);
+    expect(isImported("Ride", runsOnly)).toBe(false);
+    expect(isImported("Hike", { walks: true, rides: false })).toBe(true);
+    expect(isImported("Ride", { walks: true, rides: false })).toBe(false);
+    expect(isImported("GravelRide", { walks: false, rides: true })).toBe(true);
+    expect(isImported("Walk", { walks: false, rides: true })).toBe(false);
+    expect(isImported("VirtualRun", everything)).toBe(false);
+    expect(isImported("VirtualRide", everything)).toBe(false);
+    expect(isImported("Swim", everything)).toBe(false);
   });
 
   test("Strava is polled between 7 and 23, London time", () => {
@@ -153,20 +161,22 @@ describe("Strava import", () => {
     expect(sent).toEqual([]);
   });
 
-  test("walks are imported once asked for", async () => {
+  test("walks and rides are imported once asked for", async () => {
     const login = uniqueLogin();
     await connect(login);
-    await db.update(connections).set({ includeWalks: true }).where(eq(connections.login, login));
+    await db.update(connections).set({ includeWalks: true, includeRides: true }).where(eq(connections.login, login));
     const { work, strava, drain } = createStreetsPipeline(testbed);
     record(strava, 5, "2026-09-05T07:00:00Z", ["Tokenhouse Yard"], { sportType: "Walk" });
+    record(strava, 6, "2026-09-06T07:00:00Z", ["Lothbury"], { sportType: "Ride" });
 
     await work.startBackfill(login);
     await drain();
 
     expect((await progressOn(login, "Tokenhouse Yard"))?.completedAt).not.toBeNull();
+    expect((await progressOn(login, "Lothbury"))?.completedAt).not.toBeNull();
   });
 
-  test("a poll finds a new run and tells its runner which streets it completed", async () => {
+  test("a poll tells the runner about each new activity, once, and which streets it completed", async () => {
     const login = uniqueLogin();
     await connect(login);
     const { work, strava, sent, drain } = createStreetsPipeline(testbed);
@@ -187,9 +197,16 @@ describe("Strava import", () => {
     const [connection] = await db.select().from(connections).where(eq(connections.login, login));
     expect(connection?.lastPolledAt).toEqual(NOON);
 
+    record(strava, 8, "2026-09-21T09:00:00Z", ["Bartholomew Lane"], { name: "Same again" });
     await testbed.context.jobs.enqueue(work.definitions.poll, {});
     await drain();
-    expect(sent).toHaveLength(1);
+    expect(sent.slice(1)).toEqual([
+      { login, title: "Same again", message: "No new streets", clickUrl: "https://apps.example/streets/" },
+    ]);
+
+    await testbed.context.jobs.enqueue(work.definitions.poll, {});
+    await drain();
+    expect(sent).toHaveLength(2);
   });
 
   test("nothing is asked of Strava overnight", async () => {

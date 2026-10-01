@@ -47,7 +47,7 @@ describe("streets mcp", () => {
       "refresh_street_network",
       "reimport_strava_history",
       "rematch_runs",
-      "set_include_walks",
+      "set_counted_activities",
       "suggest_streets",
     ]);
     expect(client.getInstructions()).toContain("CityStrides");
@@ -110,7 +110,7 @@ describe("streets mcp", () => {
     const client = await connect(uniqueLogin());
 
     for (const [name, args] of [
-      ["set_include_walks", { includeWalks: true }],
+      ["set_counted_activities", { includeWalks: true }],
       ["reimport_strava_history", {}],
       ["disconnect_strava", {}],
     ] as const) {

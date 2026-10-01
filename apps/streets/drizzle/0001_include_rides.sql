@@ -1,0 +1,1 @@
+ALTER TABLE "streets"."connections" ADD COLUMN "include_rides" boolean DEFAULT false NOT NULL;

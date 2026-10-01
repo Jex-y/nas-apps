@@ -57,11 +57,16 @@ const OVERPASS_TIMEOUT_MS = 4 * MINUTE;
 
 export const RUN_TYPES = ["Run", "TrailRun"] as const;
 export const WALK_TYPES = ["Walk", "Hike"] as const;
+export const RIDE_TYPES = ["Ride", "GravelRide", "MountainBikeRide", "EBikeRide", "EMountainBikeRide"] as const;
 
-/** Runs always; walks and hikes when the athlete opts in. Virtual runs happen on a treadmill, not a street. */
-export const isImported = (sportType: string, includeWalks: boolean): boolean =>
+/** What the athlete has opted in to count besides runs. */
+export type Included = { readonly walks: boolean; readonly rides: boolean };
+
+/** Runs always; walks, hikes and rides when the athlete opts in. Virtual ones happen indoors, not on a street. */
+export const isImported = (sportType: string, { walks, rides }: Included): boolean =>
   (RUN_TYPES as readonly string[]).includes(sportType) ||
-  (includeWalks && (WALK_TYPES as readonly string[]).includes(sportType));
+  (walks && (WALK_TYPES as readonly string[]).includes(sportType)) ||
+  (rides && (RIDE_TYPES as readonly string[]).includes(sportType));
 
 /** Strava is polled in waking hours (London time) only; runs recorded overnight are picked up in the morning. */
 export const isActiveHour = (at: Date): boolean => {
@@ -146,8 +151,13 @@ export const createStreetsWork = (deps: StreetsWorkDeps) => {
       .where(eq(activities.id, activityId));
   };
 
-  const announce = async (login: string, activityName: string, completed: readonly Completion[]) => {
+  /** The streets an activity completed, and how far along that leaves the borough most of them are in. */
+  const summaryOf = async (login: string, completed: readonly Completion[]): Promise<string> => {
     const streetIds = completed.map((completion) => completion.streetId);
+    if (streetIds.length === 0) {
+      return "No new streets";
+    }
+    const plural = streetIds.length === 1 ? "street" : "streets";
     const [top] = await db
       .select({ boroughId: streets.boroughId, name: boroughs.name })
       .from(streets)
@@ -157,17 +167,20 @@ export const createStreetsWork = (deps: StreetsWorkDeps) => {
       .orderBy(desc(count()))
       .limit(1);
     if (top === undefined) {
-      return;
+      return `${streetIds.length} new ${plural}`;
     }
     const [borough] = await db
       .select({ total: count(), completed: count(streetProgress.completedAt) })
       .from(streets)
       .leftJoin(streetProgress, and(eq(streetProgress.streetId, streets.id), eq(streetProgress.login, login)))
       .where(eq(streets.boroughId, top.boroughId));
-    const plural = streetIds.length === 1 ? "street" : "streets";
+    return `${streetIds.length} new ${plural} · ${top.name} now ${formatPercent(borough?.completed ?? 0, borough?.total ?? 0)}`;
+  };
+
+  const announce = async (login: string, activityName: string, completed: readonly Completion[]) => {
     await deps.notifier(login).send({
       title: activityName,
-      message: `${streetIds.length} new ${plural} · ${top.name} now ${formatPercent(borough?.completed ?? 0, borough?.total ?? 0)}`,
+      message: await summaryOf(login, completed),
       clickUrl: `${deps.publicUrl}/streets/`,
     });
   };
@@ -196,7 +209,7 @@ export const createStreetsWork = (deps: StreetsWorkDeps) => {
           .where(eq(activities.id, activityId));
         return newlyCompleted;
       });
-      if (notify && completed.length > 0) {
+      if (notify) {
         await announce(activity.login, activity.name, completed);
       }
     },
@@ -236,12 +249,12 @@ export const createStreetsWork = (deps: StreetsWorkDeps) => {
 
   /** Records runs Strava listed and queues their tracks; ones already known are left alone, so this is idempotent. */
   const addStravaActivities = async (
-    login: string,
-    includeWalks: boolean,
+    { login, includeWalks, includeRides }: typeof connections.$inferSelect,
     listed: readonly StravaActivity[],
     notify: boolean,
   ) => {
-    const wanted = listed.filter((activity) => !activity.manual && isImported(activity.sportType, includeWalks));
+    const included = { walks: includeWalks, rides: includeRides };
+    const wanted = listed.filter((activity) => !activity.manual && isImported(activity.sportType, included));
     if (wanted.length === 0) {
       return;
     }
@@ -293,7 +306,7 @@ export const createStreetsWork = (deps: StreetsWorkDeps) => {
       if (page.kind !== "ok") {
         return setBack(login, page, retry);
       }
-      await addStravaActivities(login, connection.includeWalks, page.body, false);
+      await addStravaActivities(connection, page.body, false);
       if (page.body.length < BACKFILL_PAGE) {
         await db
           .update(connections)
@@ -332,7 +345,7 @@ export const createStreetsWork = (deps: StreetsWorkDeps) => {
       if (page.kind !== "ok") {
         return setBack(login, page, retry);
       }
-      await addStravaActivities(login, connection.includeWalks, page.body, true);
+      await addStravaActivities(connection, page.body, true);
       await db
         .update(connections)
         .set({ lastPolledAt: deps.now(), lastError: null })

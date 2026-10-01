@@ -112,6 +112,7 @@ export const connections = streetsSchema.table("connections", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   scope: text("scope").notNull(),
   includeWalks: boolean("include_walks").notNull().default(false),
+  includeRides: boolean("include_rides").notNull().default(false),
   backfill: backfillState("backfill").notNull().default("running"),
   backfillFinishedAt: timestamp("backfill_finished_at", { withTimezone: true }),
   lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),

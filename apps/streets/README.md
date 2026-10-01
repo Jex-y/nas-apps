@@ -30,9 +30,10 @@ again when it arrives.
 3. On the Connect page, connect with Strava. Your whole history is imported, then checked for new runs every half
    hour between 7:00 and 23:00.
 
-Runs and trail runs count; walks and hikes too once switched on. A new application may only be connected by the
+Runs and trail runs count; walks and hikes, and bike rides, too once each is switched on. A new application may only be connected by the
 athlete who owns it, and reads 100 requests per quarter hour and 1,000 a day: a long history is imported across
-several of those windows. A run that completes streets sends a notification saying how many.
+several of those windows. Each new activity the half-hourly check finds sends a notification saying how many streets
+it completed; the history import sends none.
 
 Without Strava, export runs as GPX from any service and upload them on the Connect page. Strava's bulk export is a
 zip of them; `.gpx` and `.gpx.gz` files both work.
