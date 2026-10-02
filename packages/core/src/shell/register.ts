@@ -18,6 +18,7 @@ export const installApp = async (slug: string): Promise<ServiceWorkerRegistratio
   followSavedTheme();
   const shell = appShellPath(slug);
   append("link", { rel: "manifest", href: `${shell}/manifest.webmanifest` });
+  append("link", { rel: "icon", type: "image/png", href: `${shell}/icons/icon-192.png` });
   append("link", { rel: "apple-touch-icon", href: `${shell}/icons/icon-180.png` });
   append("meta", { name: "mobile-web-app-capable", content: "yes" });
   return "serviceWorker" in navigator
