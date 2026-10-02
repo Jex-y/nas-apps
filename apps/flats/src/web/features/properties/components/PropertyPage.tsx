@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import type { PropertyDetail } from "../../../../contract";
 import { Contributions } from "../../../components/Contributions";
 import { Warnings } from "../../../components/PropertyCard";
+import { useKeymap } from "../../../hooks/useKeymap";
 import {
   AVAILABILITY_LABELS,
   formatCommuteTime,
@@ -12,29 +13,29 @@ import {
   formatTenure,
   pricePerSqft,
 } from "../../../utils/format";
-import { useProperty, useUpdateNotes } from "../api/properties";
+import { SCROLL_BINDINGS } from "../../../utils/keymap";
+import { useProperty, useUpdateNotes, useUpdateStatus } from "../api/properties";
+import { openOnPortal } from "../utils/portal";
+import { firstOf, type Slide, slidesOf } from "../utils/slides";
 import { CrimeSection } from "./CrimeSection";
 import { PhotoViewer } from "./PhotoViewer";
 import { StatusControl } from "./StatusControl";
-import type { GalleryPhoto } from "./SwipeCard";
 import { ViewingsSection } from "./ViewingsSection";
 
 /**
  * An installed app has no browser back button. Goes back through the app's history, or to the inbox when the page was
  * opened directly, e.g. from a notification.
  */
-const BackLink = () => {
+const useGoBack = () => {
   const [, navigate] = useLocation();
-  return (
-    <button
-      type="button"
-      className="back-link"
-      onClick={() => (window.history.length > 1 ? window.history.back() : navigate("/"))}
-    >
-      ‹ Back
-    </button>
-  );
+  return () => (window.history.length > 1 ? window.history.back() : navigate("/"));
 };
+
+const BackLink = () => (
+  <button type="button" className="back-link" onClick={useGoBack()}>
+    ‹ Back
+  </button>
+);
 
 const Facts = ({ property }: { property: PropertyDetail }) => {
   const rows: [string, string | null][] = [
@@ -66,18 +67,23 @@ const Facts = ({ property }: { property: PropertyDetail }) => {
   );
 };
 
+/** The cover and a strip of the rest, the map last; l, f and m open them full screen. */
 const PhotoGallery = ({ property }: { property: PropertyDetail }) => {
   const [viewing, setViewing] = useState<number | null>(null);
-  const photos: readonly GalleryPhoto[] =
-    property.photos.length > 0
-      ? [
-          ...property.photos.filter((photo) => photo.kind === "photo"),
-          ...property.photos.filter((photo) => photo.kind === "floorplan"),
-        ]
-      : property.thumbnailUrl
-        ? [{ kind: "photo", url: property.thumbnailUrl }]
-        : [];
-  const [cover, ...rest] = photos;
+  const slides = slidesOf(property);
+  const show = (kind: Slide["kind"]) => () => setViewing(firstOf(slides, kind) ?? 0);
+  useKeymap(
+    "Photos",
+    slides.length === 0
+      ? []
+      : [
+          { keys: ["l", "Space"], does: "Look through the photos", run: show("photo") },
+          { keys: ["f"], does: "Floorplan", run: show("floorplan") },
+          { keys: ["m"], does: "Where it is on the map", run: show("map") },
+        ],
+  );
+
+  const cover = slides[0]?.kind === "map" ? undefined : slides[0];
 
   return (
     <div className="gallery">
@@ -87,14 +93,20 @@ const PhotoGallery = ({ property }: { property: PropertyDetail }) => {
         </button>
       )}
       <div className="thumbs">
-        {rest.map((photo, i) => (
-          <button key={photo.url} type="button" onClick={() => setViewing(i + 1)}>
-            <img src={photo.url} alt={photo.kind} loading="lazy" />
-          </button>
-        ))}
+        {slides.map((slide, at) =>
+          slide === cover ? null : slide.kind === "map" ? (
+            <button key="map" type="button" className="map-thumb" onClick={() => setViewing(at)}>
+              Map
+            </button>
+          ) : (
+            <button key={slide.url} type="button" onClick={() => setViewing(at)}>
+              <img src={slide.url} alt={slide.kind} loading="lazy" />
+            </button>
+          ),
+        )}
       </div>
       {viewing !== null && (
-        <PhotoViewer photos={photos} index={viewing} onStep={setViewing} onClose={() => setViewing(null)} />
+        <PhotoViewer slides={slides} index={viewing} onStep={setViewing} onClose={() => setViewing(null)} />
       )}
     </div>
   );
@@ -130,7 +142,27 @@ export const PropertyPage = ({ id }: { id: string }) => {
   if (property.error) {
     return <p className="error">{property.error.message}</p>;
   }
-  const detail = property.data;
+  return <Property detail={property.data} />;
+};
+
+const Property = ({ detail }: { detail: PropertyDetail }) => {
+  const updateStatus = useUpdateStatus();
+  const goBack = useGoBack();
+  useKeymap("Listing", [
+    {
+      keys: ["s"],
+      does: "Shortlist",
+      run: () => updateStatus.mutate({ id: detail.id, update: { status: "shortlisted" } }),
+    },
+    {
+      keys: ["x"],
+      does: "Reject",
+      run: () => updateStatus.mutate({ id: detail.id, update: { status: "rejected", reason: null } }),
+    },
+    { keys: ["g x"], does: "Open on the portal", run: () => openOnPortal(detail) },
+    { keys: ["q", "Backspace"], does: "Back", run: goBack },
+    ...SCROLL_BINDINGS,
+  ]);
 
   return (
     <article className="property">

@@ -1,35 +1,24 @@
 import { Link } from "wouter";
-import type { Photo, PropertySummary } from "../../../../contract";
+import type { PropertySummary } from "../../../../contract";
 import { Warnings } from "../../../components/PropertyCard";
 import { formatDate, formatPrice, keyFacts } from "../../../utils/format";
 import type { SwipeGesture } from "../hooks/useSwipeGesture";
+import { coverSlides, type Slide } from "../utils/slides";
+import { SlideView } from "./SlideView";
 
-export type GalleryPhoto = Pick<Photo, "kind" | "url">;
-
-/**
- * The current photo, with the next one mounted but hidden so it has loaded by the time it is shown: photo URLs
- * redirect to freshly signed ones, so a separately preloaded copy would never be a cache hit.
- */
-const Gallery = ({ photos, index }: { photos: readonly GalleryPhoto[]; index: number }) => {
-  const current = photos[index];
+/** The map is a picture here, so that a drag across it still swipes the card. */
+const Gallery = ({ slides, index }: { slides: readonly Slide[]; index: number }) => {
+  const current = slides[index];
   if (current === undefined) {
     return <div className="no-photo" />;
   }
   return (
     <>
-      {photos.slice(index, index + 2).map((photo) => (
-        <img
-          key={photo.url}
-          src={photo.url}
-          alt=""
-          draggable={false}
-          className={[photo.kind, photo !== current && "preload"].filter(Boolean).join(" ")}
-        />
-      ))}
-      {photos.length > 1 && (
-        <ol className="photo-bars" aria-label={`Photo ${index + 1} of ${photos.length}`}>
-          {photos.map((photo, i) => (
-            <li key={photo.url} className={i === index ? "current" : undefined} />
+      <SlideView slides={slides} index={index} interactive={false} />
+      {slides.length > 1 && (
+        <ol className="photo-bars" aria-label={`Photo ${index + 1} of ${slides.length}`}>
+          {slides.map((slide, i) => (
+            <li key={slide.kind === "map" ? "map" : slide.url} className={i === index ? "current" : undefined} />
           ))}
         </ol>
       )}
@@ -40,13 +29,13 @@ const Gallery = ({ photos, index }: { photos: readonly GalleryPhoto[]; index: nu
 
 export const SwipeCard = ({
   property,
-  photos = property.thumbnailUrl ? [{ kind: "photo", url: property.thumbnailUrl }] : [],
-  photoIndex = 0,
+  slides = coverSlides(property),
+  slideIndex = 0,
   gesture,
 }: {
   property: PropertySummary;
-  photos?: readonly GalleryPhoto[] | undefined;
-  photoIndex?: number;
+  slides?: readonly Slide[] | undefined;
+  slideIndex?: number;
   gesture?: SwipeGesture;
 }) => (
   <article
@@ -57,7 +46,7 @@ export const SwipeCard = ({
     {...gesture?.handlers}
   >
     <div className="swipe-photo">
-      <Gallery photos={photos} index={photoIndex} />
+      <Gallery slides={slides} index={slideIndex} />
       <span className="stamp shortlist" style={{ opacity: Math.max(0, gesture?.lean ?? 0) }}>
         Shortlist
       </span>

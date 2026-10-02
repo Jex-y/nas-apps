@@ -1,9 +1,12 @@
 import { PropertyCard } from "../../../components/PropertyCard";
+import { useKeymap } from "../../../hooks/useKeymap";
+import { SCROLL_BINDINGS } from "../../../utils/keymap";
 import { useProperties } from "../api/properties";
 import { StatusControl } from "./StatusControl";
 
 export const RejectedPage = () => {
   const properties = useProperties("rejected");
+  useKeymap("Rejected", SCROLL_BINDINGS);
 
   if (properties.isPending) {
     return <p className="muted">Loading…</p>;

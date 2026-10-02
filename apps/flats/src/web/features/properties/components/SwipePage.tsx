@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
-import type { PropertySummary, UpdateStatus } from "../../../../contract";
-import { useInbox, usePhotos, useTriage } from "../api/properties";
+import { useState } from "react";
+import { useLocation } from "wouter";
+import type { UpdateStatus } from "../../../../contract";
+import { useKeymap } from "../../../hooks/useKeymap";
+import { useInbox, useSlides } from "../api/properties";
 import { type SwipeDirection, useSwipeGesture } from "../hooks/useSwipeGesture";
-import { isTyping } from "../utils/keyboard";
+import { useTriageHistory } from "../hooks/useTriageHistory";
+import { openOnPortal } from "../utils/portal";
+import { slideBindings, stepFrom } from "../utils/slides";
 import { SwipeCard } from "./SwipeCard";
 
 const DECISIONS = {
@@ -10,76 +14,66 @@ const DECISIONS = {
   right: { status: "shortlisted" },
 } as const satisfies Record<SwipeDirection, UpdateStatus>;
 
-type Swipe = { property: PropertySummary; direction: SwipeDirection };
-
 /**
- * New listings one at a time: swipe or ←/→ to reject or shortlist, u to undo. Tap the photo's right side or press
- * space for the next photo, its left third or shift+space for the previous one.
+ * New listings one at a time: swipe, ←/→ or x/s to reject or shortlist, u to undo. Tap the photo's right side or
+ * press l for the next photo, its left third or h for the previous one; the last is where it is on the map.
  */
 export const SwipePage = () => {
   const properties = useInbox();
-  const triage = useTriage();
-  const [history, setHistory] = useState<readonly Swipe[]>([]);
+  const triage = useTriageHistory();
+  const [, navigate] = useLocation();
 
   const [top, next] = properties.data ?? [];
-  const photos = usePhotos(top?.id).data;
+  const slides = useSlides(top?.id).data;
   // Fetched ahead so the next card has its gallery as soon as it comes up.
-  usePhotos(next?.id);
+  useSlides(next?.id);
   // Keyed by property, so the next card starts from its first photo without an effect to reset it.
   const [viewing, setViewing] = useState({ propertyId: "", index: 0 });
-  const photoIndex = viewing.propertyId === top?.id ? viewing.index : 0;
-  const stepPhoto = (delta: number) => {
-    if (top !== undefined && photos !== undefined) {
-      setViewing({ propertyId: top.id, index: Math.max(0, Math.min(photos.length - 1, photoIndex + delta)) });
+  const slideIndex = viewing.propertyId === top?.id ? viewing.index : 0;
+  const showSlide = (index: number) => {
+    if (top !== undefined) {
+      setViewing({ propertyId: top.id, index });
     }
   };
+  const stepSlide = (delta: number) => showSlide(stepFrom(slides ?? [], slideIndex, delta));
 
   const gesture = useSwipeGesture(
     (direction) => {
       if (top !== undefined) {
-        setHistory((swipes) => [...swipes, { property: top, direction }]);
-        triage.mutate({ property: top, update: DECISIONS[direction] });
+        triage.decide(top, DECISIONS[direction]);
       }
     },
     (target, clientX) => {
       const photo = target.closest(".swipe-photo");
       if (photo !== null) {
         const { left, width } = photo.getBoundingClientRect();
-        stepPhoto(clientX < left + width / 3 ? -1 : 1);
+        stepSlide(clientX < left + width / 3 ? -1 : 1);
       }
     },
   );
-  const last = history.at(-1);
   const canSwipe = top !== undefined && !gesture.busy;
-  const canUndo = last !== undefined && !gesture.busy;
-
+  const canUndo = triage.canUndo && !gesture.busy;
+  const fling = (direction: SwipeDirection) => () => {
+    if (canSwipe) {
+      gesture.fling(direction);
+    }
+  };
   const undo = () => {
     if (canUndo) {
-      setHistory((swipes) => swipes.slice(0, -1));
-      triage.mutate({ property: last.property, update: { status: "new" } });
+      triage.undo();
     }
   };
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-      const actions: Record<string, () => void> = {
-        ArrowLeft: () => canSwipe && gesture.fling("left"),
-        ArrowRight: () => canSwipe && gesture.fling("right"),
-        u: undo,
-        " ": () => stepPhoto(event.shiftKey ? -1 : 1),
-      };
-      const action = actions[event.key];
-      if (action !== undefined) {
-        event.preventDefault();
-        action();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
+  useKeymap("Swipe", [
+    { keys: ["s", "ArrowRight"], does: "Shortlist", run: fling("right") },
+    { keys: ["x", "ArrowLeft"], does: "Reject", run: fling("left") },
+    { keys: ["u"], does: "Undo", run: undo },
+    ...slideBindings(slides ?? [], slideIndex, showSlide),
+    { keys: ["Space"], does: "Next photo", run: () => stepSlide(1) },
+    { keys: ["shift+Space"], does: "Previous photo", run: () => stepSlide(-1) },
+    { keys: ["o", "Enter"], does: "Open the details", run: () => top && navigate(`/properties/${top.id}`) },
+    { keys: ["g x"], does: "Open on the portal", run: () => top && openOnPortal(top) },
+  ]);
 
   if (properties.isPending) {
     return <p className="muted">Loading…</p>;
@@ -96,7 +90,8 @@ export const SwipePage = () => {
           {properties.data.length} left
           <span className="key-hints">
             {" "}
-            · <kbd>←</kbd> reject · <kbd>→</kbd> shortlist · <kbd>u</kbd> undo · <kbd>space</kbd> photos
+            · <kbd>x</kbd> reject · <kbd>s</kbd> shortlist · <kbd>h</kbd>/<kbd>l</kbd> photos · <kbd>m</kbd> map ·{" "}
+            <kbd>?</kbd> keys
           </span>
         </span>
       </div>
@@ -106,19 +101,19 @@ export const SwipePage = () => {
         ) : (
           <>
             {next && <SwipeCard key={next.id} property={next} />}
-            <SwipeCard key={top.id} property={top} photos={photos} photoIndex={photoIndex} gesture={gesture} />
+            <SwipeCard key={top.id} property={top} slides={slides} slideIndex={slideIndex} gesture={gesture} />
           </>
         )}
       </div>
       {triage.error && <p className="error">{triage.error.message}</p>}
       <div className="swipe-actions">
-        <button type="button" className="reject" disabled={!canSwipe} onClick={() => gesture.fling("left")}>
+        <button type="button" className="reject" disabled={!canSwipe} onClick={fling("left")}>
           ✕ Reject
         </button>
         <button type="button" disabled={!canUndo} onClick={undo}>
           ↶ Undo
         </button>
-        <button type="button" className="shortlist" disabled={!canSwipe} onClick={() => gesture.fling("right")}>
+        <button type="button" className="shortlist" disabled={!canSwipe} onClick={fling("right")}>
           ♥ Shortlist
         </button>
       </div>

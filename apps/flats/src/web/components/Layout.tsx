@@ -1,8 +1,11 @@
 import { type FormEvent, type ReactNode, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import { useAddListing } from "../features/properties/api/properties";
+import { useKeymap } from "../hooks/useKeymap";
+import { KeyHelp } from "./KeyHelp";
 
-type Section = { readonly href: string; readonly label: string; readonly icon: string };
+/** `key` after `g` goes to the section from anywhere. */
+type Section = { readonly href: string; readonly label: string; readonly icon: string; readonly key: string };
 
 /** 24×24 stroked icon paths. */
 const ICONS = {
@@ -15,16 +18,16 @@ const ICONS = {
 
 /** On phones the first four sit in the bottom tab bar and the rest in its More menu. */
 const TABS: readonly Section[] = [
-  { href: "/", label: "Inbox", icon: ICONS.inbox },
-  { href: "/swipe", label: "Swipe", icon: ICONS.swipe },
-  { href: "/board", label: "Board", icon: ICONS.board },
-  { href: "/rejected", label: "Rejected", icon: ICONS.rejected },
+  { href: "/", label: "Inbox", icon: ICONS.inbox, key: "i" },
+  { href: "/swipe", label: "Swipe", icon: ICONS.swipe, key: "s" },
+  { href: "/board", label: "Board", icon: ICONS.board, key: "b" },
+  { href: "/rejected", label: "Rejected", icon: ICONS.rejected, key: "r" },
 ];
 const MORE: readonly Omit<Section, "icon">[] = [
-  { href: "/map", label: "Map" },
-  { href: "/searches", label: "Searches" },
-  { href: "/commutes", label: "Commutes" },
-  { href: "/requirements", label: "Requirements" },
+  { href: "/map", label: "Map", key: "m" },
+  { href: "/searches", label: "Searches", key: "/" },
+  { href: "/commutes", label: "Commutes", key: "c" },
+  { href: "/requirements", label: "Requirements", key: "w" },
 ];
 
 /** Served by the app shell, outside the router: theme and notifications. */
@@ -119,8 +122,19 @@ const TabBar = () => {
   );
 };
 
+const SectionKeys = () => {
+  const [, navigate] = useLocation();
+  useKeymap(
+    "Go to",
+    [...TABS, ...MORE].map(({ href, label, key }) => ({ keys: [`g ${key}`], does: label, run: () => navigate(href) })),
+  );
+  return null;
+};
+
 export const Layout = ({ children }: { children: ReactNode }) => (
   <>
+    <SectionKeys />
+    <KeyHelp />
     <header className="site-header">
       <nav>
         <a href="/" className="nav-link launcher-link">

@@ -1,11 +1,14 @@
 import { TRACKED_STATUSES } from "../../../../contract";
 import { PropertyCard } from "../../../components/PropertyCard";
+import { useKeymap } from "../../../hooks/useKeymap";
 import { STATUS_LABELS } from "../../../utils/format";
+import { SCROLL_BINDINGS } from "../../../utils/keymap";
 import { useProperties } from "../api/properties";
 import { StatusControl } from "./StatusControl";
 
 export const BoardPage = () => {
   const properties = useProperties("all");
+  useKeymap("Board", SCROLL_BINDINGS);
 
   if (properties.isPending) {
     return <p className="muted">Loading…</p>;

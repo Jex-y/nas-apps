@@ -10,6 +10,7 @@ import {
   type UpdateStatus,
 } from "../../../../contract";
 import { bestFirst } from "../utils/ranking";
+import { slidesOf } from "../utils/slides";
 
 const keys = {
   all: ["properties"] as const,
@@ -41,9 +42,9 @@ const detailQuery = (id: string) =>
 
 export const useProperty = (id: string) => useQuery(detailQuery(id));
 
-/** Photos then floorplans, from the detail; nothing while `id` is undefined. */
-export const usePhotos = (id: string | undefined) =>
-  useQuery({ ...detailQuery(id ?? ""), enabled: id !== undefined, select: (detail) => detail.photos });
+/** What there is to look at for a property, from its detail; nothing while `id` is undefined. */
+export const useSlides = (id: string | undefined) =>
+  useQuery({ ...detailQuery(id ?? ""), enabled: id !== undefined, select: slidesOf });
 
 const useInvalidatingMutation = <T>(mutationFn: (input: T) => Promise<void>) => {
   const queryClient = useQueryClient();

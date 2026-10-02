@@ -1,29 +1,60 @@
-import { type PointerEvent, useEffect, useRef } from "react";
-import type { GalleryPhoto } from "./SwipeCard";
+import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { useKeymap } from "../../../hooks/useKeymap";
+import type { Binding } from "../../../utils/keymap";
+import { LOCATION_ZOOM } from "../../map/components/LocationMap";
+import { type Slide, slideBindings, stepFrom } from "../utils/slides";
+import { SlideView } from "./SlideView";
 
 const SWIPE_PX = 40;
 
+const LABELS = { photo: null, floorplan: "Floorplan", map: "Map" } as const satisfies Record<Slide["kind"], unknown>;
+
 /**
- * Full-screen photos, opened at `index`: ←/→, the arrow buttons, a horizontal swipe or a tap on either side step
- * through them, and Escape closes. The next photo is mounted hidden so it has loaded by the time it is shown: photo URLs redirect to freshly signed ones, so the thumbnail's copy is never a cache hit.
+ * Full-screen slides, opened at `index`: h/l or ←/→, the arrow buttons, a horizontal swipe or a tap on either side
+ * step through them, f and m jump to the floorplan and the map, +/- zoom the map, and q or Escape closes.
+ * `bindings` add keys of the caller's own, and the children caption the slide.
  */
 export const PhotoViewer = ({
-  photos,
+  slides,
   index,
   onStep,
   onClose,
+  bindings = [],
+  children,
 }: {
-  photos: readonly GalleryPhoto[];
+  slides: readonly Slide[];
   index: number;
   onStep: (index: number) => void;
   onClose: () => void;
+  bindings?: readonly Binding[];
+  children?: ReactNode;
 }) => {
   const dialog = useRef<HTMLDialogElement>(null);
   const pressedAt = useRef<number | null>(null);
-  useEffect(() => dialog.current?.showModal(), []);
+  const [zoom, setZoom] = useState(LOCATION_ZOOM);
+  useEffect(() => {
+    dialog.current?.showModal();
+    // On a button, the space bar and Enter would press it.
+    dialog.current?.focus();
+  }, []);
 
-  const current = photos[index];
-  const step = (delta: number) => onStep(Math.max(0, Math.min(photos.length - 1, index + delta)));
+  const current = slides[index];
+  const label = current === undefined ? null : LABELS[current.kind];
+  const step = (delta: number) => onStep(stepFrom(slides, index, delta));
+
+  useKeymap(
+    "Photos",
+    [
+      ...slideBindings(slides, index, onStep),
+      { keys: ["ArrowRight"], does: "Next photo", run: () => step(1) },
+      { keys: ["ArrowLeft"], does: "Previous photo", run: () => step(-1) },
+      { keys: ["+", "="], does: "Zoom the map in", run: () => setZoom((level) => Math.min(18, level + 1)) },
+      { keys: ["-"], does: "Zoom the map out", run: () => setZoom((level) => Math.max(8, level - 1)) },
+      { keys: ["q"], does: "Close", run: () => dialog.current?.close() },
+      ...bindings,
+    ],
+    dialog,
+  );
 
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
     const startX = pressedAt.current;
@@ -44,44 +75,32 @@ export const PhotoViewer = ({
     <dialog
       ref={dialog}
       className="photo-viewer"
-      aria-label={`Photo ${index + 1} of ${photos.length}`}
+      tabIndex={-1}
+      aria-label={`Photo ${index + 1} of ${slides.length}`}
       onClose={onClose}
-      onKeyDown={(event) => {
-        const delta = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
-        if (delta !== undefined) {
-          event.preventDefault();
-          step(delta);
-        }
-      }}
     >
       <div
         className="photo-viewer-stage"
         onPointerDown={(event) => {
-          pressedAt.current = event.clientX;
+          // A drag on the map moves the map.
+          pressedAt.current = current?.kind === "map" ? null : event.clientX;
         }}
         onPointerUp={onPointerUp}
         onPointerCancel={() => {
           pressedAt.current = null;
         }}
       >
-        {photos.slice(index, index + 2).map((photo) => (
-          <img
-            key={photo.url}
-            src={photo.url}
-            alt=""
-            draggable={false}
-            className={[photo.kind, photo !== current && "preload"].filter(Boolean).join(" ")}
-          />
-        ))}
+        <SlideView slides={slides} index={index} zoom={zoom} interactive />
       </div>
       <span className="photo-viewer-count">
-        {index + 1} / {photos.length}
-        {current?.kind === "floorplan" && " · Floorplan"}
+        {index + 1} / {slides.length}
+        {label !== null && ` · ${label}`}
       </span>
+      {children && <div className="photo-viewer-caption">{children}</div>}
       <button type="button" className="photo-viewer-close" aria-label="Close" onClick={() => dialog.current?.close()}>
         ×
       </button>
-      {photos.length > 1 && (
+      {slides.length > 1 && (
         <>
           <button
             type="button"
@@ -96,7 +115,7 @@ export const PhotoViewer = ({
             type="button"
             className="photo-viewer-next"
             aria-label="Next photo"
-            disabled={index === photos.length - 1}
+            disabled={index === slides.length - 1}
             onClick={() => step(1)}
           >
             ›

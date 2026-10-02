@@ -42,7 +42,11 @@ const MapView = ({ data }: { data: MapData }) => {
     const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
     return bounds === null
       ? null
-      : { bounds, padding: { top: EDGE, right: EDGE, bottom: EDGE, left: phone ? EDGE : PANEL_REM * rem + EDGE } };
+      : {
+          kind: "bounds",
+          bounds,
+          padding: { top: EDGE, right: EDGE, bottom: EDGE, left: phone ? EDGE : PANEL_REM * rem + EDGE },
+        };
   }, [data, phone]);
   const toggle = useCallback(
     (id: string) =>

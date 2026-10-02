@@ -3,6 +3,7 @@ import {
   type GeoJSONSource,
   type LayerSpecification,
   MapLibreMap,
+  type MapOptions,
   NavigationControl,
   type PaddingOptions,
   setWorkerUrl,
@@ -22,8 +23,28 @@ const STYLES = {
 /** The map, and a counter that moves each time its style (and so every layer on it) is replaced. */
 type MapHandle = { readonly map: MapLibreMap; readonly version: number };
 
-/** Where the map first looks, kept `padding` pixels clear of each edge, e.g. of a panel over it. */
-export type MapStart = { readonly bounds: MapBounds; readonly padding: PaddingOptions };
+/** Where the map first looks. */
+export type MapStart =
+  /** Kept `padding` pixels clear of each edge, e.g. of a panel over it. */
+  | { readonly kind: "bounds"; readonly bounds: MapBounds; readonly padding: PaddingOptions }
+  | { readonly kind: "centre"; readonly latitude: number; readonly longitude: number; readonly zoom: number };
+
+const LONDON = { center: [-0.1, 51.51], zoom: 11 } as const satisfies Pick<MapOptions, "center" | "zoom">;
+
+const cameraFor = (start: MapStart | null): Pick<MapOptions, "center" | "zoom" | "bounds" | "fitBoundsOptions"> => {
+  switch (start?.kind) {
+    case undefined:
+      return LONDON;
+    case "bounds":
+      return {
+        ...LONDON,
+        bounds: [start.bounds.west, start.bounds.south, start.bounds.east, start.bounds.north],
+        fitBoundsOptions: { padding: start.padding, maxZoom: 14 },
+      };
+    case "centre":
+      return { center: [start.longitude, start.latitude], zoom: start.zoom };
+  }
+};
 
 const MapContext = createContext<MapHandle | null>(null);
 
@@ -33,18 +54,20 @@ const boundsOf = (map: MapLibreMap): MapBounds => {
 };
 
 /**
- * A MapLibre map over OpenFreeMap tiles, light or dark to suit the theme, fitted first to `start`. Overlays render
- * as its children and reach it through `useOverlay`.
+ * A MapLibre map over OpenFreeMap tiles, light or dark to suit the theme, looking first at `start`. Overlays render
+ * as its children and reach it through `useOverlay`. One that is not `interactive` is a picture: it cannot be moved.
  */
 export const MapCanvas = ({
   scheme,
   start,
-  onMove,
+  interactive = true,
+  onMove = () => undefined,
   children,
 }: {
   scheme: keyof typeof STYLES;
   start: MapStart | null;
-  onMove: (bounds: MapBounds) => void;
+  interactive?: boolean;
+  onMove?: (bounds: MapBounds) => void;
   children: ReactNode;
 }) => {
   const host = useRef<HTMLDivElement>(null);
@@ -62,18 +85,16 @@ export const MapCanvas = ({
     const map = new MapLibreMap({
       container,
       style: STYLES[scheme],
-      ...(start !== null && {
-        bounds: [start.bounds.west, start.bounds.south, start.bounds.east, start.bounds.north],
-        fitBoundsOptions: { padding: start.padding, maxZoom: 14 },
-      }),
-      center: [-0.1, 51.51],
-      zoom: 11,
+      ...cameraFor(start),
+      interactive,
       attributionControl: { compact: true },
       dragRotate: false,
       pitchWithRotate: false,
     });
-    map.touchZoomRotate.disableRotation();
-    map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
+    if (interactive) {
+      map.touchZoomRotate.disableRotation();
+      map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
+    }
     let version = 0;
     map.on("style.load", () => {
       version += 1;

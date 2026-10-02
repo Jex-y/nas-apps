@@ -2,8 +2,8 @@ import { type FormEvent, useState } from "react";
 import { MAX_VIEWING_PHOTO_BYTES, type Viewing } from "../../../../contract";
 import { formatDateTime } from "../../../utils/format";
 import { useAddViewing, useDeleteViewing, useUploadViewingPhoto } from "../api/properties";
+import type { Slide } from "../utils/slides";
 import { PhotoViewer } from "./PhotoViewer";
-import type { GalleryPhoto } from "./SwipeCard";
 
 const localNow = () => {
   const now = new Date();
@@ -57,7 +57,7 @@ const ViewingItem = ({ viewing }: { viewing: Viewing }) => {
   const deleteViewing = useDeleteViewing();
   const upload = useUploadViewingPhoto();
   const [shown, setShown] = useState<number | null>(null);
-  const photos: readonly GalleryPhoto[] = viewing.photos.map(({ url }) => ({ kind: "photo", url }));
+  const slides: readonly Slide[] = viewing.photos.map(({ url }) => ({ kind: "photo", url }));
 
   return (
     <li className="viewing">
@@ -77,7 +77,7 @@ const ViewingItem = ({ viewing }: { viewing: Viewing }) => {
           </button>
         ))}
       </div>
-      {shown !== null && <PhotoViewer photos={photos} index={shown} onStep={setShown} onClose={() => setShown(null)} />}
+      {shown !== null && <PhotoViewer slides={slides} index={shown} onStep={setShown} onClose={() => setShown(null)} />}
       <label className="upload">
         {upload.isPending ? "Uploading…" : "Add photos"}
         <input

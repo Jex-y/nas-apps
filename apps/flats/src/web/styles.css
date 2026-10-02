@@ -232,6 +232,15 @@ main {
   width: 100%;
 }
 
+.thumbs .map-thumb {
+  height: 5rem;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-small);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
 .gallery .cover {
   display: block;
 }
@@ -319,6 +328,84 @@ main {
 
 .photo-viewer-prev {
   left: 0.5rem;
+}
+
+/* The scrim keeps the caption legible over white floorplans and the map as well as dark photos. */
+.photo-viewer-caption {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 2rem 1rem 0.75rem;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.8));
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.photo-viewer-caption p {
+  margin: 0.15rem 0 0;
+}
+
+.photo-viewer-caption strong {
+  font-size: 1.1rem;
+}
+
+.photo-viewer-caption .key-hints {
+  color: rgb(255 255 255 / 0.7);
+  font-size: 0.8rem;
+}
+
+.photo-viewer-caption kbd {
+  border-color: rgb(255 255 255 / 0.4);
+  background: none;
+}
+
+.key-help {
+  width: min(52rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--fg);
+  box-shadow: var(--shadow-raised);
+  columns: 16rem;
+  column-gap: 2rem;
+}
+
+.key-help::backdrop {
+  background: rgb(0 0 0 / 0.4);
+}
+
+.key-help section {
+  break-inside: avoid;
+  margin-bottom: 1rem;
+}
+
+.key-help h2 {
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.key-help dl {
+  margin: 0;
+}
+
+.key-help dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.15rem 0;
+  font-size: 0.875rem;
+}
+
+.key-help dt {
+  white-space: nowrap;
+}
+
+.key-help dd {
+  margin: 0;
+  color: var(--muted);
+  text-align: end;
 }
 
 .photo-viewer-next {
@@ -2488,6 +2575,40 @@ main:has(.map-page) {
 .map-canvas {
   height: 100%;
   background: var(--surface-2);
+}
+
+.location-map {
+  width: 100%;
+  height: 100%;
+}
+
+.photo-viewer-stage .location-map {
+  position: absolute;
+  inset: 0;
+  cursor: auto;
+}
+
+.swipe-photo .location-map {
+  aspect-ratio: 4 / 3;
+  max-height: 45dvh;
+}
+
+.map-pin {
+  width: 1.5rem;
+  height: 1.8rem;
+}
+
+/* A teardrop whose point sits on the place. The map positions the pin by its transform, so the drop turns inside it. */
+.map-pin::after {
+  content: "";
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--surface-raised);
+  border-radius: 50% 50% 50% 0;
+  background: var(--accent);
+  box-shadow: var(--shadow-raised);
+  rotate: -45deg;
 }
 
 .layer-panel,
