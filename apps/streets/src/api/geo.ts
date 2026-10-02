@@ -121,6 +121,27 @@ export type Grid = ReturnType<typeof createGrid>;
  */
 export const CELLS = createGrid(250);
 
+/** Square blocks of `size` × `size` cells of a grid, numbered row-major like the cells. */
+export const createTiling = (grid: Grid, size: number) => {
+  const cols = Math.ceil(grid.cols / size);
+  return {
+    count: Math.ceil(grid.rows / size) * cols,
+    tileOf: (cell: number): number =>
+      Math.floor(Math.floor(cell / grid.cols) / size) * cols + Math.floor((cell % grid.cols) / size),
+    cellsOf: (tile: number): number[] => {
+      const row = Math.floor(tile / cols) * size;
+      const col = (tile % cols) * size;
+      return grid.block(row, col, row + size - 1, col + size - 1);
+    },
+  };
+};
+
+/**
+ * The map is fetched a tile of about 2 km at a time, so each is cached on its own and a pan only fetches the tiles it
+ * brings into view. A segment belongs to the tile of its cell, so tiles never repeat one.
+ */
+export const MAP_TILES = createTiling(CELLS, 8);
+
 /** Points strictly between `a` and `b`, evenly spaced so no gap exceeds `stepMetres`. */
 export const between = (a: LatLon, b: LatLon, stepMetres: number): LatLon[] => {
   const parts = Math.ceil(haversineMetres(a, b) / stepMetres);

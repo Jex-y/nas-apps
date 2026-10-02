@@ -16,9 +16,6 @@ export const NODE_SPACING_METRES = 50;
 /** Rounds up, so a street of fewer than ten nodes needs every one of them, as on CityStrides. */
 export const requiredNodes = (nodeCount: number): number => Math.ceil((nodeCount * COMPLETION_PERCENT) / 100);
 
-/** The largest viewport the map endpoint draws, in degrees; about 11 × 11 km. */
-export const MAX_MAP_SPAN = { lat: 0.1, lon: 0.16 } as const;
-
 const LatLon = z.tuple([z.number(), z.number()]).readonly();
 
 export const StravaStatus = z.object({

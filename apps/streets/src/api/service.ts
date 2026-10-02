@@ -1,28 +1,27 @@
 import { HttpError } from "@apps/core";
 import { eq } from "drizzle-orm";
-import {
-  type Activity,
-  type ConnectOutcome,
-  MAX_MAP_SPAN,
-  type MapStreet,
-  type NearbyStreet,
-  type NetworkStatus,
-  type Stats,
-  type StravaStatus,
-  type StreetNode,
-  type Suggestion,
-  type UpdateStrava,
-  type UploadResult,
+import type {
+  Activity,
+  ConnectOutcome,
+  MapStreet,
+  NearbyStreet,
+  NetworkStatus,
+  Stats,
+  StravaStatus,
+  StreetNode,
+  Suggestion,
+  UpdateStrava,
+  UploadResult,
 } from "../contract";
 import type { StreetsDb } from "./db";
-import { type Box, contains, type LatLon, LONDON } from "./geo";
+import { contains, type LatLon, LONDON } from "./geo";
 import type { OAuthStates } from "./oauth-state";
 import { connections } from "./schema";
 import type { StravaApi } from "./strava";
 import { GpxError, parseGpx } from "./track";
 import {
   readActivities,
-  readMap,
+  readMapTile,
   readNetworkStatus,
   readStats,
   readStravaStatus,
@@ -206,12 +205,7 @@ export const createStreetsService = ({ db, work, strava, states, publicUrl, now 
       };
     },
 
-    map: async (login: string, box: Box): Promise<MapStreet[]> => {
-      if (box.north - box.south > MAX_MAP_SPAN.lat || box.east - box.west > MAX_MAP_SPAN.lon) {
-        throw new HttpError(400, "Zoom in to see streets");
-      }
-      return readMap(db, login, box);
-    },
+    mapTile: (login: string, tile: number): Promise<MapStreet[]> => readMapTile(db, login, tile),
 
     stats: (login: string): Promise<Stats> => readStats(db, login, now()),
 

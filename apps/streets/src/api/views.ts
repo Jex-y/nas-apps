@@ -12,7 +12,7 @@ import type {
   Suggestion,
 } from "../contract";
 import type { StreetsDb } from "./db";
-import { type Box, boxAround, CELLS, createGrid, haversineMetres, type LatLon } from "./geo";
+import { boxAround, CELLS, createGrid, haversineMetres, type LatLon, MAP_TILES } from "./geo";
 import { chunks } from "./progress";
 import {
   activities,
@@ -111,25 +111,21 @@ export const readStravaStatus = async (db: StreetsDb, login: string, configured:
   };
 };
 
-export const readMap = async (db: StreetsDb, login: string, box: Box): Promise<MapStreet[]> => {
-  const rows = [];
-  for (const cells of chunks(CELLS.cellsIn(box, 1))) {
-    rows.push(
-      ...(await db
-        .select({
-          id: streets.id,
-          name: streets.name,
-          nodeCount: streets.nodeCount,
-          hitCount: streetProgress.hitCount,
-          completedAt: streetProgress.completedAt,
-          path: segments.path,
-        })
-        .from(segments)
-        .innerJoin(streets, eq(streets.id, segments.streetId))
-        .leftJoin(streetProgress, and(eq(streetProgress.streetId, streets.id), eq(streetProgress.login, login)))
-        .where(inArray(segments.cell, cells))),
-    );
-  }
+/** The segments of one {@link MAP_TILES} tile, by street; a street crossing tiles has its other pieces in those. */
+export const readMapTile = async (db: StreetsDb, login: string, tile: number): Promise<MapStreet[]> => {
+  const rows = await db
+    .select({
+      id: streets.id,
+      name: streets.name,
+      nodeCount: streets.nodeCount,
+      hitCount: streetProgress.hitCount,
+      completedAt: streetProgress.completedAt,
+      path: segments.path,
+    })
+    .from(segments)
+    .innerJoin(streets, eq(streets.id, segments.streetId))
+    .leftJoin(streetProgress, and(eq(streetProgress.streetId, streets.id), eq(streetProgress.login, login)))
+    .where(inArray(segments.cell, MAP_TILES.cellsOf(tile)));
   return [...Map.groupBy(rows, (row) => row.id).values()].map((pieces) => {
     const [first] = pieces as [(typeof pieces)[number]];
     const hitCount = first.hitCount ?? 0;

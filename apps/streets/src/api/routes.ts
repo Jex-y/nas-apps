@@ -9,6 +9,7 @@ import {
 } from "@apps/core";
 import { z } from "zod";
 import { type ConnectOutcome, MAX_UPLOAD_BYTES, UpdateStrava } from "../contract";
+import { MAP_TILES } from "./geo";
 import type { GpxUpload, StravaAnswer, StreetsService } from "./service";
 
 export type StreetsRoutesDeps = {
@@ -19,14 +20,26 @@ export type StreetsRoutesDeps = {
 /** The runs list shows this many, newest first. */
 const ACTIVITY_LIMIT = 300;
 
+/** A map tile in central London is about 150 KB of JSON and a quarter of that gzipped, which a phone notices. */
+const jsonMaybeGzipped = (request: Request, body: unknown): Response => {
+  const json = JSON.stringify(body);
+  return request.headers.get("Accept-Encoding")?.includes("gzip")
+    ? new Response(Bun.gzipSync(json), {
+        headers: { "Content-Type": "application/json", "Content-Encoding": "gzip", Vary: "Accept-Encoding" },
+      })
+    : Response.json(body, { headers: { Vary: "Accept-Encoding" } });
+};
+
 const redirectTo = (location: string) => new Response(null, { status: 302, headers: { Location: location } });
 const connectPage = (outcome: ConnectOutcome) => redirectTo(`/streets/connect?strava=${outcome}`);
 
 const Coordinate = (limit: number) => z.coerce.number().min(-limit).max(limit);
 
-const Viewport = z
-  .object({ south: Coordinate(90), west: Coordinate(180), north: Coordinate(90), east: Coordinate(180) })
-  .refine((box) => box.north > box.south && box.east > box.west, { message: "The box is inside out" });
+const MapTile = z.coerce
+  .number()
+  .int()
+  .min(0)
+  .max(MAP_TILES.count - 1);
 
 const Start = z.object({ lat: Coordinate(90), lon: Coordinate(180) });
 
@@ -99,10 +112,11 @@ export const createStreetsRoutes = ({ service, identity }: StreetsRoutesDeps) =>
         return Response.json(await service.importGpx(owner, await Promise.all(files.map(uploadOf))), { status: 201 });
       },
     },
-    "/streets/api/map": {
+    "/streets/api/map/:tile": {
       GET: async (request) => {
         const owner = login(request);
-        return Response.json({ streets: await service.map(owner, parseQuery(request, Viewport)) });
+        const tile = parseParam(request.params.tile, MapTile);
+        return jsonMaybeGzipped(request, { streets: await service.mapTile(owner, tile) });
       },
     },
     "/streets/api/stats": {

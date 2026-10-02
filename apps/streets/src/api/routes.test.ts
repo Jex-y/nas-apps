@@ -14,7 +14,7 @@ import {
   UploadResult,
 } from "../contract";
 import { createStreetsApp } from "../module";
-import { boxAround } from "./geo";
+import { boxAround, CELLS, MAP_TILES } from "./geo";
 
 const testbed = createStreetsTestContext();
 const { context, streetNamed } = testbed;
@@ -60,7 +60,13 @@ const upload = (as: string, ...files: File[]) => {
   return request("/streets/api/uploads", { method: "POST", body, as });
 };
 
-const viewport = query(boxAround(BANK, 300));
+/** The map tiles a viewport around Bank draws, as the map page picks them. */
+const bankTiles = [...new Set(CELLS.cellsIn(boxAround(BANK, 300), 1).map(MAP_TILES.tileOf))];
+
+const readMap = async (as: string) => {
+  const views = await Promise.all(bankTiles.map((tile) => read(`/streets/api/map/${tile}`, MapView, as)));
+  return views.flatMap((view) => view.streets);
+};
 
 beforeEach(() => {
   strava.history.length = 0;
@@ -231,25 +237,40 @@ describe("progress", () => {
     const me = uniqueLogin();
     await runLane(me);
 
-    const mine = await read(`/streets/api/map?${viewport}`, MapView, me);
-    const theirs = await read(`/streets/api/map?${viewport}`, MapView, uniqueLogin());
-    const lane = (view: typeof mine) => view.streets.find((street) => street.name === "Bartholomew Lane");
+    const mine = await readMap(me);
+    const theirs = await readMap(uniqueLogin());
+    const lane = (streets: typeof mine) => streets.find((street) => street.name === "Bartholomew Lane");
 
     expect(lane(mine)).toMatchObject({ state: "complete", hitCount: lane(mine)?.nodeCount });
     expect(lane(mine)?.paths.flat().length).toBeGreaterThan(1);
     expect(lane(theirs)).toMatchObject({ state: "untouched", hitCount: 0 });
-    expect(mine.streets.some((street) => street.state === "partial")).toBe(true);
+    expect(mine.some((street) => street.state === "partial")).toBe(true);
   });
 
-  test("only draws a viewport small enough to be worth drawing", async () => {
+  test("splits the map into tiles that never repeat a segment", async () => {
+    const paths = (await readMap(uniqueLogin())).flatMap((street) => street.paths.map((path) => JSON.stringify(path)));
+
+    expect(bankTiles.length).toBeGreaterThan(1);
+    expect(paths.length).toBeGreaterThan(0);
+    expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  test("gzips a tile for a client that accepts it", async () => {
+    const response = await request(`/streets/api/map/${bankTiles[0]}`, {
+      as: uniqueLogin(),
+      headers: { "Accept-Encoding": "gzip" },
+    });
+
+    expect(response.headers.get("Content-Encoding")).toBe("gzip");
+    expect(MapView.parse(await response.json()).streets.length).toBeGreaterThan(0);
+  });
+
+  test("only draws tiles of London", async () => {
     const me = uniqueLogin();
 
-    expect(await errorOf(await request(`/streets/api/map?${query(boxAround(BANK, 20_000))}`, { as: me }))).toEqual([
-      400,
-      "Zoom in to see streets",
-    ]);
-    expect((await request("/streets/api/map?south=51.6&west=0&north=51.5&east=0.1", { as: me })).status).toBe(400);
-    expect((await request("/streets/api/map", { as: me })).status).toBe(400);
+    for (const tile of [MAP_TILES.count, -1, "bank"]) {
+      expect((await request(`/streets/api/map/${tile}`, { as: me })).status).toBe(404);
+    }
   });
 
   test("counts streets by borough and week, and remembers which run finished each", async () => {

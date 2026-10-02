@@ -1,30 +1,22 @@
 import { requestJson } from "@apps/core/web";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { type Box, CELLS, MAP_TILES } from "../../../../api/geo";
 import { MapView, STREETS_API, StreetNodeList } from "../../../../contract";
 
-export type Viewport = { readonly south: number; readonly west: number; readonly north: number; readonly east: number };
+/**
+ * The tiles to draw a viewport. Segments belong to the cell they start in and reach at most a cell beyond it, so the
+ * ring of cells around the viewport is included.
+ */
+export const tilesIn = (viewport: Box): number[] => [...new Set(CELLS.cellsIn(viewport, 1).map(MAP_TILES.tileOf))];
 
-/** Rounded outwards to about 100 m, so small pans reuse the last response instead of refetching. */
-const snap = ({ south, west, north, east }: Viewport): Viewport => ({
-  south: Math.floor(south * 1000) / 1000,
-  west: Math.floor(west * 1000) / 1000,
-  north: Math.ceil(north * 1000) / 1000,
-  east: Math.ceil(east * 1000) / 1000,
-});
-
-const query = (viewport: Viewport) =>
-  new URLSearchParams(Object.entries(viewport).map(([key, value]) => [key, String(value)]));
-
-/** Only the streets in view; pass `null` when zoomed out too far to draw them. */
-export const useMapStreets = (viewport: Viewport | null) => {
-  const snapped = viewport && snap(viewport);
-  return useQuery({
-    queryKey: ["map", snapped],
-    queryFn: () => (snapped === null ? { streets: [] } : requestJson(`${STREETS_API}/map?${query(snapped)}`, MapView)),
-    enabled: snapped !== null,
-    placeholderData: keepPreviousData,
+/** Each tile is its own query, so a pan only fetches the tiles it brings into view. */
+export const useMapTiles = (tiles: readonly number[]) =>
+  useQueries({
+    queries: tiles.map((tile) => ({
+      queryKey: ["map", tile],
+      queryFn: () => requestJson(`${STREETS_API}/map/${tile}`, MapView),
+    })),
   });
-};
 
 export const useStreetNodes = (streetId: number | null) =>
   useQuery({

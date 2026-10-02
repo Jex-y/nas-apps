@@ -1,6 +1,13 @@
 @import "@apps/core/theme.css";
 @import "leaflet/dist/leaflet.css";
 
+/* The map's own colours, whatever the theme: its tiles are always light, and these stay distinct on them. */
+:root {
+  --street-complete: #0b7a3e;
+  --street-partial: #e8590c;
+  --street-untouched: #c2255c;
+}
+
 a {
   color: inherit;
 }
@@ -198,21 +205,25 @@ main:has(.map-page) {
 }
 
 .swatch.complete {
-  background: var(--accent);
+  background: var(--street-complete);
 }
 
 .swatch.partial {
-  background: var(--accent);
-  opacity: 0.45;
+  background: var(--street-partial);
 }
 
 .swatch.untouched {
-  background: var(--pink);
-  opacity: 0.5;
+  background: var(--street-untouched);
+  opacity: 0.6;
 }
 
 .leaflet-container {
   font-family: var(--font-body);
+}
+
+/* Greyed, so the streets are the only colour on the map. */
+.leaflet-tile-pane {
+  filter: grayscale(1) contrast(0.85) brightness(1.05);
 }
 
 .fact,
