@@ -11,6 +11,7 @@ import {
   NOON,
   ok,
   type Pages,
+  saleHistory,
   searchPage,
   soldStcPage,
 } from "../../test/support";
@@ -21,7 +22,18 @@ import type { JourneyPlanner } from "./places";
 import { fingerprint, QUESTIONS } from "./questions";
 import { latestTexts } from "./readings";
 import { DEFAULT_REQUIREMENTS, saveRequirements } from "./requirements";
-import { commutes, crime, crimeReports, listings, photos, properties, readings, searches, snapshots } from "./schema";
+import {
+  commutes,
+  crime,
+  crimeReports,
+  listings,
+  photos,
+  properties,
+  readings,
+  saleHistories,
+  searches,
+  snapshots,
+} from "./schema";
 import { isActiveHour, MAX_CONSECUTIVE_FAILURES } from "./work";
 
 const { context, db, blob, setup, addSearch, addDestination, propertyByPortalId } = createFlatsTestbed();
@@ -283,6 +295,66 @@ describe("adding a listing by URL", () => {
     const { work, drain } = setup();
     await work.addListing("rightmove", "1");
     expect(await drain()).toMatchObject({ dead: 1 });
+  });
+});
+
+describe("sale history", () => {
+  const SOLD_STC = "deliveryPointId=44017030";
+  const soldFor = async (portalId: string) => {
+    const { property } = await propertyByPortalId(portalId);
+    const [history] = await db.select().from(saleHistories).where(eq(saleHistories.propertyId, property.id));
+    return history?.sales;
+  };
+  const asked = (requested: readonly string[]) => requested.filter((url) => url.includes("/soldProperty/"));
+
+  test("is looked up once for each property whose page names it, newest sale first", async () => {
+    const pages: Pages = {
+      ...defaultPages,
+      sales: (url) => ok(url.includes(SOLD_STC) ? saleHistory([2010, "£250,000"], [2019, "£410,000"]) : saleHistory()),
+    };
+    const { work, fetcher, drain } = setup(pages);
+    const search = await addSearch();
+    await work.backfillSearch(search.id, 1);
+    await drain();
+
+    expect(await soldFor("128855633")).toEqual([
+      { year: 2019, price: 410000 },
+      { year: 2010, price: 250000 },
+    ]);
+    expect(await soldFor("93524796")).toEqual([]);
+    const stored = (await context.sql`select jsonb_typeof(sales) as type from flats.sale_histories`) as {
+      type: string;
+    }[];
+    expect(stored.map(({ type }) => type)).toEqual(["array", "array"]);
+    expect(asked(fetcher.requested)).toHaveLength(2);
+
+    await context.jobs.enqueue(work.definitions.sweepSales, {});
+    await drain();
+    expect(asked(fetcher.requested)).toHaveLength(2);
+  });
+
+  test("is left unrecorded when the portal refuses, so the job's retry asks again", async () => {
+    const { work, drain } = setup({ ...defaultPages, sales: () => ({ kind: "blocked", status: 429 }) });
+    const search = await addSearch();
+    await work.backfillSearch(search.id, 1);
+    await drain();
+
+    expect(await soldFor("128855633")).toBeUndefined();
+  });
+
+  test("is looked up by a sweep for a property never asked about", async () => {
+    const before = setup();
+    const search = await addSearch();
+    await before.work.backfillSearch(search.id, 1);
+    await before.drain();
+    await db.delete(saleHistories);
+
+    const { work, fetcher, drain } = setup({ ...defaultPages, sales: () => ok(saleHistory([2021, "£426,000"])) });
+    await context.jobs.enqueue(work.definitions.sweepSales, {});
+    await drain();
+
+    expect(await soldFor("128855633")).toEqual([{ year: 2021, price: 426000 }]);
+    expect(asked(fetcher.requested)).toHaveLength(2);
   });
 });
 

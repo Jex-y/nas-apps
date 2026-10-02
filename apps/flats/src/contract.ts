@@ -28,6 +28,10 @@ export const CrimeSummary = z.object({
 });
 export type CrimeSummary = z.infer<typeof CrimeSummary>;
 
+/** One earlier sale of a property, as the Land Registry recorded it; the portal gives the year, not the day. */
+export const PastSale = z.object({ year: z.number().int(), price: z.number().positive() });
+export type PastSale = z.infer<typeof PastSale>;
+
 export const Commute = z.object({
   destinationId: z.uuid(),
   name: z.string(),
@@ -133,6 +137,8 @@ export const FACT_KEYS = [
   "lease_years",
   "annual_service_charge",
   "crime_per_month",
+  "last_sold_year",
+  "percent_above_last_sale",
 ] as const;
 export type FactKey = (typeof FACT_KEYS)[number];
 
@@ -244,6 +250,8 @@ export const PropertySummary = z.object({
   commutes: z.array(Commute),
   /** `null` until counted, or for a property with no known location. */
   crime: CrimeSummary.nullable(),
+  /** The most recent sale; `null` until looked up, or when the portal knows of none. */
+  lastSale: PastSale.nullable(),
   ranking: Ranking,
 });
 export type PropertySummary = z.infer<typeof PropertySummary>;
@@ -299,6 +307,8 @@ export const PropertyDetail = PropertySummary.extend({
   agent: z.object({ name: z.string(), phone: z.string().nullable() }).nullable(),
   photos: z.array(Photo),
   history: z.array(PricePoint),
+  /** Earlier sales, newest first. */
+  sales: z.array(PastSale),
   viewings: z.array(Viewing),
 });
 export type PropertyDetail = z.infer<typeof PropertyDetail>;

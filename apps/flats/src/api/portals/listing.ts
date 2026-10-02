@@ -1,3 +1,4 @@
+import type { PastSale } from "../../contract";
 export const PORTALS = ["rightmove", "zoopla"] as const;
 export type Portal = (typeof PORTALS)[number];
 
@@ -89,4 +90,11 @@ export type PortalParser = {
   readonly portalIdFromUrl: (url: string) => string | null;
   readonly parseSearch: (html: string) => readonly SearchHit[];
   readonly parseListing: (html: string, portalId: string) => ParsedListing;
+  /**
+   * Where the portal serves the past sales of the property a listing page advertises; `null` when the page ties it
+   * to no address, so there is nothing to look up.
+   */
+  readonly saleHistoryUrl: (html: string) => string | null;
+  /** The body served at `saleHistoryUrl`, newest sale first. */
+  readonly parseSaleHistory: (body: string) => readonly PastSale[];
 };

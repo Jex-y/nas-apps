@@ -11,6 +11,9 @@ import { rightmove } from "../src/api/portals/rightmove";
 import { destinations, listings, properties, searches } from "../src/api/schema";
 import { createFlatsWork } from "../src/api/work";
 import type { Answer, Question } from "../src/contract";
+import { saleHistory } from "./rightmove-page";
+
+export { saleHistory };
 
 const fixture = (name: string) => Bun.file(new URL(`./fixtures/rightmove/${name}`, import.meta.url)).text();
 export const [searchPage, listingPage, soldStcPage] = await Promise.all([
@@ -19,7 +22,12 @@ export const [searchPage, listingPage, soldStcPage] = await Promise.all([
   fixture("listing-sold-stc.html"),
 ]);
 
-export type Pages = { search: () => FetchResult<string>; listing: (portalId: string) => FetchResult<string> };
+export type Pages = {
+  search: () => FetchResult<string>;
+  listing: (portalId: string) => FetchResult<string>;
+  /** What the portal says a property sold for before, by the URL its listing page names; none by default. */
+  sales?: (url: string) => FetchResult<string>;
+};
 
 const JPEG: FetchResult<Download> = {
   kind: "ok",
@@ -32,6 +40,9 @@ const fakeFetcher = (pages: Pages): Fetcher & { readonly requested: string[] } =
     requested,
     text: async (url) => {
       requested.push(url);
+      if (url.includes("/soldProperty/")) {
+        return pages.sales?.(url) ?? ok(saleHistory());
+      }
       const listingId = rightmove.portalIdFromUrl(url);
       return listingId === null ? pages.search() : pages.listing(listingId);
     },

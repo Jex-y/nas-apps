@@ -16,7 +16,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
-import type { Answer, Requirements } from "../contract";
+import type { Answer, PastSale, Requirements } from "../contract";
 import { PROPERTY_STATUSES } from "../contract";
 import { AVAILABILITIES, type ParsedListing, PORTALS, TENURES } from "./portals/listing";
 
@@ -237,6 +237,16 @@ export const crime = flatsSchema.table("crime", {
   /** Crimes over those months by police.uk category. */
   byCategory: jsonb<Record<string, number>>("by_category").notNull(),
   countedAt: timestamp("counted_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** What the portal says a property sold for before; a row with no sales means it was asked and knows of none. */
+export const saleHistories = flatsSchema.table("sale_histories", {
+  propertyId: uuid("property_id")
+    .primaryKey()
+    .references(() => properties.id, { onDelete: "cascade" }),
+  /** Newest first. */
+  sales: jsonb<readonly PastSale[]>("sales").notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const commutes = flatsSchema.table(

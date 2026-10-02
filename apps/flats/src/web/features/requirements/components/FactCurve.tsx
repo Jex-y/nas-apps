@@ -30,14 +30,14 @@ export const FactCurve = ({ rule, values }: { rule: FactRule; values: readonly n
   const px = (x: number) => PAD.left + ((x - xMin) / (xMax - xMin)) * (WIDTH - PAD.left - PAD.right);
   const py = (y: number) => PAD.top + ((yMax - y) / (yMax - yMin)) * (HEIGHT - PAD.top - PAD.bottom);
   const line = samples.map((x) => `${px(x).toFixed(1)},${py(pointsFor(rule, x)).toFixed(1)}`).join(" ");
-  const { unit } = FACTS[rule.fact];
+  const { unit, tick = short } = FACTS[rule.fact];
 
   return (
     <svg
       className="fact-curve"
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
       role="img"
-      aria-label={`Points for ${FACTS[rule.fact].label.toLowerCase()} from ${short(xMin)} to ${short(xMax)} ${unit}`}
+      aria-label={`Points for ${FACTS[rule.fact].label.toLowerCase()} from ${tick(xMin)} to ${tick(xMax)} ${unit}`}
     >
       <line className="curve-zero" x1={PAD.left} x2={WIDTH - PAD.right} y1={py(0)} y2={py(0)} />
       <line className="curve-from" x1={px(rule.from)} x2={px(rule.from)} y1={PAD.top} y2={HEIGHT - PAD.bottom} />
@@ -59,13 +59,13 @@ export const FactCurve = ({ rule, values }: { rule: FactRule; values: readonly n
         {short(yLow)}
       </text>
       <text className="curve-tick" x={PAD.left} y={HEIGHT - 6} textAnchor="start">
-        {short(xMin)}
+        {tick(xMin)}
       </text>
       <text className="curve-tick" x={px(rule.from)} y={HEIGHT - 6} textAnchor="middle">
-        {short(rule.from)}
+        {tick(rule.from)}
       </text>
       <text className="curve-tick" x={WIDTH - PAD.right} y={HEIGHT - 6} textAnchor="end">
-        {short(xMax)} {unit}
+        {tick(xMax)} {unit}
       </text>
     </svg>
   );

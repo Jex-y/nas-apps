@@ -57,6 +57,13 @@
       "when": 1790799736092,
       "tag": "0007_drop_answers_by_property",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790926750656,
+      "tag": "0008_record_sale_histories",
+      "breakpoints": true
     }
   ]
 }

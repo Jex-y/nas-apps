@@ -8,6 +8,7 @@ import {
   type FactRule,
   type Limits,
   type Option,
+  type PastSale,
   type Question,
   type Ranking,
   type StoredAnswer,
@@ -22,6 +23,7 @@ export type PropertyFacts = {
   readonly leaseYearsRemaining: number | null;
   readonly annualServiceCharge: number | null;
   readonly crime: Pick<CrimeSummary, "perMonth"> | null;
+  readonly lastSale: PastSale | null;
 };
 
 export type RankingInput = {
@@ -42,6 +44,8 @@ type FactDefinition = {
   /** The fact's value for a property; commutes are read per destination instead. */
   readonly read: (facts: PropertyFacts, medianPricePerSqft: number | null) => number | null;
   readonly describe: (value: number) => string;
+  /** How a chart labels a value on its axis, for a fact whose values are not amounts, e.g. a year. */
+  readonly tick?: (value: number) => string;
 };
 
 const count = (value: number) => value.toLocaleString("en-GB");
@@ -87,6 +91,20 @@ export const FACTS: Readonly<Record<FactKey, FactDefinition>> = {
     unit: "a month",
     read: (facts) => facts.crime?.perMonth ?? null,
     describe: (crimes) => `${count(Math.round(crimes))} a month nearby`,
+  },
+  last_sold_year: {
+    label: "Last sold",
+    unit: "year",
+    read: (facts) => facts.lastSale?.year ?? null,
+    describe: (year) => `in ${year}`,
+    tick: (year) => String(Math.round(year)),
+  },
+  percent_above_last_sale: {
+    label: "Asking against last sale",
+    unit: "% above",
+    read: ({ price, lastSale }) => (price === null || lastSale === null ? null : (price / lastSale.price - 1) * 100),
+    describe: (percent) =>
+      `${Math.abs(Math.round(percent))}% ${percent >= 0 ? "above" : "below"} what it last sold for`,
   },
 };
 

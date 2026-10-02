@@ -32,3 +32,14 @@ export const rightmoveListingPage = (overrides: Record<string, unknown>) => {
   const model = { data: JSON.stringify(flatten({ propertyData })), encoding: "on" };
   return `<script>window.__PAGE_MODEL = ${JSON.stringify(model)};window.adInfo = {};</script>`;
 };
+
+/** Rightmove's reply when asked what a property sold for before, newest first. */
+export const saleHistory = (...sales: readonly (readonly [year: number, soldPrice: string])[]) =>
+  JSON.stringify({
+    soldPropertyTransactions: sales.map(([year, soldPrice]) => ({
+      year: String(year),
+      soldPrice,
+      percentageChange: "",
+    })),
+    disclaimer: "Source acknowledgement: House price data produced by the Land Registry",
+  });

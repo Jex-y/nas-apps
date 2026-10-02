@@ -37,6 +37,7 @@ const unknown: PropertyFacts = {
   leaseYearsRemaining: null,
   annualServiceCharge: null,
   crime: null,
+  lastSale: null,
 };
 const nothing: RankingInput = { answers: new Map(), facts: unknown, commutes: [], medianPricePerSqft: null };
 const answering = (answers: Record<string, Answer>): RankingInput => ({
@@ -142,6 +143,42 @@ describe("scoring a property", () => {
       ],
     });
     expect(scoreProperty(roomier, nothing)).toEqual({ kind: "scored", total: 0, contributions: [] });
+  });
+
+  test("scores when a property last sold, and how far the asking price is above that", () => {
+    const rules = {
+      questions: [],
+      facts: [
+        { fact: "last_sold_year", from: 2021, perUnit: -0.5, min: 0, max: 3 },
+        { fact: "percent_above_last_sale", from: 20, perUnit: -0.05, min: -3, max: 1 },
+      ],
+    } as const;
+    const sold = (year: number, price: number): RankingInput => ({
+      ...nothing,
+      facts: { ...unknown, price: 600000, lastSale: { year, price } },
+    });
+
+    expect(scoreProperty(rules, sold(2017, 400000))).toEqual({
+      kind: "scored",
+      total: expect.closeTo(2 - 1.5, 9),
+      contributions: [
+        { key: "last_sold_year", source: "fact", label: "Last sold", detail: "in 2017", points: 2 },
+        {
+          key: "percent_above_last_sale",
+          source: "fact",
+          label: "Asking against last sale",
+          detail: "50% above what it last sold for",
+          points: expect.closeTo(-1.5, 9),
+        },
+      ],
+    });
+    expect(scoreProperty(rules, sold(2023, 625000))).toMatchObject({
+      contributions: [
+        { key: "percent_above_last_sale", detail: "4% below what it last sold for", points: 1 },
+        { key: "last_sold_year", detail: "in 2023", points: 0 },
+      ],
+    });
+    expect(scoreProperty(rules, { ...nothing, facts: { ...unknown, price: 600000 } })).toMatchObject({ total: 0 });
   });
 
   test("ignores an answer that does not fit its question", () => {

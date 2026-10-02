@@ -23,6 +23,8 @@ const INSTRUCTIONS = `A shared flat hunt: saved portal searches are polled for n
 - Try a draft of the requirements on one property with try_requirements before saving it; saving re-judges every
   untriaged property and may reject some.
 - Commutes are timed by public transport to each destination; a property lists only those already timed.
+- A property's sales are what it sold for before, by year, newest first, where the portal knows; lastSale is the
+  newest. The requirements can score the year it last sold and how far the asking price is above that sale.
 - Photos and floorplans are listed by id on get_property; view_photo shows one.
 - Ids are UUIDs; find them with list_properties, list_searches or list_destinations.`;
 
@@ -43,6 +45,7 @@ const listed = (property: PropertySummary) => ({
   tenure: property.tenure,
   leaseYearsRemaining: property.leaseYearsRemaining,
   annualServiceCharge: property.annualServiceCharge,
+  lastSale: property.lastSale,
   commutes: property.commutes.map(({ name, minutes }) => ({ name, minutes })),
   ranking:
     property.ranking.kind === "scored"

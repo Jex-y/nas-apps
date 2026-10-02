@@ -12,6 +12,7 @@ import {
   MAX_VIEWING_PHOTO_BYTES,
   type MapBounds,
   type MapData,
+  type PastSale,
   type PricePoint,
   type PropertyDetail,
   type PropertyStatus,
@@ -44,6 +45,7 @@ import {
   listings,
   photos,
   properties,
+  saleHistories,
   searches,
   snapshots,
   viewingPhotos,
@@ -112,6 +114,11 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       .select()
       .from(crime)
       .where(inArray(crime.propertyId, [...ids]));
+    const sold = await db
+      .select()
+      .from(saleHistories)
+      .where(inArray(saleHistories.propertyId, [...ids]));
+    const salesOf = new Map(sold.map((history) => [history.propertyId, history.sales]));
     const [inbox] = await db
       .select({
         median: sql<
@@ -147,6 +154,8 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
         const total = Object.values(byCategory).reduce((sum, count) => sum + count, 0);
         return { perMonth: total / months, months, throughMonth, radiusMetres, byCategory };
       },
+      /** Newest first; none until looked up. */
+      salesOf: (propertyId: string): readonly PastSale[] => salesOf.get(propertyId) ?? [],
       medianPricePerSqft: inbox?.median ?? null,
     };
   };
@@ -157,7 +166,7 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
    */
   const trial = async ({ requirements: draft, propertyId }: TrialRequest, signal: AbortSignal): Promise<Trial> => {
     const row = await requireProperty(propertyId);
-    const { textOf, commutesOf, storedAnswersOf, crimeOf, medianPricePerSqft } = await rankingInputs([row.id]);
+    const { textOf, commutesOf, storedAnswersOf, crimeOf, salesOf, medianPricePerSqft } = await rankingInputs([row.id]);
     const text = textOf(row.id);
     if (text === undefined) {
       throw new HttpError(409, "That property's listing page has not been read yet");
@@ -174,7 +183,7 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       rejectedBy: row.sharedOwnership ? SHARED_OWNERSHIP_REASON : breach(row, draft.limits),
       ranking: scoreProperty(draft, {
         answers: answered,
-        facts: { ...row, crime: crimeOf(row.id) },
+        facts: { ...row, crime: crimeOf(row.id), lastSale: salesOf(row.id)[0] ?? null },
         commutes: commutesOf(row.id),
         medianPricePerSqft,
       }),
@@ -226,11 +235,11 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       .orderBy(listings.propertyId, asc(photos.position));
     const coverOf = new Map(covers.map((cover) => [cover.propertyId, photoPath(cover.photoId)]));
     const saved = await loadRequirements(db);
-    const { commutesOf, storedAnswersOf, crimeOf, medianPricePerSqft } = inputs ?? (await rankingInputs(ids));
+    const { commutesOf, storedAnswersOf, crimeOf, salesOf, medianPricePerSqft } = inputs ?? (await rankingInputs(ids));
     const rankingOf = (row: PropertyRow) =>
       scoreProperty(saved, {
         answers: currentAnswers(saved.questions, storedAnswersOf(row.id)),
-        facts: { ...row, crime: crimeOf(row.id) },
+        facts: { ...row, crime: crimeOf(row.id), lastSale: salesOf(row.id)[0] ?? null },
         commutes: commutesOf(row.id),
         medianPricePerSqft,
       });
@@ -259,6 +268,7 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
       listings: adverts.filter((advert) => advert.propertyId === row.id).map(({ portal, url }) => ({ portal, url })),
       commutes: commutesOf(row.id),
       crime: crimeOf(row.id),
+      lastSale: salesOf(row.id)[0] ?? null,
       ranking: rankingOf(row),
     }));
   };
@@ -403,6 +413,10 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
             .from(snapshots)
             .where(inArray(snapshots.listingId, listingIds))
             .orderBy(asc(snapshots.observedAt));
+    const [sold] = await db
+      .select({ sales: saleHistories.sales })
+      .from(saleHistories)
+      .where(eq(saleHistories.propertyId, row.id));
     const visits = await db.select().from(viewings).where(eq(viewings.propertyId, row.id)).orderBy(desc(viewings.at));
     const visitPhotos =
       visits.length === 0
@@ -439,6 +453,7 @@ export const createFlatsService = ({ db, blob, work, parsers, geocoder, extracto
           observedAt: point.observedAt.toISOString(),
         })),
       ),
+      sales: [...(sold?.sales ?? [])],
       viewings: visits.map((visit) => ({
         id: visit.id,
         at: visit.at.toISOString(),

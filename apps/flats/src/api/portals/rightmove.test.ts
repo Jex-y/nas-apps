@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { rightmoveListingPage as listingPage } from "../../../test/rightmove-page";
+import { rightmoveListingPage as listingPage, saleHistory } from "../../../test/rightmove-page";
 import { ParseError } from "./listing";
 import { rightmove } from "./rightmove";
 
@@ -70,6 +70,38 @@ describe("rightmove listing page", () => {
 
   test("rejects a page without the page model", () => {
     expect(() => rightmove.parseListing("<html></html>", "1")).toThrow(ParseError);
+  });
+});
+
+describe("rightmove sale history", () => {
+  const ORIGIN = "https://www.rightmove.co.uk/properties/api/soldProperty/transactionHistory";
+
+  test("is asked for by the delivery point and the listing's own id, whichever the page gives", async () => {
+    expect(rightmove.saleHistoryUrl(await fixture("listing-sold-stc.html"))).toBe(
+      `${ORIGIN}?deliveryPointId=44017030&encId=Wq5K5BgoS_pSv1B_O98CaW79Xou1fWci29iHiA%3D%3D`,
+    );
+    expect(rightmove.saleHistoryUrl(await fixture("listing.html"))).toBe(
+      `${ORIGIN}?encId=VlVVt_9jLksm209gTfTsXsCS8Tn2eb7Ac6I3`,
+    );
+  });
+
+  test("is nowhere for a page that names no property", () => {
+    expect(rightmove.saleHistoryUrl(listingPage({}))).toBeNull();
+    expect(rightmove.saleHistoryUrl(listingPage({ encId: null }))).toBeNull();
+  });
+
+  test("reads each sale's year and price", () => {
+    expect(rightmove.parseSaleHistory(saleHistory([2014, "£787,500"], [2010, "£500,000"]))).toEqual([
+      { year: 2014, price: 787500 },
+      { year: 2010, price: 500000 },
+    ]);
+    expect(rightmove.parseSaleHistory(saleHistory())).toEqual([]);
+  });
+
+  test("rejects a reply that is not a sale history", () => {
+    expect(() => rightmove.parseSaleHistory("<html></html>")).toThrow(ParseError);
+    expect(() => rightmove.parseSaleHistory('{"error":"no"}')).toThrow(ParseError);
+    expect(() => rightmove.parseSaleHistory(saleHistory([2014, "POA"]))).toThrow(ParseError);
   });
 });
 

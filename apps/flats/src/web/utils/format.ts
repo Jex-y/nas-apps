@@ -1,4 +1,4 @@
-import type { Commute, PropertySummary } from "../../contract";
+import type { Commute, PastSale, PropertySummary } from "../../contract";
 
 const money = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
 const date = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
@@ -38,6 +38,9 @@ export const formatTenure = (property: Pick<PropertySummary, "tenure" | "leaseYe
     ? TENURES[property.tenure]
     : `${TENURES[property.tenure]}, ${property.leaseYearsRemaining} yrs`;
 
+/** e.g. "Sold 2018 for £410,000". */
+export const formatSale = ({ year, price }: PastSale): string => `Sold ${year} for ${money.format(price)}`;
+
 /** The facts that decide whether a flat is worth a look, as short labels, skipping what the portal did not say. */
 export const keyFacts = (property: PropertySummary): string[] =>
   [
@@ -48,6 +51,7 @@ export const keyFacts = (property: PropertySummary): string[] =>
     formatTenure(property),
     property.annualServiceCharge === null ? null : `${formatMoney(property.annualServiceCharge)}/yr service`,
     property.councilTaxBand === null ? null : `Band ${property.councilTaxBand}`,
+    property.lastSale === null ? null : formatSale(property.lastSale),
   ].filter((fact): fact is string => fact !== null);
 
 export const STATUS_LABELS = {

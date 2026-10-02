@@ -112,6 +112,29 @@ const PhotoGallery = ({ property }: { property: PropertyDetail }) => {
   );
 };
 
+/** What the flat sold for before, newest first, and how far the asking price has come since the last sale. */
+const SalesSection = ({ price, sales }: Pick<PropertyDetail, "price" | "sales">) => {
+  const [last] = sales;
+  const above = price === null || last === undefined ? null : Math.round((price / last.price - 1) * 100);
+  return (
+    <section>
+      <h2>Sold before</h2>
+      <ol className="history">
+        {sales.map((sale) => (
+          <li key={`${sale.year} ${sale.price}`}>
+            <span className="muted">{sale.year}</span> {formatMoney(sale.price)}
+          </li>
+        ))}
+      </ol>
+      {above !== null && (
+        <p className="muted">
+          Asking {Math.abs(above)}% {above >= 0 ? "above" : "below"} the {last?.year} sale.
+        </p>
+      )}
+    </section>
+  );
+};
+
 const Notes = ({ property }: { property: PropertyDetail }) => {
   const updateNotes = useUpdateNotes();
   const [notes, setNotes] = useState(property.notes);
@@ -221,6 +244,7 @@ const Property = ({ detail }: { detail: PropertyDetail }) => {
           {detail.ranking.kind === "scored" && detail.ranking.contributions.length > 0 && (
             <Contributions total={detail.ranking.total} contributions={detail.ranking.contributions} />
           )}
+          {detail.sales.length > 0 && <SalesSection price={detail.price} sales={detail.sales} />}
           <section>
             <h2>History</h2>
             <ol className="history">

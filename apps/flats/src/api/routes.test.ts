@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { startTestServer, uniqueLogin } from "@apps/core/testing";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/bun-sql";
 import { createFlatsTestbed, fakeCrime, fakeExtractor, fakeGeocoder, fakePlanner } from "../../test/support";
 import {
@@ -19,9 +20,10 @@ import {
 import { createFlatsApp } from "../module";
 import { fingerprint } from "./questions";
 import { DEFAULT_REQUIREMENTS } from "./requirements";
+import { saleHistories } from "./schema";
 import { collapseHistory } from "./service";
 
-const { context, setup, addSearch, propertyByPortalId } = createFlatsTestbed();
+const { context, db, setup, addSearch, propertyByPortalId } = createFlatsTestbed();
 const request = startTestServer(
   (ctx) => [
     createFlatsApp(ctx, {
@@ -113,6 +115,39 @@ describe("properties", () => {
     expect(detail.agent?.name).toBe("Chase Buchanan, Isleworth & Osterley");
     expect(detail.photos.filter((photo) => photo.kind === "photo")).toHaveLength(10);
     expect(detail.history).toEqual([expect.objectContaining({ price: 350000, availability: "available" })]);
+    expect(detail.sales).toEqual([]);
+    expect(detail.lastSale).toBeNull();
+  });
+
+  test("shows what a property sold for before, and scores it by a rule on the last sale", async () => {
+    await seed();
+    const { property } = await propertyByPortalId("93524796");
+    const sales = [
+      { year: 2017, price: 300000 },
+      { year: 2009, price: 210000 },
+    ];
+    await db.update(saleHistories).set({ sales }).where(eq(saleHistories.propertyId, property.id));
+    const saved = await request("/flats/api/requirements", {
+      as: me,
+      method: "PUT",
+      ...json({
+        ...DEFAULT_REQUIREMENTS,
+        facts: [{ fact: "last_sold_year", from: 2021, perUnit: -0.5, min: 0, max: 3 }],
+      }),
+    });
+    expect(saved.ok).toBe(true);
+
+    const detail = PropertyDetail.parse(
+      await (await request(`/flats/api/properties/${property.id}`, { as: me })).json(),
+    );
+
+    expect(detail.sales).toEqual(sales);
+    expect(detail.lastSale).toEqual({ year: 2017, price: 300000 });
+    expect(detail.ranking).toMatchObject({
+      contributions: expect.arrayContaining([
+        { key: "last_sold_year", source: "fact", label: "Last sold", detail: "in 2017", points: 2 },
+      ]),
+    });
   });
 
   test("rejects without a reason, storing an absent or blank one as none", async () => {

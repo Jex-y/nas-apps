@@ -2,7 +2,7 @@ import type { BlobStore, JobQueue, Notifier, RegisteredJob, Schedule } from "@ap
 import { defineJob, defineSchedule, PermanentJobError } from "@apps/core";
 import { and, asc, between, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { TRACKED_STATUSES } from "../contract";
+import { type PastSale, TRACKED_STATUSES } from "../contract";
 import { breach, exclusion } from "../scoring";
 import {
   CRIME_MONTHS,
@@ -32,7 +32,9 @@ import {
   listings,
   photos,
   properties,
+  saleHistories,
   searches,
+  snapshots,
 } from "./schema";
 
 export type FlatsWorkDeps = {
@@ -70,6 +72,21 @@ export const isActiveHour = (at: Date): boolean => {
 
 /** Properties worth timing and reading: not rejected and still advertised. */
 const inPlay = and(ne(properties.status, "rejected"), ne(properties.availability, "removed"));
+
+/** What `read` parses; a portal whose pages changed shape fails the job for good, since retrying cannot help. */
+const unlessChanged = <T>(read: () => T): T => {
+  try {
+    return read();
+  } catch (error) {
+    throw error instanceof ParseError ? new PermanentJobError(error.message) : error;
+  }
+};
+
+/** One of each sale, newest first: two listings of one property report the same sales. */
+const newestFirst = (sales: readonly PastSale[]): PastSale[] =>
+  [...new Map(sales.map((sale) => [`${sale.year} ${sale.price}`, sale])).values()].toSorted(
+    (a, b) => b.year - a.year || b.price - a.price,
+  );
 
 const formatPrice = (price: number | null) => (price === null ? "POA" : `£${price.toLocaleString("en-GB")}`);
 
@@ -327,6 +344,55 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
   });
 
   /**
+   * Looks up what the property sold for before, once: the portal serves it apart from the listing page, keyed by an
+   * address the stored page names. A property whose listings name no address is recorded as having no known sales.
+   */
+  const fetchSales = defineJob({
+    name: "flats.fetch-sales",
+    payload: z.object({ propertyId: z.uuid() }),
+    handle: async ({ propertyId }, { signal }) => {
+      const [fetched] = await db
+        .select({ propertyId: saleHistories.propertyId })
+        .from(saleHistories)
+        .where(eq(saleHistories.propertyId, propertyId));
+      if (fetched !== undefined) {
+        return;
+      }
+      const pages = await db
+        .selectDistinctOn([listings.id], { portal: listings.portal, pageKey: snapshots.pageKey })
+        .from(snapshots)
+        .innerJoin(listings, eq(listings.id, snapshots.listingId))
+        .where(and(eq(listings.propertyId, propertyId), isNotNull(snapshots.pageKey)))
+        .orderBy(listings.id, desc(snapshots.observedAt));
+      if (pages.length === 0) {
+        return;
+      }
+      const sales: PastSale[] = [];
+      for (const { portal, pageKey } of pages) {
+        const parser = parserFor(portal);
+        const url =
+          pageKey === null
+            ? null
+            : parser.saleHistoryUrl(new TextDecoder().decode(Bun.gunzipSync(await blob.read(pageKey))));
+        if (url === null) {
+          continue;
+        }
+        const result = await fetcher.text(url, signal);
+        if (result.kind === "blocked") {
+          throw new Error(`Blocked (${result.status}) fetching the sale history of ${propertyId}`);
+        }
+        if (result.kind === "ok") {
+          sales.push(...unlessChanged(() => parser.parseSaleHistory(result.body)));
+        }
+      }
+      await db
+        .insert(saleHistories)
+        .values({ propertyId, sales: newestFirst(sales) })
+        .onConflictDoNothing();
+    },
+  });
+
+  /**
    * Asks Jev whatever the current questions have no answer for in the listing's current text, and rejects the property
    * if it is now excluded. A page whose text changed is a new text, so it is read afresh.
    */
@@ -372,13 +438,8 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
   });
 
-  const parsePage = (parser: PortalParser, html: string, portalId: string): ParsedListing => {
-    try {
-      return parser.parseListing(html, portalId);
-    } catch (error) {
-      throw error instanceof ParseError ? new PermanentJobError(error.message) : error;
-    }
-  };
+  const parsePage = (parser: PortalParser, html: string, portalId: string): ParsedListing =>
+    unlessChanged(() => parser.parseListing(html, portalId));
 
   /**
    * Keeps the raw page for re-parsing, records what it says, and queues its photos, commutes and reading; `announce`
@@ -402,6 +463,7 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     if (listing !== undefined) {
       await queue.enqueue(computeCommutes, { propertyId: listing.propertyId }, { dedupeKey: listing.propertyId });
       await queue.enqueue(countCrime, { propertyId: listing.propertyId }, { dedupeKey: listing.propertyId });
+      await queue.enqueue(fetchSales, { propertyId: listing.propertyId }, { dedupeKey: listing.propertyId });
       // A distinct key, so a sweep's pending read of the same property cannot swallow the announcement.
       await queue.enqueue(
         readListing,
@@ -591,6 +653,22 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     },
   });
 
+  /** Each job only asks the portal about a property it has not asked about before. */
+  const sweepSales = defineJob({
+    name: "flats.sweep-sales",
+    payload: z.object({}),
+    handle: async () => {
+      const unasked = await db
+        .select({ id: properties.id })
+        .from(properties)
+        .leftJoin(saleHistories, eq(saleHistories.propertyId, properties.id))
+        .where(and(inPlay, isNull(saleHistories.propertyId)));
+      for (const { id } of unasked) {
+        await queue.enqueue(fetchSales, { propertyId: id }, { dedupeKey: id });
+      }
+    },
+  });
+
   /** Reads every property still in play, e.g. after a question is reworded or TypeSafe is configured. */
   /** Queues a read of every property still in play; each only asks Jev what the current questions lack. */
   const enqueueReadings = async () => {
@@ -616,6 +694,8 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
     sweepCommutes,
     countCrime,
     sweepCrime,
+    fetchSales,
+    sweepSales,
     readListing,
     sweepReadings,
     refreshTracked,
@@ -651,6 +731,13 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       payload: {},
     }),
     defineSchedule({
+      name: "flats.sweep-sales",
+      everyMs: 24 * HOUR,
+      jitterMs: 2 * HOUR,
+      job: sweepSales,
+      payload: {},
+    }),
+    defineSchedule({
       name: "flats.sweep-readings",
       everyMs: 24 * HOUR,
       jitterMs: 2 * HOUR,
@@ -672,6 +759,8 @@ export const createFlatsWork = (deps: FlatsWorkDeps) => {
       sweepCommutes,
       countCrime,
       sweepCrime,
+      fetchSales,
+      sweepSales,
       readListing,
       sweepReadings,
       refreshTracked,

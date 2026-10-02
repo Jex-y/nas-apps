@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PastSale } from "../../contract";
 import { extractAssignedJson, unflatten } from "./flattened";
 import { decodeEntities, htmlToText } from "./html-text";
 import {
@@ -168,13 +169,16 @@ const ListingPage = z.object({ data: z.string() });
 
 const MILES_PER_KM = 0.621371;
 
-const parseListing = (html: string, portalId: string): ParsedListing => {
+const pageModel = (html: string): unknown => {
   const model = extractAssignedJson(html, "window.__PAGE_MODEL = ");
   if (model === undefined) {
     throw new ParseError("Rightmove listing page has no __PAGE_MODEL");
   }
-  const root = unflatten(JSON.parse(parse(ListingPage, model, "listing page").data));
-  const property = parse(z.object({ propertyData: PropertyData }), root, "listing").propertyData;
+  return unflatten(JSON.parse(parse(ListingPage, model, "listing page").data));
+};
+
+const parseListing = (html: string, portalId: string): ParsedListing => {
+  const property = parse(z.object({ propertyData: PropertyData }), pageModel(html), "listing").propertyData;
 
   const description = htmlToText(property.text.description);
   const outcode = property.address.outcode ?? null;
@@ -222,6 +226,42 @@ const parseListing = (html: string, portalId: string): ParsedListing => {
 
 const listingUrl = (portalId: string): string => `${ORIGIN}/properties/${portalId}`;
 
+/** How a listing names the property it advertises; an agent who gives no address leaves the delivery point out. */
+const SoldProperty = z.object({
+  encId: z.string().nullish(),
+  address: z.object({ deliveryPointId: z.number().nullish() }),
+});
+
+const saleHistoryUrl = (html: string): string | null => {
+  const { encId, address } = parse(z.object({ propertyData: SoldProperty }), pageModel(html), "listing").propertyData;
+  const named = new URLSearchParams({
+    ...(address.deliveryPointId != null && { deliveryPointId: String(address.deliveryPointId) }),
+    ...(encId != null && { encId }),
+  });
+  return named.size === 0 ? null : `${ORIGIN}/properties/api/soldProperty/transactionHistory?${named}`;
+};
+
+const SaleHistory = z.object({
+  soldPropertyTransactions: z.array(z.object({ year: z.string(), soldPrice: z.string() })),
+});
+
+const json = (body: string): unknown => {
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new ParseError("Rightmove sale history is not JSON");
+  }
+};
+
+const parseSaleHistory = (body: string): readonly PastSale[] =>
+  parse(SaleHistory, json(body), "sale history").soldPropertyTransactions.map(({ year, soldPrice }) => {
+    const sale = { year: Number(year), price: Number(soldPrice.replace(/[^0-9]/g, "")) };
+    if (!Number.isInteger(sale.year) || sale.price <= 0) {
+      throw new ParseError(`Rightmove sale history has a sale it cannot read: ${year}, ${soldPrice}`);
+    }
+    return sale;
+  });
+
 const LISTING_URL = /^https:\/\/(?:www\.)?rightmove\.co\.uk\/properties\/(\d+)/;
 
 export const rightmove: PortalParser = {
@@ -241,4 +281,6 @@ export const rightmove: PortalParser = {
   portalIdFromUrl: (url) => LISTING_URL.exec(url)?.[1] ?? null,
   parseSearch,
   parseListing,
+  saleHistoryUrl,
+  parseSaleHistory,
 };

@@ -75,6 +75,8 @@ export const DEFAULT_RULES: Readonly<Record<FactKey, FactRule>> = {
   lease_years: { fact: "lease_years", from: 125, perUnit: 0.02, min: -2, max: 0 },
   annual_service_charge: { fact: "annual_service_charge", from: 2000, perUnit: -0.0005, min: -2, max: 0 },
   crime_per_month: { fact: "crime_per_month", from: 100, perUnit: -0.015, min: -2, max: 1.5 },
+  last_sold_year: { fact: "last_sold_year", from: 2021, perUnit: -0.5, min: 0, max: 3 },
+  percent_above_last_sale: { fact: "percent_above_last_sale", from: 20, perUnit: -0.05, min: -3, max: 1 },
 };
 
 export const replaceQuestion = (requirements: Requirements, key: string, next: Question): Requirements => ({
