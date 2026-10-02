@@ -155,14 +155,14 @@ export const WeightsSection = ({
       rule,
       importance: importanceOf(drivers, rule.fact),
     })),
-  ].toSorted((a, b) => b.importance - a.importance);
+  ];
   const unscored = FACT_KEYS.filter((fact) => !requirements.facts.some((rule) => rule.fact === fact));
 
   return (
     <div className="editor-section">
       <p className="editor-intro">
-        What each thing adds to a flat's score, most influential first. Jev's answers count in proportion to how sure it
-        is; a fact scores along its line.
+        What each thing adds to a flat's score, and how far it moves the ranking. Jev's answers count in proportion to
+        how sure it is; a fact scores along its line.
       </p>
       <ul className="weight-list">
         {items.map((item) => (
