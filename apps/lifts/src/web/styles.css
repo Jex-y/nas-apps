@@ -262,23 +262,72 @@ main > h2,
 }
 
 .hero h1 {
-  margin-bottom: 1rem;
   font-size: 2rem;
 }
 
-button.start {
-  min-height: 4rem;
+.starting-points {
+  display: grid;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+button.starting-point {
+  display: grid;
+  justify-content: stretch;
+  justify-items: start;
+  gap: 0.2rem;
+  width: 100%;
+  min-height: 4.25rem;
+  padding: 0.85rem 1rem;
   border-radius: var(--radius);
-  font-size: 1.1rem;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+}
+
+button.start {
+  min-height: 3.5rem;
+  border-radius: var(--radius);
+  font-size: 1.05rem;
+}
+
+button.start.primary {
+  min-height: 4rem;
 }
 
 /* A session */
 
+/* Stays in view under the header, so the rest clock and the way out are always a glance and a reach away. */
 .session-bar {
-  display: flex;
-  justify-content: space-between;
+  position: sticky;
+  top: calc(3rem + env(safe-area-inset-top));
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 1rem;
+  margin: -1rem -1rem 0;
+  padding: 0.6rem 1rem;
+  background: var(--chrome);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
+  border-bottom: 1px solid var(--edge);
+}
+
+/* A finished workout is read at leisure: its bar scrolls away with the page. */
+.session-bar.finished {
+  position: static;
+  margin: 0;
+  padding: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: none;
 }
 
 .session-bar button {
@@ -289,11 +338,12 @@ button.start {
 .session-day {
   position: relative;
   display: grid;
+  justify-self: start;
   line-height: 1.2;
 }
 
 .session-day strong {
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   letter-spacing: var(--heading-tracking);
 }
 
@@ -306,14 +356,49 @@ button.start {
   opacity: 0;
 }
 
+.rest {
+  display: grid;
+  justify-items: end;
+  line-height: 1.2;
+}
+
+.rest .numeric {
+  min-width: 3.2ch;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.pr {
+  padding: 0.05rem 0.4rem;
+  background: var(--accent);
+  border-radius: var(--radius-small);
+  color: var(--on-accent);
+  font-family: var(--label-font);
+  font-size: var(--label-size-small);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.records-made {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+}
+
+.records-made li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
 .entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 0.75rem;
-}
-
-.entry.active {
-  box-shadow: var(--shadow-raised);
+  gap: 0.5rem;
+  padding: 1rem 0.75rem 0.75rem;
 }
 
 .entry-heading {
@@ -321,23 +406,15 @@ button.start {
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
+  padding-inline: 0.25rem;
 }
 
-button.entry-name {
-  flex: 1;
-  justify-content: flex-start;
-  min-height: 2.25rem;
-  padding: 0;
-  background: none;
-  border: none;
-  border-radius: var(--radius-small);
-  color: var(--fg);
-  font-family: inherit;
+.entry-heading h2 {
   font-size: 1.2rem;
-  font-weight: 600;
-  letter-spacing: var(--heading-tracking);
-  text-align: left;
-  text-transform: none;
+}
+
+.entry-heading a {
+  text-decoration: none;
 }
 
 .figure {
@@ -351,166 +428,127 @@ button.entry-name {
   font-weight: 600;
 }
 
-.last-time {
-  display: grid;
-  gap: 0.1rem;
-  padding: 0.55rem 0.75rem;
-  background: var(--surface-2);
-  border-radius: var(--radius-small);
-  font-size: 0.9rem;
-}
-
 .sets {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  gap: 0.3rem;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.sets li + li {
-  border-top: 1px solid var(--border);
+/* Set, last time, kilograms, reps, RPE, done. */
+.set-row {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr) 4rem 2.75rem 2.75rem 2.75rem;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.25rem;
+  border-radius: var(--radius-small);
 }
 
 .set-columns {
-  display: grid;
-  grid-template-columns: 2rem minmax(0, 1.3fr) minmax(0, 1fr) 3.25rem 3.75rem;
-  padding: 0 0.35rem;
-  margin-bottom: -0.5rem;
+  padding-block: 0;
+  text-align: center;
 }
 
-button.set {
-  display: grid;
-  grid-template-columns: 2rem minmax(0, 1.3fr) minmax(0, 1fr) 3.25rem 3.75rem;
-  align-items: baseline;
-  width: 100%;
-  min-height: 2.9rem;
-  padding: 0.5rem 0.35rem;
-  background: none;
-  border: none;
-  border-radius: var(--radius-small);
-  color: var(--fg);
-  font-size: 1.15rem;
-  font-weight: 400;
-  letter-spacing: 0;
+.set-columns > :nth-child(2) {
   text-align: left;
-  text-transform: none;
 }
 
-button.set.selected {
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
-
-.set small {
-  margin: 0 0.2em;
-}
-
-.set-number {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.set-weight {
-  font-weight: 600;
-}
-
-.set-rpe,
-.set-max {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.set-max {
-  text-align: right;
-}
-
-.set-columns .set-max {
-  font-size: inherit;
-}
-
-.set.warmup .set-weight,
-.set.warmup .set-reps {
-  color: var(--muted);
-  font-weight: 400;
-}
-
-/* Holds its place while empty, so the composer under it never jumps when a rest begins. */
-.rest {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  min-height: 1.75rem;
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--border);
-}
-
-.rest .numeric {
-  font-size: 1.3rem;
-  font-weight: 600;
-}
-
-.composer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.85rem;
-}
-
-.steppers {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 0.6rem;
-}
-
-.stepper {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.3rem;
-  min-width: 0;
-}
-
-.stepper-controls {
-  display: grid;
-  grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
-  align-items: center;
-  background: var(--control-bg);
-  border: 1px solid var(--control-edge);
-  border-radius: var(--radius);
-}
-
-.stepper-controls button {
-  height: 3.5rem;
+.set-row button {
+  height: 2.75rem;
   padding: 0;
-  background: none;
-  border: none;
-  border-radius: var(--radius);
-  color: var(--muted);
+  border-radius: var(--radius-small);
 }
 
-.stepper-controls input {
+.set-row input {
   width: 100%;
   min-width: 0;
+  height: 2.75rem;
   padding: 0;
-  background: none;
-  border: none;
-  font-size: 1.65rem;
+  font-size: 1.1rem;
   font-weight: 600;
   text-align: center;
+}
+
+button.set-number {
+  background: none;
+  border-color: transparent;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.set-previous {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.set-rpe {
+  font-size: 0.95rem;
+}
+
+button.set-rpe:disabled {
+  background: none;
+  border-color: transparent;
+}
+
+button.tick {
+  color: var(--muted);
+}
+
+/* A set still to do reads as a suggestion until it is ticked off. */
+.to-do input {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.set-row.done {
+  background: color-mix(in oklab, var(--success) 14%, transparent);
+}
+
+.set-row.done button.tick {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--on-accent);
+}
+
+.set-row.warmup button.set-number {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Over the page, by the thumb: asking for an RPE never moves the rows being ticked off. */
+.rating {
+  position: fixed;
+  inset: auto 0 1rem;
+  z-index: 3;
+  display: grid;
+  gap: 0.5rem;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 0.6rem 0.75rem 0.75rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-raised);
+}
+
+.rating-ask {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
 }
 
 .rpe {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 0.25rem;
-  min-inline-size: 0;
-  margin: 0;
-  padding: 0;
-  border: none;
-}
-
-.rpe legend {
-  margin-bottom: 0.3rem;
-  padding: 0;
 }
 
 .rpe button {
@@ -520,33 +558,22 @@ button.set.selected {
   font-size: 0.85rem;
 }
 
-.rpe button[aria-pressed="true"],
-button.toggle[aria-pressed="true"] {
+.rpe button[aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
 }
 
-.composer-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.composer-actions button {
-  min-height: 3.25rem;
-  border-radius: var(--radius);
-}
-
-.composer-actions .log {
-  flex: 1 1 9rem;
-  font-size: 1.05rem;
-}
-
 .entry-footer {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  gap: 0.75rem;
+  padding: 0.15rem 0.25rem 0;
+}
+
+button.add-set {
+  min-height: 2.5rem;
+  padding-inline: 0.85rem;
 }
 
 .entry-footer input {
@@ -980,15 +1007,31 @@ button.choice.create {
 
 @media (max-width: 40rem) {
   main {
+    padding-inline: 0.75rem;
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .session-bar {
+    margin-inline: -0.75rem;
+    padding-inline: 0.75rem;
+  }
+
+  .session-bar.finished {
+    margin-inline: 0;
+    padding-inline: 0;
   }
 
   .site-header nav {
     display: none;
   }
 
-  .notices {
+  .notices,
+  .rating {
     bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+
+  .rating {
+    margin-inline: 0.5rem;
   }
 
   .tab-bar {

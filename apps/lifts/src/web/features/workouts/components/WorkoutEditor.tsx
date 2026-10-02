@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useLocation } from "wouter";
 import { type Exercise, Workout } from "../../../../contract";
-import type { WorkoutDetail } from "../../../../log";
-import { isWorkSet, tonnage } from "../../../../strength";
+import { sessionsOf, type WorkoutDetail } from "../../../../log";
+import { bestEstimate, isRecord, isWorkSet, tonnage } from "../../../../strength";
 import { ConfirmButton } from "../../../components/ConfirmButton";
 import { Icon } from "../../../components/Icon";
 import { formatDay, formatKg } from "../../../utils/format";
 import { useWorkoutActions } from "../api/workouts";
-import { lastSession } from "../utils/prefill";
+import { lastSession } from "../utils/plan";
 import { EntryCard } from "./EntryCard";
 import { ExerciseSheet } from "./ExerciseSheet";
+import { RatingBar } from "./RatingBar";
+import { RestTimer } from "./RestTimer";
 
 type Props = {
   readonly workout: WorkoutDetail;
@@ -23,17 +25,29 @@ const Bodyweight = Workout.shape.bodyweightKg.unwrap();
 export const WorkoutEditor = ({ workout, workouts, exercises }: Props) => {
   const actions = useWorkoutActions();
   const [, navigate] = useLocation();
-  const [activeId, setActiveId] = useState(workout.entries.at(-1)?.id ?? null);
   const [picking, setPicking] = useState(false);
+  const [ratingId, setRatingId] = useState<string | null>(null);
+  const stopAsking = useCallback(() => setRatingId(null), []);
   const [notes, setNotes] = useState(workout.notes);
   const [bodyweight, setBodyweight] = useState(workout.bodyweightKg === null ? "" : String(workout.bodyweightKg));
 
-  const open = workout.finishedAt === null;
+  const underWay = workout.finishedAt === null;
+  const rated = workout.entries.flatMap((entry) =>
+    entry.sets.filter((set) => set.id === ratingId).map((set) => ({ set, exercise: entry.exercise.name })),
+  )[0];
+  const others = workouts.filter((other) => other.id !== workout.id && other.date <= workout.date);
   const sets = workout.entries.flatMap((entry) => entry.sets);
   const lastLogged = sets.reduce<string | null>(
     (latest, set) => (latest === null || set.loggedAt > latest ? set.loggedAt : latest),
     null,
   );
+  const before = (exerciseId: string) => sessionsOf(others, exerciseId).flatMap((session) => session.sets);
+  const records = workout.entries.flatMap((entry) => {
+    const best = bestEstimate(entry.sets);
+    return best !== null && isRecord(best.set, before(entry.exerciseId))
+      ? [{ id: entry.id, name: entry.exercise.name, maxKg: best.maxKg }]
+      : [];
+  });
   const saveBodyweight = () => {
     const typed = bodyweight.trim().replace(",", ".");
     const parsed = typed === "" ? null : Bodyweight.safeParse(Number(typed));
@@ -46,9 +60,9 @@ export const WorkoutEditor = ({ workout, workouts, exercises }: Props) => {
 
   return (
     <>
-      <div className="session-bar">
+      <div className={underWay ? "session-bar" : "session-bar finished"}>
         <label className="session-day">
-          <span className="label">{open ? "Session under way" : "Session"}</span>
+          <span className="label">{underWay ? "Under way" : "Finished"}</span>
           <strong>{formatDay(workout.date)}</strong>
           <input
             type="date"
@@ -57,26 +71,62 @@ export const WorkoutEditor = ({ workout, workouts, exercises }: Props) => {
             onChange={(event) => event.target.value !== "" && actions.update(workout, { date: event.target.value })}
           />
         </label>
+        {underWay && <RestTimer since={lastLogged} />}
         <button
           type="button"
-          className={open ? "primary" : undefined}
-          onClick={() => actions.update(workout, { finishedAt: open ? new Date().toISOString() : null })}
+          className={underWay ? "primary" : undefined}
+          onClick={() => {
+            if (underWay) {
+              actions.finish(workout);
+            } else {
+              actions.update(workout, { finishedAt: null });
+            }
+            navigate(underWay ? `/workouts/${workout.id}` : "/");
+          }}
         >
-          {open ? "Finish" : "Reopen"}
+          {underWay ? "Finish" : "Reopen"}
         </button>
       </div>
+
+      {!underWay && records.length > 0 && (
+        <ul className="card records-made">
+          {records.map((record) => (
+            <li key={record.id}>
+              <span className="pr">PR</span>
+              <span>{record.name}</span>
+              <span className="numeric">
+                {formatKg(record.maxKg)}
+                <small>kg est. max</small>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {workout.entries.map((entry) => (
         <EntryCard
           key={entry.id}
           entry={entry}
           lastTime={lastSession(workouts, workout, entry.exerciseId)}
-          active={entry.id === activeId}
-          onActivate={() => setActiveId(entry.id)}
-          restingSince={open ? lastLogged : null}
+          before={before(entry.exerciseId)}
+          underWay={underWay}
+          ratingId={ratingId}
+          onAsk={setRatingId}
           actions={actions}
         />
       ))}
+      {rated !== undefined && (
+        <RatingBar
+          key={rated.set.id}
+          set={rated.set}
+          exercise={rated.exercise}
+          onClose={stopAsking}
+          onRate={(rpe) => {
+            actions.updateSet(rated.set, { rpe });
+            setRatingId(null);
+          }}
+        />
+      )}
 
       <button type="button" className="add-exercise" onClick={() => setPicking(true)}>
         <Icon name="plus" />
@@ -88,7 +138,7 @@ export const WorkoutEditor = ({ workout, workouts, exercises }: Props) => {
           workouts={workouts}
           onClose={() => setPicking(false)}
           onPick={(exerciseId) => {
-            setActiveId(actions.addEntry(workout, exerciseId));
+            actions.addEntry(workout, exerciseId);
             setPicking(false);
           }}
         />
@@ -137,7 +187,7 @@ export const WorkoutEditor = ({ workout, workouts, exercises }: Props) => {
           confirm="Delete the whole workout?"
           onConfirm={() => {
             actions.remove(workout);
-            navigate(open ? "/" : "/history");
+            navigate(underWay ? "/" : "/history");
           }}
         >
           Delete workout

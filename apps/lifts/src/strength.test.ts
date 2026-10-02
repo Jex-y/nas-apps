@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LiftSet } from "./contract";
-import { bestEstimate, estimatedMax, repRecords, tonnage } from "./strength";
+import { bestEstimate, estimatedMax, isRecord, repRecords, tonnage } from "./strength";
 
 type Shorthand = Pick<LiftSet, "weightKg" | "reps" | "rpe" | "kind">;
 
@@ -66,5 +66,16 @@ describe("repRecords", () => {
 describe("tonnage", () => {
   test("adds up the work sets", () => {
     expect(tonnage([warmup(60, 5), work(100, 5), work(102.5, 4)])).toBe(910);
+  });
+});
+
+describe("isRecord", () => {
+  test("holds for a work set that beats every earlier estimate, and never on a first session", () => {
+    const before = [work(140, 5, 8), warmup(200, 1)];
+
+    expect(isRecord(work(145, 5, 8), before)).toBe(true);
+    expect(isRecord(work(140, 5, 8), before)).toBe(false);
+    expect(isRecord(warmup(180, 5), before)).toBe(false);
+    expect(isRecord(work(145, 5, 8), [])).toBe(false);
   });
 });

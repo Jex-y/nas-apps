@@ -68,3 +68,16 @@ export const repRecords = <S extends Effort & Pick<LiftSet, "kind">>(sets: reado
 /** Kilograms moved across the work sets. */
 export const tonnage = (sets: readonly (Effort & Pick<LiftSet, "kind">)[]): number =>
   sets.filter(isWorkSet).reduce((total, set) => total + set.weightKg * set.reps, 0);
+
+/**
+ * Whether a work set implies a higher one-rep max than every set in `before`. Never on a first session, which has
+ * nothing to beat.
+ */
+export const isRecord = (
+  set: Effort & Pick<LiftSet, "kind">,
+  before: readonly (Effort & Pick<LiftSet, "kind">)[],
+): boolean => {
+  const best = bestEstimate(before);
+  const maxKg = isWorkSet(set) ? estimatedMax(set) : null;
+  return best !== null && maxKg !== null && maxKg > best.maxKg;
+};

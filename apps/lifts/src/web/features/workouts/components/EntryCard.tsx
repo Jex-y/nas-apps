@@ -1,61 +1,74 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import type { LiftSet } from "../../../../contract";
+import { LiftSet } from "../../../../contract";
 import type { EntryDetail, Session } from "../../../../log";
-import { bestEstimate, estimatedMax, isWorkSet } from "../../../../strength";
+import { bestEstimate, isRecord } from "../../../../strength";
 import { ConfirmButton } from "../../../components/ConfirmButton";
-import { formatDay, formatKg, formatSet } from "../../../utils/format";
+import { Icon } from "../../../components/Icon";
+import { NumberCell } from "../../../components/NumberCell";
+import { formatKg, formatSet } from "../../../utils/format";
 import type { WorkoutActions } from "../api/workouts";
-import { nextSet, type SetValues } from "../utils/prefill";
-import { RestTimer } from "./RestTimer";
-import { SetComposer } from "./SetComposer";
+import { doneRows, type Intent, NO_INTENT, openRows, type Row, type SetValues, withChange } from "../utils/plan";
 
 type Props = {
   readonly entry: EntryDetail;
-  /** The exercise's previous session, to lift against. */
+  /** The exercise's previous session, whose sets are laid out to do again. */
   readonly lastTime: Session | null;
-  /** The one exercise being logged; the others fold down to their sets. */
-  readonly active: boolean;
-  readonly onActivate: () => void;
-  /** When the workout's latest set was logged, for the rest clock; `null` once the workout is finished. */
-  readonly restingSince: string | null;
+  /** Every set of the exercise in other workouts, for spotting a record. */
+  readonly before: readonly LiftSet[];
+  /** Whether the workout is under way; a finished one shows only what was done. */
+  readonly underWay: boolean;
+  /** The set whose RPE is being asked for, anywhere in the workout. */
+  readonly ratingId: string | null;
+  /** Asks how hard a set was, or with `null` stops asking. */
+  readonly onAsk: (setId: string | null) => void;
   readonly actions: WorkoutActions;
 };
 
 const valuesOf = ({ weightKg, reps, rpe, kind }: LiftSet): SetValues => ({ weightKg, reps, rpe, kind });
 
-export const EntryCard = ({ entry, lastTime, active, onActivate, restingSince, actions }: Props) => {
-  const [draft, setDraft] = useState(() => nextSet(entry, lastTime));
-  const [editingId, setEditingId] = useState<string | null>(null);
+export const EntryCard = ({ entry, lastTime, before, underWay, ratingId, onAsk, actions }: Props) => {
+  const [intent, setIntent] = useState<Intent>(NO_INTENT);
   const [notes, setNotes] = useState(entry.notes);
 
-  const editing = entry.sets.find((set) => set.id === editingId) ?? null;
+  const template = lastTime?.sets ?? [];
+  const rows = underWay ? openRows(entry.sets, template, intent) : doneRows(entry.sets, template);
   const best = bestEstimate(entry.sets);
-  const stopEditing = () => {
-    setEditingId(null);
-    setDraft(nextSet(entry, lastTime));
-  };
-  const edit = (set: LiftSet) => {
-    onActivate();
-    setEditingId(set.id);
-    setDraft(valuesOf(set));
-  };
-  const submit = () => {
-    if (editing === null) {
-      actions.addSet(entry, draft);
-      setDraft({ ...draft, rpe: null });
+  const values = (row: Row): SetValues => (row.kind === "logged" ? valuesOf(row.set) : row.values);
+
+  const change = (row: Row, patch: Partial<SetValues>) => {
+    if (row.kind === "logged") {
+      actions.updateSet(row.set, patch);
     } else {
-      actions.updateSet(editing, draft);
-      stopEditing();
+      setIntent(withChange(rows, intent, row.index, patch));
+    }
+  };
+  const tick = (row: Row) => {
+    if (row.kind === "planned") {
+      const id = actions.addSet(entry, row.values, row.index);
+      onAsk(row.values.kind === "work" ? id : null);
+      return;
+    }
+    // Unticked, the set goes back to being one still to do, as it was lifted.
+    actions.removeSet(row.set);
+    setIntent({ ...intent, changes: new Map(intent.changes).set(row.index, { ...valuesOf(row.set), rpe: null }) });
+    onAsk(null);
+  };
+  const addRow = () => {
+    const last = rows.at(-1);
+    if (underWay) {
+      setIntent({ ...intent, extra: rows.length - template.length + 1 });
+    } else {
+      actions.addSet(entry, last === undefined ? { weightKg: 20, reps: 5, rpe: null, kind: "work" } : values(last));
     }
   };
 
   return (
-    <section className={active ? "card entry active" : "card entry"}>
+    <section className="card entry">
       <header className="entry-heading">
-        <button type="button" className="entry-name" aria-expanded={active} onClick={onActivate}>
-          {entry.exercise.name}
-        </button>
+        <h2>
+          <Link href={`/exercises/${entry.exerciseId}`}>{entry.exercise.name}</Link>
+        </h2>
         {best !== null && (
           <span className="figure">
             <span className="label">Est. max</span>
@@ -64,95 +77,92 @@ export const EntryCard = ({ entry, lastTime, active, onActivate, restingSince, a
         )}
       </header>
 
-      {lastTime !== null && (
-        <p className="last-time">
-          <span className="label">Last · {formatDay(lastTime.workout.date)}</span>
-          <span className="numeric">{lastTime.sets.filter(isWorkSet).map(formatSet).join("  ·  ")}</span>
-        </p>
-      )}
-
-      {entry.sets.length > 0 && (
-        <div className="set-columns label" aria-hidden="true">
+      {rows.length > 0 && (
+        <div className="set-row set-columns label" aria-hidden="true">
           <span>Set</span>
-          <span>Weight</span>
+          <span>Last time</span>
+          <span>kg</span>
           <span>Reps</span>
           <span>RPE</span>
-          <span className="set-max">e1RM</span>
+          <span />
         </div>
       )}
-      {entry.sets.length > 0 && (
-        <ol className="sets">
-          {entry.sets.map((set, index) => {
-            const maxKg = isWorkSet(set) ? estimatedMax(set) : null;
-            return (
-              <li key={set.id}>
+      <ol className="sets">
+        {rows.map((row) => {
+          const { weightKg, reps, rpe, kind } = values(row);
+          const number = row.index + 1;
+          const done = row.kind === "logged";
+          const record = done && isRecord(row.set, before);
+          return (
+            <li key={done ? row.set.id : `to-do-${row.index}`}>
+              <div className={["set-row", done ? "done" : "to-do", kind === "warmup" ? "warmup" : ""].join(" ")}>
                 <button
                   type="button"
-                  className={[
-                    "set",
-                    isWorkSet(set) ? "" : "warmup",
-                    set.id === editingId && active ? "selected" : "",
-                  ].join(" ")}
-                  aria-label={`Set ${index + 1}: ${formatSet(set)}${isWorkSet(set) ? "" : ", warm-up"}. Tap to correct`}
-                  onClick={() => edit(set)}
+                  className="set-number numeric"
+                  aria-label={`Set ${number}: ${kind === "warmup" ? "warm-up" : "work"} set. Tap to change`}
+                  onClick={() => change(row, { kind: kind === "warmup" ? "work" : "warmup" })}
                 >
-                  <span className="set-number numeric">{isWorkSet(set) ? index + 1 : "W"}</span>
-                  <span className="set-weight numeric">
-                    {formatKg(set.weightKg)}
-                    <small>kg</small>
-                  </span>
-                  <span className="set-reps numeric">
-                    <small>×</small>
-                    {set.reps}
-                  </span>
-                  <span className="set-rpe numeric">{set.rpe === null ? "" : `@${set.rpe}`}</span>
-                  <span className="set-max numeric">{maxKg === null ? "" : formatKg(maxKg)}</span>
+                  {kind === "warmup" ? "W" : number}
                 </button>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+                <span className="set-previous numeric">
+                  {record ? <span className="pr">PR</span> : row.previous === null ? "–" : formatSet(row.previous)}
+                </span>
+                <NumberCell
+                  value={weightKg}
+                  schema={LiftSet.shape.weightKg}
+                  label={`Set ${number} weight in kilograms`}
+                  inputMode="decimal"
+                  onCommit={(next) => change(row, { weightKg: next })}
+                />
+                <NumberCell
+                  value={reps}
+                  schema={LiftSet.shape.reps}
+                  label={`Set ${number} reps`}
+                  inputMode="numeric"
+                  onCommit={(next) => change(row, { reps: next })}
+                />
+                <button
+                  type="button"
+                  className="set-rpe numeric"
+                  disabled={!done || kind === "warmup"}
+                  aria-label={`Set ${number} RPE${rpe === null ? "" : ` ${rpe}`}`}
+                  aria-expanded={done && ratingId === row.set.id}
+                  onClick={() => done && onAsk(ratingId === row.set.id ? null : row.set.id)}
+                >
+                  {rpe ?? (done && kind === "work" ? "+" : "")}
+                </button>
+                <button
+                  type="button"
+                  className="tick"
+                  aria-pressed={done}
+                  aria-label={done ? `Set ${number} done. Tap to undo` : `Mark set ${number} done`}
+                  onClick={() => tick(row)}
+                >
+                  <Icon name="check" />
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
 
-      {active && (
-        <>
-          <RestTimer since={restingSince} />
-          <SetComposer
-            draft={draft}
-            onDraft={setDraft}
-            number={editing === null ? entry.sets.length + 1 : entry.sets.indexOf(editing) + 1}
-            editing={
-              editing === null
-                ? null
-                : {
-                    onCancel: stopEditing,
-                    onDelete: () => {
-                      actions.removeSet(editing);
-                      stopEditing();
-                    },
-                  }
-            }
-            onSubmit={submit}
-          />
-          <footer className="entry-footer">
-            <input
-              value={notes}
-              placeholder="Add a note"
-              aria-label={`Notes on ${entry.exercise.name}`}
-              maxLength={10_000}
-              onChange={(event) => setNotes(event.target.value)}
-              onBlur={() => notes !== entry.notes && actions.updateEntry(entry, notes)}
-            />
-            <Link href={`/exercises/${entry.exerciseId}`} className="quiet-link">
-              History
-            </Link>
-            <ConfirmButton className="quiet-link" confirm="Remove it?" onConfirm={() => actions.removeEntry(entry)}>
-              Remove
-            </ConfirmButton>
-          </footer>
-        </>
-      )}
-      {!active && entry.notes !== "" && <p className="muted">{entry.notes}</p>}
+      <footer className="entry-footer">
+        <button type="button" className="add-set" onClick={addRow}>
+          <Icon name="plus" />
+          Add set
+        </button>
+        <input
+          value={notes}
+          placeholder="Note"
+          aria-label={`Notes on ${entry.exercise.name}`}
+          maxLength={10_000}
+          onChange={(event) => setNotes(event.target.value)}
+          onBlur={() => notes !== entry.notes && actions.updateEntry(entry, notes)}
+        />
+        <ConfirmButton className="quiet-link" confirm="Remove it?" onConfirm={() => actions.removeEntry(entry)}>
+          Remove
+        </ConfirmButton>
+      </footer>
     </section>
   );
 };
